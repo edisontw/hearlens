@@ -1,5 +1,6 @@
 import http from "node:http";
 
+const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 8787);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const TOKEN_ENDPOINT =
@@ -185,6 +186,6 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("HearLens Gemini token broker listening on :" + PORT);
+server.listen(PORT, HOST, () => {
+  console.log("HearLens Gemini token broker listening on " + HOST + ":" + PORT);
 });
