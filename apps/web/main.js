@@ -2,6 +2,7 @@ import { createSttProvider, describeSttCapabilities } from "./stt/provider.js";
 
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
+const MAX_DEBUG_LINES = 120;
 
 const els = {
   start: document.querySelector("#start"),
@@ -20,6 +21,7 @@ const els = {
   diagBaseLatency: document.querySelector("#diag-base-latency"),
   diagOutputLatency: document.querySelector("#diag-output-latency"),
   diagSettings: document.querySelector("#diag-settings"),
+  sttLog: document.querySelector("#stt-log"),
 };
 
 let stream = null;
@@ -29,11 +31,28 @@ let interimText = "";
 let lastRecognizedText = "";
 let lastRecognizedAt = 0;
 let fontIndex = 0;
+let sessionCounter = 0;
+let activeSessionId = 0;
 const transcript = [];
+const debugLines = [];
 
 function setStatus(text, state = "idle") {
   els.status.textContent = text;
   els.status.dataset.state = state;
+}
+
+function appendSttLog(message) {
+  const time = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+  debugLines.push(time + " " + message);
+
+  while (debugLines.length > MAX_DEBUG_LINES) {
+    debugLines.shift();
+  }
+
+  if (els.sttLog) {
+    els.sttLog.textContent = debugLines.join("\n");
+    els.sttLog.scrollTop = els.sttLog.scrollHeight;
+  }
 }
 
 function trimTranscript(now = Date.now()) {
@@ -90,7 +109,7 @@ function setFontSize() {
   fontIndex = (fontIndex + 1) % FONT_SIZES.length;
   document.documentElement.style.setProperty(
     "--caption-size",
-    `${FONT_SIZES[fontIndex]}px`,
+    FONT_SIZES[fontIndex] + "px",
   );
 }
 
@@ -110,18 +129,18 @@ function renderDiagnostics(track) {
 
   els.diagMic.textContent = track.label || "已取得麥克風";
   els.diagRate.textContent = audioContext
-    ? `${audioContext.sampleRate} Hz`
+    ? audioContext.sampleRate + " Hz"
     : settings.sampleRate
-      ? `${settings.sampleRate} Hz`
+      ? settings.sampleRate + " Hz"
       : "—";
   els.diagChannels.textContent = settings.channelCount ?? "—";
   els.diagBaseLatency.textContent =
     audioContext && Number.isFinite(audioContext.baseLatency)
-      ? `${(audioContext.baseLatency * 1000).toFixed(1)} ms`
+      ? (audioContext.baseLatency * 1000).toFixed(1) + " ms"
       : "—";
   els.diagOutputLatency.textContent =
     audioContext && Number.isFinite(audioContext.outputLatency)
-      ? `${(audioContext.outputLatency * 1000).toFixed(1)} ms`
+      ? (audioContext.outputLatency * 1000).toFixed(1) + " ms"
       : "—";
 
   els.diagSettings.textContent = JSON.stringify(
@@ -136,11 +155,27 @@ function renderDiagnostics(track) {
       },
       actual: settings,
       note:
-        "Browser-reported latency/settings are diagnostics only; they do not prove end-to-end acoustic latency or SPL calibration.",
+        "This getUserMedia stream is released before Browser SpeechRecognition starts, to avoid competing microphone consumers on mobile Chrome.",
     },
     null,
     2,
   );
+}
+
+async function releaseDiagnosticCapture(label = "已釋放") {
+  for (const track of stream?.getTracks?.() ?? []) {
+    track.stop();
+  }
+  stream = null;
+
+  if (audioContext && audioContext.state !== "closed") {
+    await audioContext.close();
+  }
+  audioContext = null;
+
+  if (label) {
+    els.diagMic.textContent = label;
+  }
 }
 
 async function startSession() {
@@ -152,9 +187,16 @@ async function startSession() {
     throw new Error("這個瀏覽器不支援麥克風存取。");
   }
 
+  const sessionId = ++sessionCounter;
+  activeSessionId = sessionId;
+  appendSttLog("S" + sessionId + " session-start");
+
   setStatus("啟動中…");
   els.start.disabled = true;
+  els.stop.disabled = true;
 
+  // getUserMedia is used only for permission/device diagnostics.
+  // Browser SpeechRecognition manages its own microphone capture.
   stream = await navigator.mediaDevices.getUserMedia({
     audio: requestedAudioConstraints(),
     video: false,
@@ -171,15 +213,23 @@ async function startSession() {
     const source = audioContext.createMediaStreamSource(stream);
     const analyser = audioContext.createAnalyser();
 
-    // Diagnostics only: deliberately do NOT connect to audioContext.destination.
+    // Diagnostics only: deliberately do NOT connect to destination.
     source.connect(analyser);
   }
 
   renderDiagnostics(track);
+  appendSttLog("S" + sessionId + " diagnostic-mic-ready");
+
+  // Critical mobile fix: do not keep getUserMedia open while
+  // Browser SpeechRecognition tries to own the microphone.
+  await releaseDiagnosticCapture("權限正常；已釋放給字幕引擎");
+  appendSttLog("S" + sessionId + " diagnostic-mic-released");
+  await new Promise((resolve) => window.setTimeout(resolve, 250));
 
   sttProvider = createSttProvider({
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
+      if (sessionId !== activeSessionId) return;
       interimText = text;
       if (text.trim()) {
         rememberRecognizedText(text, timestamp);
@@ -187,22 +237,39 @@ async function startSession() {
       renderCaption();
     },
     onFinal: ({ text, timestamp }) => {
+      if (sessionId !== activeSessionId) return;
       interimText = "";
       rememberRecognizedText(text, timestamp);
       addFinalTranscript(text);
     },
-    onStatus: ({ label }) => {
+    onStatus: ({ label, state }) => {
+      if (sessionId !== activeSessionId) return;
       els.diagStt.textContent = label;
+      appendSttLog("S" + sessionId + " status " + state);
     },
-    onError: ({ message }) => {
+    onError: ({ message, code }) => {
+      if (sessionId !== activeSessionId) return;
       els.diagStt.textContent = message;
+      appendSttLog("S" + sessionId + " provider-error " + (code || message));
+    },
+    onDebug: ({ event, detail, segmentId }) => {
+      const suffix = detail ? " " + detail : "";
+      appendSttLog(
+        "S" + sessionId + " seg" + segmentId + " " + event + suffix,
+      );
     },
   });
 
   if (sttProvider) {
     try {
-      await sttProvider.start({ stream });
+      await sttProvider.start();
     } catch (error) {
+      appendSttLog(
+        "S" +
+          sessionId +
+          " provider-start-failed " +
+          (error instanceof Error ? error.message : "unknown"),
+      );
       els.diagStt.textContent =
         "字幕引擎無法啟動：" +
         (error instanceof Error ? error.message : "unknown error");
@@ -210,6 +277,7 @@ async function startSession() {
   } else {
     els.diagStt.textContent =
       "此瀏覽器沒有免費 Browser STT；麥克風診斷仍可使用";
+    appendSttLog("S" + sessionId + " no-browser-stt");
   }
 
   setStatus("正在聆聽", "listening");
@@ -218,35 +286,54 @@ async function startSession() {
 }
 
 async function stopSession() {
+  const sessionId = activeSessionId;
+  els.stop.disabled = true;
+  setStatus("停止中…");
+  appendSttLog("S" + sessionId + " stop-request");
+
   if (sttProvider) {
     await sttProvider.stop();
   }
   sttProvider = null;
 
-  for (const track of stream?.getTracks?.() ?? []) {
-    track.stop();
-  }
-  stream = null;
-
-  if (audioContext && audioContext.state !== "closed") {
-    await audioContext.close();
-  }
-  audioContext = null;
+  await releaseDiagnosticCapture(null);
 
   interimText = "";
   trimTranscript();
   const recent = visibleTranscript() || recentRecognizedText();
   els.caption.textContent = recent || "字幕會顯示在這裡。";
-  els.diagMic.textContent = "未啟動";
+  els.diagMic.textContent = "未使用";
+  activeSessionId = 0;
   els.start.disabled = false;
   els.stop.disabled = true;
   setStatus("已停止");
+  appendSttLog("S" + sessionId + " session-stopped");
+}
+
+async function cleanupFailedStart(error) {
+  appendSttLog(
+    "S" +
+      activeSessionId +
+      " session-start-error " +
+      (error instanceof Error ? error.message : "unknown"),
+  );
+
+  try {
+    await sttProvider?.dispose?.();
+  } catch {
+    // Ignore cleanup errors.
+  }
+  sttProvider = null;
+
+  await releaseDiagnosticCapture("未啟動");
+  activeSessionId = 0;
 }
 
 els.start.addEventListener("click", async () => {
   try {
     await startSession();
   } catch (error) {
+    await cleanupFailedStart(error);
     setStatus("無法啟動", "error");
     els.caption.textContent =
       error instanceof Error ? error.message : "無法啟動麥克風。";
