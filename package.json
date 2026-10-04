@@ -4,7 +4,7 @@
   "private": true,
   "description": "Caption-first hearing-assistance research prototype",
   "scripts": {
-    "test": "node --test services/gemini-token/token.test.mjs apps/web/stt/providers/gemini-live-wire.test.mjs && node --check apps/web/main.js && node --check apps/web/stt/provider.js && node --check apps/web/stt/providers/browser-speech.js && node --check apps/web/stt/providers/gemini-live-transcribe.js && node --check apps/web/stt/providers/google-cloud-streaming.js && node --check services/gemini-token/token.mjs && node --check services/gemini-token/server.mjs && node --check services/stt-proxy/server.mjs",
+    "test": "node --test services/gemini-token/token.test.mjs apps/web/stt/providers/gemini-live-wire.test.mjs apps/web/zh-display.test.mjs && node --check apps/web/main.js && node --check apps/web/zh-display.js && node --check apps/web/stt/provider.js && node --check apps/web/stt/providers/browser-speech.js && node --check apps/web/stt/providers/gemini-live-transcribe.js && node --check apps/web/stt/providers/google-cloud-streaming.js && node --check services/gemini-token/token.mjs && node --check services/gemini-token/server.mjs && node --check services/stt-proxy/server.mjs",
     "check": "npm test"
   }
 }

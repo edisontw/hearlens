@@ -1,6 +1,10 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-gemini-live-mvp2";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-gemini-live-mvp3";
+import {
+  ensureTaiwanTraditionalDisplay,
+  toTaiwanTraditional,
+} from "./zh-display.js?v=20261004-gemini-live-mvp3";
 
-const BUILD_ID = "20261004-gemini-live-mvp2";
+const BUILD_ID = "20261004-gemini-live-mvp3";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
@@ -50,6 +54,7 @@ let stream = null;
 let audioContext = null;
 let sttProvider = null;
 let interimText = "";
+let rawInterimText = "";
 let lastRecognizedText = "";
 let lastRecognizedAt = 0;
 let fontIndex = 0;
@@ -59,6 +64,9 @@ const transcript = [];
 const debugLines = [];
 
 appendSttLog("build " + BUILD_ID);
+void ensureTaiwanTraditionalDisplay().then((ready) => {
+  appendSttLog("display-script " + (ready ? "zh-TW-ready" : "raw-fallback"));
+});
 appendSttLog("runtime-provider " + runtimeSttConfig.provider);
 if (runtimeSttConfig.tokenUrl) {
   appendSttLog("runtime-token configured");
@@ -116,11 +124,15 @@ function renderCaption() {
   els.caption.textContent = combined || "正在聆聽…";
 }
 
-function addFinalTranscript(text) {
+function addFinalTranscript(text, rawText = text) {
   const clean = text.trim();
   if (!clean) return;
   const now = Date.now();
-  transcript.push({ text: clean, time: now });
+  transcript.push({
+    text: clean,
+    rawText: rawText.trim(),
+    time: now,
+  });
   rememberRecognizedText(clean, now);
   trimTranscript(now);
   renderCaption();
@@ -264,17 +276,20 @@ async function startSession() {
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
-      interimText = text;
-      if (text.trim()) {
-        rememberRecognizedText(text, timestamp);
+      rawInterimText = text;
+      interimText = toTaiwanTraditional(text);
+      if (interimText.trim()) {
+        rememberRecognizedText(interimText, timestamp);
       }
       renderCaption();
     },
     onFinal: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
+      const displayText = toTaiwanTraditional(text);
+      rawInterimText = "";
       interimText = "";
-      rememberRecognizedText(text, timestamp);
-      addFinalTranscript(text);
+      rememberRecognizedText(displayText, timestamp);
+      addFinalTranscript(displayText, text);
     },
     onStatus: ({ label, state }) => {
       if (sessionId !== activeSessionId) return;
@@ -334,6 +349,7 @@ async function stopSession() {
   await releaseDiagnosticCapture(null);
 
   interimText = "";
+  rawInterimText = "";
   trimTranscript();
   const recent = visibleTranscript() || recentRecognizedText();
   els.caption.textContent = recent || "字幕會顯示在這裡。";
