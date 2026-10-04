@@ -39,7 +39,9 @@ export class BrowserSpeechProvider {
 
     const recognition = new Recognition();
     recognition.lang = this.language;
-    recognition.continuous = true;
+    // Chrome Android does not honor continuous mode reliably.
+    // Use one recognition segment at a time and restart from onend while active.
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -78,6 +80,10 @@ export class BrowserSpeechProvider {
     };
 
     recognition.onerror = (event) => {
+      if (!this.active && event.error === "aborted") {
+        return;
+      }
+
       this.onError({
         providerId: this.id,
         code: event.error || "unknown",
@@ -120,7 +126,7 @@ export class BrowserSpeechProvider {
                 : "SpeechRecognition restart failed.",
           });
         }
-      }, 300);
+      }, 450);
     };
 
     this.recognition = recognition;
@@ -149,11 +155,14 @@ export class BrowserSpeechProvider {
         resolve();
       };
 
-      const timeout = window.setTimeout(finish, 1200);
+      const timeout = window.setTimeout(finish, 1500);
       this.endResolver = finish;
 
       try {
-        recognition.stop();
+        // abort() discards the current recognition segment and fully
+        // disconnects the browser service. This is more reliable for a
+        // fresh second Start on mobile Chrome than stop() finalization.
+        recognition.abort();
       } catch {
         finish();
       }
@@ -161,6 +170,9 @@ export class BrowserSpeechProvider {
 
     this.recognition = null;
     this.endResolver = null;
+
+    // Give the browser microphone/STT service a short release window.
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
   }
 
   async dispose() {
