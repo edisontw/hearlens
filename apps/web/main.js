@@ -1,6 +1,6 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-google-stt-mvp1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-gemini-live-mvp1";
 
-const BUILD_ID = "20261004-google-stt-mvp1";
+const BUILD_ID = "20261004-gemini-live-mvp1";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
@@ -9,14 +9,17 @@ function readRuntimeSttConfig() {
   const params = new URLSearchParams(window.location.search);
   const rawProvider = (params.get("stt") || "auto").trim().toLowerCase();
   const provider =
-    rawProvider === "google"
-      ? "google-cloud-streaming"
-      : rawProvider === "browser"
-        ? "browser-speech"
-        : rawProvider;
+    rawProvider === "gemini"
+      ? "gemini-live-transcribe"
+      : rawProvider === "google"
+        ? "google-cloud-streaming"
+        : rawProvider === "browser"
+          ? "browser-speech"
+          : rawProvider;
 
   return {
     provider,
+    tokenUrl: (params.get("token") || "").trim(),
     websocketUrl: (params.get("ws") || "").trim(),
   };
 }
@@ -57,6 +60,9 @@ const debugLines = [];
 
 appendSttLog("build " + BUILD_ID);
 appendSttLog("runtime-provider " + runtimeSttConfig.provider);
+if (runtimeSttConfig.tokenUrl) {
+  appendSttLog("runtime-token configured");
+}
 if (runtimeSttConfig.websocketUrl) {
   appendSttLog("runtime-ws configured");
 }
@@ -253,6 +259,7 @@ async function startSession() {
 
   sttProvider = createSttProvider({
     provider: runtimeSttConfig.provider,
+    tokenUrl: runtimeSttConfig.tokenUrl,
     websocketUrl: runtimeSttConfig.websocketUrl,
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
@@ -389,7 +396,11 @@ window.addEventListener("pagehide", () => {
 });
 
 const sttCapabilities = describeSttCapabilities();
-if (runtimeSttConfig.provider === "google-cloud-streaming") {
+if (runtimeSttConfig.provider === "gemini-live-transcribe") {
+  els.diagStt.textContent = runtimeSttConfig.tokenUrl
+    ? "Gemini 3.5 Transcribe Live 已設定"
+    : "Gemini 已選擇，但缺少 ?token=https://.../token";
+} else if (runtimeSttConfig.provider === "google-cloud-streaming") {
   els.diagStt.textContent = runtimeSttConfig.websocketUrl
     ? "Google Cloud streaming proxy 已設定"
     : "Google Cloud 已選擇，但缺少 ?ws=wss://.../stt";

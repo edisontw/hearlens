@@ -39,7 +39,31 @@ This was reproduced after:
 
 Decision: stop spending M01 engineering time on the Android Browser SpeechRecognition lifecycle. Keep it as a zero-cost fallback only.
 
-### B. Google Cloud Speech-to-Text — first cloud benchmark
+### B. Gemini 3.5 Transcribe Live — first free cloud benchmark
+
+This is now the first formal Taiwan Mandarin cloud benchmark because the Gemini Developer API currently exposes a free tier for Gemini 3.5 Transcribe Live.
+
+Architecture:
+
+    phone browser
+      -> MN4 HTTPS token broker (no audio)
+      -> one-use ephemeral token
+      -> direct Gemini Live WebSocket
+      -> interim/final captions
+
+Reasons:
+- dedicated low-latency streaming speech-to-text model,
+- interim and final transcription events map directly to the HearLens provider contract,
+- automatic language detection supports multilingual/code-switching speech,
+- no long-lived Gemini API key in browser JavaScript,
+- direct browser-to-Gemini audio avoids an extra MN4 media hop,
+- current free tier is suitable for development benchmarking.
+
+The browser sends 16 kHz mono PCM16 in approximately 100 ms chunks. The Live session limit is 10 minutes, so production-like continuous captions will later need session rollover/resumption behavior.
+
+MN4 only serves `POST /token`. The long-lived `GEMINI_API_KEY` remains on MN4 and is exchanged for one-use short-lived Live API credentials.
+
+### C. Google Cloud Speech-to-Text — later paid comparison
 
 Google Cloud Speech-to-Text V2 explicitly supports Traditional Taiwan Mandarin (cmn-Hant-TW).
 
@@ -59,7 +83,7 @@ Implementation status:
 
 The initial proxy defaults to a configurable V2 `us` / `chirp_3` path. Location and model are environment variables so Taiwan latency and regional model behavior can be benchmarked without rebuilding the browser client.
 
-### C. OpenAI transcription — comparison benchmark
+### D. OpenAI transcription — comparison benchmark
 
 OpenAI provides dedicated transcription and live-transcription models.
 
@@ -73,7 +97,7 @@ ChatGPT Plus and OpenAI API billing are separate. Plus must not be treated as AP
 
 Never put an OpenAI API key in browser JavaScript. Cloud providers require a server-side token/proxy layer.
 
-### D. Local / self-hosted Taigi
+### E. Local / self-hosted Taigi
 
 Primary candidate: MediaTek Research Breeze-ASR-26.
 
@@ -141,10 +165,11 @@ Breeze-ASR-26 primarily produces Chinese-character transcription for Taigi; this
 Development order:
 
 1. Browser fallback.
-2. Small free-tier / low-cost cloud benchmark.
-3. Compare accuracy, first-partial latency, privacy and cost.
-4. Select a default Taiwan Mandarin backend only after measurement.
-5. Preserve a self-hosted Taigi path.
+2. Gemini 3.5 Transcribe Live free-tier benchmark.
+3. Compare accuracy, first-partial latency, privacy and reconnect behavior.
+4. Benchmark Google Cloud STT / OpenAI only if Gemini quality is insufficient or a second provider is needed.
+5. Select a default Taiwan Mandarin backend only after measurement.
+6. Preserve a self-hosted Taigi path.
 
 Track cost as USD per active caption hour, together with:
 - first meaningful partial latency,

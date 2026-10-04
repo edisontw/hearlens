@@ -1,19 +1,23 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261004-google-stt-mvp1";
+} from "./providers/browser-speech.js?v=20261004-gemini-live-mvp1";
+import { GeminiLiveTranscribeProvider } from
+  "./providers/gemini-live-transcribe.js?v=20261004-gemini-live-mvp1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261004-google-stt-mvp1";
+  "./providers/google-cloud-streaming.js?v=20261004-gemini-live-mvp1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
   BROWSER: "browser-speech",
+  GEMINI: "gemini-live-transcribe",
   GOOGLE: "google-cloud-streaming",
 });
 
 export function describeSttCapabilities() {
   return {
     browserSpeech: browserSpeechSupported(),
+    geminiLiveTranscribeClient: true,
     googleCloudStreamingClient: true,
     planned: ["openai-streaming", "local-taigi-breeze"],
   };
@@ -22,6 +26,7 @@ export function describeSttCapabilities() {
 export function createSttProvider({
   provider = STT_PROVIDER_IDS.AUTO,
   language = "zh-TW",
+  tokenUrl = "",
   websocketUrl = "",
   onPartial,
   onFinal,
@@ -41,6 +46,17 @@ export function createSttProvider({
 
     return new BrowserSpeechProvider({
       language,
+      onPartial,
+      onFinal,
+      onStatus,
+      onError,
+      onDebug,
+    });
+  }
+
+  if (requested === STT_PROVIDER_IDS.GEMINI) {
+    return new GeminiLiveTranscribeProvider({
+      tokenUrl,
       onPartial,
       onFinal,
       onStatus,

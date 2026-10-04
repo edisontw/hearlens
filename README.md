@@ -32,7 +32,8 @@ The project is intentionally split into three capability layers:
 - `docs/` — product, research, safety, architecture and validation decisions
 - `apps/web/` — caption-first Web MVP and browser/device diagnostics
 - `packages/` — reusable hearing, audiogram, DSP and caption logic as implementation begins
-- `services/stt-proxy/` — server-side Google Cloud streaming STT bridge; cloud credentials never belong in browser code
+- `services/gemini-token/` — MN4 ephemeral-token broker for direct Gemini Live transcription; microphone audio bypasses the VM
+- `services/stt-proxy/` — optional Google Cloud streaming STT bridge for later comparison
 - `tests/` — deterministic DSP vectors, device-bench protocols and human-test definitions
 
 ## Current status
@@ -45,7 +46,8 @@ The Web Hearing Lab is runnable on GitHub Pages. Current work focuses on:
 - requested vs. actual audio constraints,
 - device/sample-rate/latency information,
 - caption backend abstraction with Browser SpeechRecognition as an optional fallback,
-- a server-side Google Cloud streaming STT benchmark path,
+- a free-tier Gemini 3.5 Transcribe Live benchmark path using short-lived tokens from MN4,
+- an optional Google Cloud streaming STT comparison path,
 - rolling recent-caption state,
 - large-text senior-friendly interaction.
 
