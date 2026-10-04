@@ -15,6 +15,7 @@ export class BrowserSpeechProvider {
     onFinal = () => {},
     onStatus = () => {},
     onError = () => {},
+    onDebug = () => {},
   } = {}) {
     this.id = "browser-speech";
     this.label = "Browser SpeechRecognition (fallback)";
@@ -23,15 +24,26 @@ export class BrowserSpeechProvider {
     this.onFinal = onFinal;
     this.onStatus = onStatus;
     this.onError = onError;
+    this.onDebug = onDebug;
+
     this.active = false;
     this.recognition = null;
     this.restartTimer = null;
     this.endResolver = null;
+    this.segmentId = 0;
   }
 
-  async start() {
-    if (this.active) return;
+  debug(event, detail = "") {
+    this.onDebug({
+      providerId: this.id,
+      event,
+      detail,
+      timestamp: Date.now(),
+      segmentId: this.segmentId,
+    });
+  }
 
+  createRecognition() {
     const Recognition = recognitionConstructor();
     if (!Recognition) {
       throw new Error("Browser SpeechRecognition is not available.");
@@ -39,13 +51,15 @@ export class BrowserSpeechProvider {
 
     const recognition = new Recognition();
     recognition.lang = this.language;
-    // Chrome Android does not honor continuous mode reliably.
-    // Use one recognition segment at a time and restart from onend while active.
+
+    // Chrome Android does not keep continuous sessions reliably.
+    // Each segment gets a fresh SpeechRecognition instance.
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
+      this.debug("start");
       this.onStatus({
         state: "listening",
         providerId: this.id,
@@ -53,8 +67,17 @@ export class BrowserSpeechProvider {
       });
     };
 
+    recognition.onaudiostart = () => this.debug("audiostart");
+    recognition.onsoundstart = () => this.debug("soundstart");
+    recognition.onspeechstart = () => this.debug("speechstart");
+    recognition.onspeechend = () => this.debug("speechend");
+    recognition.onsoundend = () => this.debug("soundend");
+    recognition.onaudioend = () => this.debug("audioend");
+    recognition.onnomatch = () => this.debug("nomatch");
+
     recognition.onresult = (event) => {
       let interim = "";
+      let finalCount = 0;
 
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
@@ -62,6 +85,7 @@ export class BrowserSpeechProvider {
         if (!text) continue;
 
         if (result.isFinal) {
+          finalCount += 1;
           this.onFinal({
             text,
             providerId: this.id,
@@ -72,6 +96,11 @@ export class BrowserSpeechProvider {
         }
       }
 
+      this.debug(
+        "result",
+        "final=" + finalCount + ", interim=" + (interim.trim() ? "yes" : "no"),
+      );
+
       this.onPartial({
         text: interim.trim(),
         providerId: this.id,
@@ -80,6 +109,8 @@ export class BrowserSpeechProvider {
     };
 
     recognition.onerror = (event) => {
+      this.debug("error", event.error || "unknown");
+
       if (!this.active && event.error === "aborted") {
         return;
       }
@@ -92,6 +123,12 @@ export class BrowserSpeechProvider {
     };
 
     recognition.onend = () => {
+      this.debug("end");
+
+      if (this.recognition === recognition) {
+        this.recognition = null;
+      }
+
       this.onPartial({
         text: "",
         providerId: this.id,
@@ -113,28 +150,57 @@ export class BrowserSpeechProvider {
       }
 
       this.restartTimer = window.setTimeout(() => {
-        if (!this.active) return;
-        try {
-          recognition.start();
-        } catch (error) {
-          this.onError({
-            providerId: this.id,
-            code: "restart-failed",
-            message:
-              error instanceof Error
-                ? error.message
-                : "SpeechRecognition restart failed.",
-          });
-        }
-      }, 450);
+        this.restartTimer = null;
+        this.startSegment();
+      }, 500);
     };
 
+    return recognition;
+  }
+
+  startSegment() {
+    if (!this.active) return;
+
+    this.segmentId += 1;
+    const recognition = this.createRecognition();
     this.recognition = recognition;
+    this.debug("start-call");
+
+    try {
+      recognition.start();
+    } catch (error) {
+      this.debug(
+        "start-throw",
+        error instanceof Error ? error.message : "unknown",
+      );
+      this.onError({
+        providerId: this.id,
+        code: "start-failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "SpeechRecognition start failed.",
+      });
+
+      if (this.active) {
+        this.restartTimer = window.setTimeout(() => {
+          this.restartTimer = null;
+          this.startSegment();
+        }, 800);
+      }
+    }
+  }
+
+  async start() {
+    if (this.active) return;
+
     this.active = true;
-    recognition.start();
+    this.debug("provider-start");
+    this.startSegment();
   }
 
   async stop() {
+    this.debug("provider-stop");
     this.active = false;
 
     if (this.restartTimer !== null) {
@@ -143,7 +209,10 @@ export class BrowserSpeechProvider {
     }
 
     const recognition = this.recognition;
-    if (!recognition) return;
+    if (!recognition) {
+      this.debug("provider-stop-no-active-recognition");
+      return;
+    }
 
     await new Promise((resolve) => {
       let settled = false;
@@ -155,15 +224,21 @@ export class BrowserSpeechProvider {
         resolve();
       };
 
-      const timeout = window.setTimeout(finish, 1500);
+      const timeout = window.setTimeout(() => {
+        this.debug("stop-timeout");
+        finish();
+      }, 1500);
+
       this.endResolver = finish;
 
       try {
-        // abort() discards the current recognition segment and fully
-        // disconnects the browser service. This is more reliable for a
-        // fresh second Start on mobile Chrome than stop() finalization.
+        this.debug("abort-call");
         recognition.abort();
-      } catch {
+      } catch (error) {
+        this.debug(
+          "abort-throw",
+          error instanceof Error ? error.message : "unknown",
+        );
         finish();
       }
     });
@@ -171,11 +246,13 @@ export class BrowserSpeechProvider {
     this.recognition = null;
     this.endResolver = null;
 
-    // Give the browser microphone/STT service a short release window.
-    await new Promise((resolve) => window.setTimeout(resolve, 250));
+    // Give Android Chrome time to release the recognition service.
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    this.debug("provider-stopped");
   }
 
   async dispose() {
+    this.debug("provider-dispose");
     this.active = false;
 
     if (this.restartTimer !== null) {
