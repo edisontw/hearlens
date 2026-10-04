@@ -230,6 +230,7 @@ export class GeminiLiveTranscribeProvider {
 
     const interim = content.interimInputTranscription?.text?.trim() || "";
     if (interim) {
+      this.debug("interim");
       this.onPartial({
         text: interim,
         providerId: this.id,
@@ -239,6 +240,7 @@ export class GeminiLiveTranscribeProvider {
 
     const finalText = content.inputTranscription?.text?.trim() || "";
     if (finalText) {
+      this.debug("final");
       this.onFinal({
         text: finalText,
         providerId: this.id,
