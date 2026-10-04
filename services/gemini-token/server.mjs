@@ -1,5 +1,11 @@
 import http from "node:http";
 
+import {
+  createTokenWithKey,
+  redactSecrets,
+  shouldTryAnotherKey,
+} from "./token.mjs";
+
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 8787);
 const GEMINI_API_KEYS = [
@@ -13,10 +19,6 @@ const GEMINI_API_KEYS = [
 ].filter((value, index, array) => array.indexOf(value) === index);
 
 let nextKeyIndex = 0;
-const TOKEN_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/auth_tokens";
-const TOKEN_LIFETIME_MS = 12 * 60 * 1000;
-const NEW_SESSION_LIFETIME_MS = 60 * 1000;
 const WINDOW_MS = 60 * 1000;
 const MAX_TOKENS_PER_WINDOW = Number(
   process.env.HEARLENS_TOKEN_RATE_LIMIT || 12,
@@ -83,77 +85,6 @@ function rateAllowed(ip) {
 
   current.count += 1;
   return true;
-}
-
-class TokenProvisionError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
-}
-
-async function createTokenWithKey(apiKey) {
-  const now = Date.now();
-  const payload = {
-    uses: 1,
-    expireTime: new Date(now + TOKEN_LIFETIME_MS).toISOString(),
-    newSessionExpireTime: new Date(
-      now + NEW_SESSION_LIFETIME_MS,
-    ).toISOString(),
-    liveConnectConstraints: {
-      model: "models/gemini-3.5-transcribe-live",
-      config: {
-        responseModalities: ["TEXT"],
-        inputAudioTranscription: {
-          languageCodes: [],
-        },
-      },
-    },
-  };
-
-  const response = await fetch(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": apiKey,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await response.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    const message =
-      data?.error?.message ||
-      data?.message ||
-      text ||
-      "Gemini token provisioning failed.";
-    throw new TokenProvisionError(message, response.status);
-  }
-
-  if (!data?.name) {
-    throw new TokenProvisionError(
-      "Gemini token provisioning returned no token.",
-      502,
-    );
-  }
-
-  return {
-    token: data.name,
-    expireTime: payload.expireTime,
-    newSessionExpireTime: payload.newSessionExpireTime,
-  };
-}
-
-function shouldTryAnotherKey(error) {
-  if (!(error instanceof TokenProvisionError)) return false;
-  return [400, 401, 403].includes(error.status);
 }
 
 async function createGeminiToken() {
@@ -237,16 +168,17 @@ const server = http.createServer(async (request, response) => {
     const token = await createGeminiToken();
     sendJson(response, 200, token, cors);
   } catch (error) {
-    console.error(
-      "token provisioning failed:",
-      error instanceof Error ? error.message : error,
+    const message = redactSecrets(
+      error instanceof Error ? error.message : "unknown error",
+      GEMINI_API_KEYS,
     );
+    console.error("token provisioning failed:", message);
     sendJson(
       response,
       502,
       {
         error: "token-provisioning-failed",
-        message: error instanceof Error ? error.message : "unknown error",
+        message,
       },
       cors,
     );
