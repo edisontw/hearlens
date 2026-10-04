@@ -4,7 +4,7 @@
   "private": true,
   "description": "Caption-first hearing-assistance research prototype",
   "scripts": {
-    "test": "node --check apps/web/main.js",
+    "test": "node --check apps/web/main.js && node --check apps/web/stt/provider.js && node --check apps/web/stt/providers/browser-speech.js",
     "check": "npm test"
   }
 }
