@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261004-gemini-live-mvp2";
+} from "./providers/browser-speech.js?v=20261004-gemini-live-mvp4";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261004-gemini-live-mvp2";
+  "./providers/gemini-live-transcribe.js?v=20261004-gemini-live-mvp4";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261004-gemini-live-mvp2";
+  "./providers/google-cloud-streaming.js?v=20261004-gemini-live-mvp4";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
@@ -28,6 +28,7 @@ export function createSttProvider({
   language = "zh-TW",
   tokenUrl = "",
   websocketUrl = "",
+  inputGain = 1,
   onPartial,
   onFinal,
   onStatus,
@@ -57,6 +58,7 @@ export function createSttProvider({
   if (requested === STT_PROVIDER_IDS.GEMINI) {
     return new GeminiLiveTranscribeProvider({
       tokenUrl,
+      inputGain,
       onPartial,
       onFinal,
       onStatus,

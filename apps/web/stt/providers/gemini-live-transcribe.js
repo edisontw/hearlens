@@ -1,4 +1,5 @@
-import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp2";
+import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp4";
+import { processInputAudio } from "./input-audio.mjs?v=20261004-gemini-live-mvp4";
 
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
@@ -72,6 +73,7 @@ function pcm16Base64(samples) {
 export class GeminiLiveTranscribeProvider {
   constructor({
     tokenUrl = "",
+    inputGain = 1,
     onPartial = () => {},
     onFinal = () => {},
     onStatus = () => {},
@@ -81,6 +83,7 @@ export class GeminiLiveTranscribeProvider {
     this.id = "gemini-live-transcribe";
     this.label = "Gemini 3.5 Transcribe Live";
     this.tokenUrl = tokenUrl;
+    this.inputGain = Math.min(8, Math.max(1, Number(inputGain) || 1));
     this.onPartial = onPartial;
     this.onFinal = onFinal;
     this.onStatus = onStatus;
@@ -101,6 +104,7 @@ export class GeminiLiveTranscribeProvider {
     this.setupRejecter = null;
     this.stopResolver = null;
     this.firstAudioSent = false;
+    this.lastLevelDebugAt = 0;
   }
 
   debug(event, detail = "") {
@@ -381,7 +385,22 @@ export class GeminiLiveTranscribeProvider {
         this.audioContext.sampleRate,
         TARGET_SAMPLE_RATE,
       );
-      this.pushResampledSamples(resampled);
+      const processed = processInputAudio(resampled, this.inputGain);
+      const now = Date.now();
+
+      if (now - this.lastLevelDebugAt >= 1000) {
+        this.lastLevelDebugAt = now;
+        this.debug(
+          "audio-level",
+          "gain=" + this.inputGain.toFixed(2) +
+            "x raw-rms=" + processed.rawRmsDbfs.toFixed(1) +
+            "dBFS raw-peak=" + processed.rawPeakDbfs.toFixed(1) +
+            "dBFS out-peak=" + processed.outputPeakDbfs.toFixed(1) +
+            "dBFS clipped=" + processed.clippedPercent.toFixed(2) + "%",
+        );
+      }
+
+      this.pushResampledSamples(processed.samples);
     };
 
     this.sourceNode.connect(this.processorNode);
@@ -390,7 +409,8 @@ export class GeminiLiveTranscribeProvider {
 
     this.debug(
       "capture-ready",
-      "source-rate=" + this.audioContext.sampleRate + ", target-rate=16000",
+      "source-rate=" + this.audioContext.sampleRate +
+        ", target-rate=16000, gain=" + this.inputGain.toFixed(2) + "x",
     );
   }
 
@@ -401,6 +421,7 @@ export class GeminiLiveTranscribeProvider {
     this.stopping = false;
     this.segmentId += 1;
     this.firstAudioSent = false;
+    this.lastLevelDebugAt = 0;
 
     this.onStatus({
       state: "connecting",
