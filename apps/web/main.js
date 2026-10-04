@@ -1,3 +1,5 @@
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js";
+
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 
@@ -22,8 +24,7 @@ const els = {
 
 let stream = null;
 let audioContext = null;
-let recognition = null;
-let shouldRecognize = false;
+let sttProvider = null;
 let interimText = "";
 let fontIndex = 0;
 const transcript = [];
@@ -71,67 +72,6 @@ function setFontSize() {
     "--caption-size",
     `${FONT_SIZES[fontIndex]}px`,
   );
-}
-
-function recognitionConstructor() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
-
-function configureRecognition() {
-  const Recognition = recognitionConstructor();
-  if (!Recognition) {
-    els.diagStt.textContent = "此瀏覽器沒有 SpeechRecognition fallback";
-    return null;
-  }
-
-  const instance = new Recognition();
-  instance.lang = "zh-TW";
-  instance.continuous = true;
-  instance.interimResults = true;
-  instance.maxAlternatives = 1;
-
-  instance.onstart = () => {
-    els.diagStt.textContent = "Browser SpeechRecognition (demo/fallback)";
-  };
-
-  instance.onresult = (event) => {
-    let nextInterim = "";
-
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const result = event.results[i];
-      const text = result[0]?.transcript ?? "";
-
-      if (result.isFinal) {
-        addFinalTranscript(text);
-      } else {
-        nextInterim += text;
-      }
-    }
-
-    interimText = nextInterim.trim();
-    renderCaption();
-  };
-
-  instance.onerror = (event) => {
-    els.diagStt.textContent = `SpeechRecognition error: ${event.error}`;
-  };
-
-  instance.onend = () => {
-    interimText = "";
-    renderCaption();
-
-    if (shouldRecognize) {
-      window.setTimeout(() => {
-        try {
-          instance.start();
-        } catch {
-          // Some engines need more time before restart; next manual Start remains available.
-        }
-      }, 250);
-    }
-  };
-
-  return instance;
 }
 
 function requestedAudioConstraints() {
@@ -217,14 +157,35 @@ async function startSession() {
 
   renderDiagnostics(track);
 
-  shouldRecognize = true;
-  recognition = configureRecognition();
-  if (recognition) {
+  sttProvider = createSttProvider({
+    language: "zh-TW",
+    onPartial: ({ text }) => {
+      interimText = text;
+      renderCaption();
+    },
+    onFinal: ({ text }) => {
+      interimText = "";
+      addFinalTranscript(text);
+    },
+    onStatus: ({ label }) => {
+      els.diagStt.textContent = label;
+    },
+    onError: ({ message }) => {
+      els.diagStt.textContent = message;
+    },
+  });
+
+  if (sttProvider) {
     try {
-      recognition.start();
+      await sttProvider.start({ stream });
     } catch (error) {
-      els.diagStt.textContent = `SpeechRecognition 無法啟動：${error.message}`;
+      els.diagStt.textContent =
+        "字幕引擎無法啟動：" +
+        (error instanceof Error ? error.message : "unknown error");
     }
+  } else {
+    els.diagStt.textContent =
+      "此瀏覽器沒有免費 Browser STT；麥克風診斷仍可使用";
   }
 
   setStatus("正在聆聽", "listening");
@@ -233,16 +194,10 @@ async function startSession() {
 }
 
 async function stopSession() {
-  shouldRecognize = false;
-
-  if (recognition) {
-    try {
-      recognition.stop();
-    } catch {
-      // Already stopped.
-    }
+  if (sttProvider) {
+    await sttProvider.stop();
   }
-  recognition = null;
+  sttProvider = null;
 
   for (const track of stream?.getTracks?.() ?? []) {
     track.stop();
@@ -286,18 +241,14 @@ els.closeRecall.addEventListener("click", () => {
 els.fontSize.addEventListener("click", setFontSize);
 
 window.addEventListener("pagehide", () => {
-  shouldRecognize = false;
-  try {
-    recognition?.abort?.();
-  } catch {
-    // Ignore shutdown errors.
-  }
+  void sttProvider?.dispose?.();
 
   for (const track of stream?.getTracks?.() ?? []) {
     track.stop();
   }
 });
 
-els.diagStt.textContent = recognitionConstructor()
+const sttCapabilities = describeSttCapabilities();
+els.diagStt.textContent = sttCapabilities.browserSpeech
   ? "可用（Browser fallback）"
   : "此瀏覽器無 Browser SpeechRecognition";
