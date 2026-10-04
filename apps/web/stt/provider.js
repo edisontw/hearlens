@@ -26,6 +26,7 @@ export function createSttProvider({
   onFinal,
   onStatus,
   onError,
+  onDebug,
 } = {}) {
   const requested =
     provider === STT_PROVIDER_IDS.AUTO
@@ -43,6 +44,7 @@ export function createSttProvider({
       onFinal,
       onStatus,
       onError,
+      onDebug,
     });
   }
 
