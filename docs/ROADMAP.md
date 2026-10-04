@@ -9,8 +9,8 @@ Goal: turn research conclusions into enforceable architecture.
 - [x] Define safety invariants.
 - [x] Define audiogram-processing research boundary.
 - [x] Define test strategy.
-- [ ] Create runnable Web Hearing Lab.
-- [ ] Add CI/build checks.
+- [x] Create runnable Web Hearing Lab.
+- [x] Add CI/build checks.
 
 Exit: repository builds, documentation and safety rules agree with implementation skeleton.
 
@@ -21,8 +21,8 @@ Goal: validate the simplest useful product.
 - microphone permission flow,
 - requested/actual capture diagnostics,
 - large-text live caption UI,
-- STT provider abstraction,
-- browser speech recognition as optional fallback only,
+- [x] STT provider abstraction,
+- [x] browser speech recognition as optional fallback only,
 - 15–30 s rolling transcript,
 - "What did they just say?",
 - text-size control,
