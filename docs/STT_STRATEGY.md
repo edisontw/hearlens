@@ -39,7 +39,7 @@ This was reproduced after:
 
 Decision: stop spending M01 engineering time on the Android Browser SpeechRecognition lifecycle. Keep it as a zero-cost fallback only.
 
-### B. Gemini 3.5 Transcribe Live — first free cloud benchmark
+### B. Gemini 3.5 Transcribe Live — active M01 cloud path
 
 This is now the first formal Taiwan Mandarin cloud benchmark because the Gemini Developer API currently exposes a free tier for Gemini 3.5 Transcribe Live.
 
@@ -60,6 +60,16 @@ Reasons:
 - current free tier is suitable for development benchmarking.
 
 The browser sends 16 kHz mono PCM16 in approximately 100 ms chunks. The Live session limit is 10 minutes, so production-like continuous captions will later need session rollover/resumption behavior.
+
+Current M01 status (2026-10-05):
+- MN4 ephemeral-token provisioning is operational.
+- Browser constrained-WebSocket setup is verified end to end.
+- Binary WebSocket frames are decoded correctly in the browser provider.
+- Gemini Mandarin output is converted for Taiwan Traditional Chinese display while preserving the raw STT text for evaluation.
+- Manual `?gain=` plus RMS / peak / clipping telemetry is available only as an engineering probe.
+- Informal distance tests show that input level materially affects 1 m recognition, so the next engineering step is adaptive input normalization rather than selecting one fixed gain value.
+
+See [DEVELOPMENT_VALIDATION_STRATEGY.md](./DEVELOPMENT_VALIDATION_STRATEGY.md) for the staged test plan.
 
 MN4 only serves `POST /token`. The long-lived `GEMINI_API_KEY` remains on MN4 and is exchanged for one-use short-lived Live API credentials.
 

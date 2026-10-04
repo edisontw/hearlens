@@ -1,5 +1,8 @@
 # Test Protocol
 
+Development-stage testing follows [DEVELOPMENT_VALIDATION_STRATEGY.md](./DEVELOPMENT_VALIDATION_STRATEGY.md). Do not run the full benchmark matrix while capture, gain control, enhancement, VAD, or segmentation parameters are still changing.
+
+
 ## 1. Automated DSP tests
 
 Run without physical hardware:
@@ -70,7 +73,13 @@ Test combinations of:
 
 Verify limiter operation before clipping and no full-scale reconnect transient.
 
-## 6. Caption metrics
+## 6. Caption engineering gate and formal metrics
+
+During active development, controlled playback from a second phone may be used for relative A/B testing of gain, normalization, VAD, and STT changes. Keep playback device, volume, recording, distance, receiving-phone position, and orientation fixed. This is a repeatability tool, not a calibrated SPL source.
+
+Manual `?gain=` testing is exploratory only. Formal caption benchmarking starts after adaptive normalization, limiter behavior, segmentation, and the selected STT path are frozen.
+
+### Formal caption metrics
 
 Timestamp:
 

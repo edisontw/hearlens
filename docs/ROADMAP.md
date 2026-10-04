@@ -24,7 +24,12 @@ Goal: validate the simplest useful product.
 - [x] STT provider abstraction,
 - [x] browser speech recognition as optional fallback only,
 - [x] Gemini 3.5 Transcribe Live provider + MN4 ephemeral-token broker scaffold,
-- [ ] deploy Gemini token broker on MN4 and run Taiwan Mandarin latency/accuracy benchmark,
+- [x] deploy Gemini token broker on MN4 and complete browser-to-Gemini Live E2E validation,
+- [x] add Traditional Chinese display conversion for Gemini captions,
+- [x] add manual input-gain and audio-level telemetry as engineering probes,
+- [ ] replace fixed-gain exploration with adaptive input normalization + limiter,
+- [ ] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
+- [ ] run the formal Taiwan Mandarin latency/accuracy benchmark only after the capture / normalization / segmentation path is frozen,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - 15–30 s rolling transcript,
 - "What did they just say?",
@@ -110,3 +115,9 @@ Start Android native work when any of the following becomes blocking:
 - external USB-C microphone integration is required.
 
 Native is a reliability decision, not a DSP-complexity milestone.
+
+## Development / validation discipline
+
+Detailed strategy: [DEVELOPMENT_VALIDATION_STRATEGY.md](./DEVELOPMENT_VALIDATION_STRATEGY.md)
+
+Key rule: manual `?gain=` values are exploratory engineering controls, not product tuning targets. Use small question-specific gates while the pipeline is changing; reserve the larger cross-device / cross-speaker benchmark for a frozen processing version.
