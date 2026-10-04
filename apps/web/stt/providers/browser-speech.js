@@ -216,37 +216,64 @@ export class BrowserSpeechProvider {
 
     await new Promise((resolve) => {
       let settled = false;
+      let abortFallback = null;
 
       const finish = () => {
         if (settled) return;
         settled = true;
         window.clearTimeout(timeout);
+        if (abortFallback !== null) {
+          window.clearTimeout(abortFallback);
+        }
         resolve();
       };
 
       const timeout = window.setTimeout(() => {
         this.debug("stop-timeout");
         finish();
-      }, 1500);
+      }, 1800);
 
       this.endResolver = finish;
 
       try {
-        this.debug("abort-call");
-        recognition.abort();
+        // Prefer a graceful stop so the Android recognition service can
+        // finalize and release its VAD/session state normally.
+        this.debug("stop-call");
+        recognition.stop();
+
+        // Some Android Chrome builds fail to emit end after stop().
+        // Fall back to abort only if graceful shutdown stalls.
+        abortFallback = window.setTimeout(() => {
+          if (settled) return;
+          try {
+            this.debug("abort-fallback-call");
+            recognition.abort();
+          } catch (error) {
+            this.debug(
+              "abort-fallback-throw",
+              error instanceof Error ? error.message : "unknown",
+            );
+            finish();
+          }
+        }, 800);
       } catch (error) {
         this.debug(
-          "abort-throw",
+          "stop-throw",
           error instanceof Error ? error.message : "unknown",
         );
-        finish();
+
+        try {
+          this.debug("abort-fallback-call");
+          recognition.abort();
+        } catch {
+          finish();
+        }
       }
     });
 
     this.recognition = null;
     this.endResolver = null;
 
-    // Give Android Chrome time to release the recognition service.
     await new Promise((resolve) => window.setTimeout(resolve, 350));
     this.debug("provider-stopped");
   }
