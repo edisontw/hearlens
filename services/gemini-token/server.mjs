@@ -2,7 +2,17 @@ import http from "node:http";
 
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 8787);
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_API_KEYS = [
+  ...(process.env.GEMINI_API_KEYS || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+  ...(process.env.GEMINI_API_KEY || "").trim()
+    ? [(process.env.GEMINI_API_KEY || "").trim()]
+    : [],
+].filter((value, index, array) => array.indexOf(value) === index);
+
+let nextKeyIndex = 0;
 const TOKEN_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/auth_tokens";
 const TOKEN_LIFETIME_MS = 12 * 60 * 1000;
@@ -75,11 +85,14 @@ function rateAllowed(ip) {
   return true;
 }
 
-async function createGeminiToken() {
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+class TokenProvisionError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
   }
+}
 
+async function createTokenWithKey(apiKey) {
   const now = Date.now();
   const payload = {
     uses: 1,
@@ -87,12 +100,21 @@ async function createGeminiToken() {
     newSessionExpireTime: new Date(
       now + NEW_SESSION_LIFETIME_MS,
     ).toISOString(),
+    liveConnectConstraints: {
+      model: "models/gemini-3.5-transcribe-live",
+      config: {
+        responseModalities: ["TEXT"],
+        inputAudioTranscription: {
+          languageCodes: [],
+        },
+      },
+    },
   };
 
   const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
-      "x-goog-api-key": GEMINI_API_KEY,
+      "x-goog-api-key": apiKey,
       "content-type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -112,11 +134,14 @@ async function createGeminiToken() {
       data?.message ||
       text ||
       "Gemini token provisioning failed.";
-    throw new Error(message);
+    throw new TokenProvisionError(message, response.status);
   }
 
   if (!data?.name) {
-    throw new Error("Gemini token provisioning returned no token.");
+    throw new TokenProvisionError(
+      "Gemini token provisioning returned no token.",
+      502,
+    );
   }
 
   return {
@@ -124,6 +149,47 @@ async function createGeminiToken() {
     expireTime: payload.expireTime,
     newSessionExpireTime: payload.newSessionExpireTime,
   };
+}
+
+function shouldTryAnotherKey(error) {
+  if (!(error instanceof TokenProvisionError)) return false;
+  return [400, 401, 403].includes(error.status);
+}
+
+async function createGeminiToken() {
+  if (GEMINI_API_KEYS.length === 0) {
+    throw new Error(
+      "GEMINI_API_KEYS or GEMINI_API_KEY is not configured.",
+    );
+  }
+
+  const startIndex = nextKeyIndex % GEMINI_API_KEYS.length;
+  nextKeyIndex = (nextKeyIndex + 1) % GEMINI_API_KEYS.length;
+
+  let lastError = null;
+
+  for (let offset = 0; offset < GEMINI_API_KEYS.length; offset += 1) {
+    const index = (startIndex + offset) % GEMINI_API_KEYS.length;
+
+    try {
+      return await createTokenWithKey(GEMINI_API_KEYS[index]);
+    } catch (error) {
+      lastError = error;
+
+      // Retry only credential/configuration failures. Do not hop keys on
+      // quota/rate-limit responses: Gemini quotas are project-scoped.
+      if (!shouldTryAnotherKey(error)) {
+        throw error;
+      }
+
+      console.warn(
+        "Gemini token key slot " + (index + 1) +
+          " failed credential validation; trying the next configured key.",
+      );
+    }
+  }
+
+  throw lastError || new Error("No Gemini API key could provision a token.");
 }
 
 const server = http.createServer(async (request, response) => {
@@ -134,7 +200,8 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === "/healthz" && request.method === "GET") {
     sendJson(response, 200, {
       ok: true,
-      configured: Boolean(GEMINI_API_KEY),
+      configured: GEMINI_API_KEYS.length > 0,
+      keyCount: GEMINI_API_KEYS.length,
       provider: "gemini-3.5-transcribe-live",
     });
     return;
