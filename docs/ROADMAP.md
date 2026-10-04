@@ -23,6 +23,8 @@ Goal: validate the simplest useful product.
 - large-text live caption UI,
 - [x] STT provider abstraction,
 - [x] browser speech recognition as optional fallback only,
+- [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold,
+- [ ] deploy/configure Google proxy and run Taiwan Mandarin latency/accuracy benchmark,
 - 15–30 s rolling transcript,
 - "What did they just say?",
 - text-size control,

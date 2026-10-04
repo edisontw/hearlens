@@ -28,6 +28,17 @@ Limitations:
 
 It remains a fallback/development baseline only.
 
+### Verified Android Chrome limitation — 2026-10-04
+
+On the tested Android Chrome device, a fresh first Browser SpeechRecognition session reaches `speechstart` and returns interim results. After a graceful `recognition.stop()` and normal `audioend` / `speechend` / `end`, the second session reaches `start` and `audiostart` but never reaches `speechstart` or `result`.
+
+This was reproduced after:
+- releasing the diagnostic `getUserMedia()` stream before SpeechRecognition,
+- creating a fresh SpeechRecognition instance for every segment/session,
+- replacing immediate `abort()` with graceful `stop()` plus delayed abort fallback.
+
+Decision: stop spending M01 engineering time on the Android Browser SpeechRecognition lifecycle. Keep it as a zero-cost fallback only.
+
 ### B. Google Cloud Speech-to-Text — first cloud benchmark
 
 Google Cloud Speech-to-Text V2 explicitly supports Traditional Taiwan Mandarin (cmn-Hant-TW).
@@ -39,6 +50,14 @@ Why benchmark it early:
 - published free usage tier suitable for small experiments.
 
 Do not assume a Google AI / Google One student subscription is Cloud Speech API credit. Confirm billing/credits in the Cloud billing console before use.
+
+Implementation status:
+- browser PCM capture -> WebSocket provider added,
+- server-side WebSocket -> Google Cloud STT V2 streaming proxy added,
+- Google credentials remain server-side,
+- Google provider is opt-in through the Web Hearing Lab query string so Browser fallback remains the default during deployment/benchmark setup.
+
+The initial proxy defaults to a configurable V2 `us` / `chirp_3` path. Location and model are environment variables so Taiwan latency and regional model behavior can be benchmarked without rebuilding the browser client.
 
 ### C. OpenAI transcription — comparison benchmark
 

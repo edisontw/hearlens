@@ -1,9 +1,27 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-stop-graceful-v2";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-google-stt-mvp1";
 
-const BUILD_ID = "20261004-stop-graceful-v2";
+const BUILD_ID = "20261004-google-stt-mvp1";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
+
+function readRuntimeSttConfig() {
+  const params = new URLSearchParams(window.location.search);
+  const rawProvider = (params.get("stt") || "auto").trim().toLowerCase();
+  const provider =
+    rawProvider === "google"
+      ? "google-cloud-streaming"
+      : rawProvider === "browser"
+        ? "browser-speech"
+        : rawProvider;
+
+  return {
+    provider,
+    websocketUrl: (params.get("ws") || "").trim(),
+  };
+}
+
+const runtimeSttConfig = readRuntimeSttConfig();
 
 const els = {
   start: document.querySelector("#start"),
@@ -38,6 +56,10 @@ const transcript = [];
 const debugLines = [];
 
 appendSttLog("build " + BUILD_ID);
+appendSttLog("runtime-provider " + runtimeSttConfig.provider);
+if (runtimeSttConfig.websocketUrl) {
+  appendSttLog("runtime-ws configured");
+}
 
 function setStatus(text, state = "idle") {
   els.status.textContent = text;
@@ -158,7 +180,7 @@ function renderDiagnostics(track) {
       },
       actual: settings,
       note:
-        "This getUserMedia stream is released before Browser SpeechRecognition starts, to avoid competing microphone consumers on mobile Chrome.",
+        "The diagnostics capture is released before the selected STT provider starts its own recognition/capture path.",
     },
     null,
     2,
@@ -198,8 +220,8 @@ async function startSession() {
   els.start.disabled = true;
   els.stop.disabled = true;
 
-  // getUserMedia is used only for permission/device diagnostics.
-  // Browser SpeechRecognition manages its own microphone capture.
+  // getUserMedia here is used only for permission/device diagnostics.
+  // The selected STT provider owns its actual recognition capture.
   stream = await navigator.mediaDevices.getUserMedia({
     audio: requestedAudioConstraints(),
     video: false,
@@ -223,13 +245,15 @@ async function startSession() {
   renderDiagnostics(track);
   appendSttLog("S" + sessionId + " diagnostic-mic-ready");
 
-  // Critical mobile fix: do not keep getUserMedia open while
-  // Browser SpeechRecognition tries to own the microphone.
+  // Do not keep the diagnostics capture open while the STT provider
+  // starts its own microphone/recognition path.
   await releaseDiagnosticCapture("權限正常；已釋放給字幕引擎");
   appendSttLog("S" + sessionId + " diagnostic-mic-released");
   await new Promise((resolve) => window.setTimeout(resolve, 250));
 
   sttProvider = createSttProvider({
+    provider: runtimeSttConfig.provider,
+    websocketUrl: runtimeSttConfig.websocketUrl,
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
@@ -276,6 +300,7 @@ async function startSession() {
       els.diagStt.textContent =
         "字幕引擎無法啟動：" +
         (error instanceof Error ? error.message : "unknown error");
+      throw error;
     }
   } else {
     els.diagStt.textContent =
@@ -364,6 +389,12 @@ window.addEventListener("pagehide", () => {
 });
 
 const sttCapabilities = describeSttCapabilities();
-els.diagStt.textContent = sttCapabilities.browserSpeech
-  ? "可用（Browser fallback）"
-  : "此瀏覽器無 Browser SpeechRecognition";
+if (runtimeSttConfig.provider === "google-cloud-streaming") {
+  els.diagStt.textContent = runtimeSttConfig.websocketUrl
+    ? "Google Cloud streaming proxy 已設定"
+    : "Google Cloud 已選擇，但缺少 ?ws=wss://.../stt";
+} else {
+  els.diagStt.textContent = sttCapabilities.browserSpeech
+    ? "可用（Browser fallback）"
+    : "此瀏覽器無 Browser SpeechRecognition";
+}

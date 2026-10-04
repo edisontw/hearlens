@@ -32,18 +32,20 @@ The project is intentionally split into three capability layers:
 - `docs/` — product, research, safety, architecture and validation decisions
 - `apps/web/` — caption-first Web MVP and browser/device diagnostics
 - `packages/` — reusable hearing, audiogram, DSP and caption logic as implementation begins
+- `services/stt-proxy/` — server-side Google Cloud streaming STT bridge; cloud credentials never belong in browser code
 - `tests/` — deterministic DSP vectors, device-bench protocols and human-test definitions
 
 ## Current status
 
-**M00 — Project foundation**
+**M01 — Caption Hearing Lab**
 
-The repository is being initialized from the development decision research. The first runnable milestone will be a Web Hearing Lab focused on:
+The Web Hearing Lab is runnable on GitHub Pages. Current work focuses on:
 
 - microphone permission and capture diagnostics,
 - requested vs. actual audio constraints,
 - device/sample-rate/latency information,
-- caption backend abstraction with browser recognition only as an optional fallback,
+- caption backend abstraction with Browser SpeechRecognition as an optional fallback,
+- a server-side Google Cloud streaming STT benchmark path,
 - rolling recent-caption state,
 - large-text senior-friendly interaction.
 
