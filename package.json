@@ -1,0 +1,10 @@
+{
+  "name": "hearlens",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Caption-first hearing-assistance research prototype",
+  "scripts": {
+    "test": "node --check apps/web/main.js",
+    "check": "npm test"
+  }
+}
