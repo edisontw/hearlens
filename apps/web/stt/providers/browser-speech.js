@@ -26,6 +26,7 @@ export class BrowserSpeechProvider {
     this.active = false;
     this.recognition = null;
     this.restartTimer = null;
+    this.endResolver = null;
   }
 
   async start() {
@@ -91,6 +92,11 @@ export class BrowserSpeechProvider {
         timestamp: Date.now(),
       });
 
+      if (this.endResolver) {
+        this.endResolver();
+        this.endResolver = null;
+      }
+
       if (!this.active) {
         this.onStatus({
           state: "stopped",
@@ -131,14 +137,30 @@ export class BrowserSpeechProvider {
     }
 
     const recognition = this.recognition;
-    this.recognition = null;
     if (!recognition) return;
 
-    try {
-      recognition.stop();
-    } catch {
-      // Already stopped by the browser.
-    }
+    await new Promise((resolve) => {
+      let settled = false;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve();
+      };
+
+      const timeout = window.setTimeout(finish, 1200);
+      this.endResolver = finish;
+
+      try {
+        recognition.stop();
+      } catch {
+        finish();
+      }
+    });
+
+    this.recognition = null;
+    this.endResolver = null;
   }
 
   async dispose() {
@@ -151,6 +173,11 @@ export class BrowserSpeechProvider {
 
     const recognition = this.recognition;
     this.recognition = null;
+
+    if (this.endResolver) {
+      this.endResolver();
+      this.endResolver = null;
+    }
 
     try {
       recognition?.abort?.();
