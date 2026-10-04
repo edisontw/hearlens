@@ -1,0 +1,263 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --caption-size: 2rem;
+  --bg: #f5f6f7;
+  --panel: #ffffff;
+  --text: #15191d;
+  --muted: #5c6670;
+  --border: #d8dde2;
+  --accent: #155eef;
+  --accent-text: #ffffff;
+  --danger: #b42318;
+  --ok: #067647;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+summary {
+  font: inherit;
+}
+
+button {
+  min-height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  padding: 0.8rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.shell {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem
+    max(2rem, env(safe-area-inset-bottom));
+}
+
+.hero {
+  padding: 1.25rem 0 0.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0.5rem;
+  font-size: clamp(2rem, 8vw, 3.25rem);
+  line-height: 1.05;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: 1.15rem;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.6;
+}
+
+.panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--panel);
+}
+
+.primary-panel {
+  padding: 1.1rem;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.status {
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  background: #eef1f4;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.status[data-state="listening"] {
+  background: #ecfdf3;
+  color: var(--ok);
+}
+
+.status[data-state="error"] {
+  background: #fef3f2;
+  color: var(--danger);
+}
+
+.caption {
+  min-height: 8.5rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  border-radius: 16px;
+  background: #101418;
+  color: #ffffff;
+  font-size: var(--caption-size);
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 0.75rem;
+}
+
+.secondary-actions {
+  margin-top: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.secondary {
+  background: transparent;
+  color: inherit;
+}
+
+.text-button {
+  min-height: 44px;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+}
+
+.hint,
+.note p {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.recall-text {
+  margin-top: 1rem;
+  font-size: calc(var(--caption-size) * 0.86);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+details > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.diagnostics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.diagnostics div {
+  min-width: 0;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: #f0f2f4;
+}
+
+.diagnostics span,
+.diagnostics strong {
+  display: block;
+}
+
+.diagnostics span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.diagnostics strong {
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.settings {
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: #101418;
+  color: #f8fafc;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 540px) {
+  .actions,
+  .secondary-actions,
+  .diagnostics {
+    grid-template-columns: 1fr;
+  }
+
+  .caption {
+    min-height: 10rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c1014;
+    --panel: #151a1f;
+    --text: #f4f6f8;
+    --muted: #aab4be;
+    --border: #303840;
+  }
+
+  .status {
+    background: #232a31;
+  }
+
+  .diagnostics div {
+    background: #20262c;
+  }
+}
