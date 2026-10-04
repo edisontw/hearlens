@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101418" />
+    <meta
+      name="description"
+      content="HearLens caption-first hearing-assistance research prototype"
+    />
+    <title>HearLens Hearing Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">HearLens · Research prototype</p>
+        <h1>聽清楚對話</h1>
+        <p class="lead">把手機靠近說話的人，按下開始。沒有耳機也可以只看字幕。</p>
+      </header>
+
+      <section class="panel primary-panel" aria-labelledby="listen-title">
+        <div class="status-row">
+          <h2 id="listen-title">即時字幕</h2>
+          <span id="status" class="status" data-state="idle">尚未開始</span>
+        </div>
+
+        <div id="caption" class="caption" aria-live="polite" aria-atomic="true">
+          字幕會顯示在這裡。
+        </div>
+
+        <div class="actions">
+          <button id="start" class="primary" type="button">開始</button>
+          <button id="stop" class="secondary" type="button" disabled>停止</button>
+        </div>
+
+        <div class="actions secondary-actions">
+          <button id="recall" class="secondary" type="button">剛剛說什麼？</button>
+          <button id="font-size" class="secondary" type="button">字再大一點</button>
+        </div>
+
+        <p class="hint">
+          聽不清楚時，先把手機移到說話者附近。HearLens 目前不會把麥克風聲音放大到手機喇叭。
+        </p>
+      </section>
+
+      <section id="recall-panel" class="panel recall-panel" hidden>
+        <div class="status-row">
+          <h2>剛剛說什麼？</h2>
+          <button id="close-recall" class="text-button" type="button">關閉</button>
+        </div>
+        <div id="recall-text" class="recall-text">目前沒有最近的字幕。</div>
+      </section>
+
+      <section class="panel">
+        <details>
+          <summary>研究／裝置資訊</summary>
+
+          <div class="diagnostics">
+            <div>
+              <span>麥克風</span>
+              <strong id="diag-mic">未啟動</strong>
+            </div>
+            <div>
+              <span>字幕引擎</span>
+              <strong id="diag-stt">尚未檢查</strong>
+            </div>
+            <div>
+              <span>Sample rate</span>
+              <strong id="diag-rate">—</strong>
+            </div>
+            <div>
+              <span>Input channels</span>
+              <strong id="diag-channels">—</strong>
+            </div>
+            <div>
+              <span>AudioContext base latency</span>
+              <strong id="diag-base-latency">—</strong>
+            </div>
+            <div>
+              <span>Output latency estimate</span>
+              <strong id="diag-output-latency">—</strong>
+            </div>
+          </div>
+
+          <pre id="diag-settings" class="settings">尚未取得裝置設定。</pre>
+        </details>
+      </section>
+
+      <section class="panel note">
+        <h2>目前版本</h2>
+        <p>
+          這一版只驗證字幕、手機收音與瀏覽器能力，不進行 hearing-aid fitting，
+          也不輸出放大的麥克風聲音。
+        </p>
+        <p>
+          最近字幕只保留在此頁面記憶體中；停止或重新載入頁面後會清除。
+        </p>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
