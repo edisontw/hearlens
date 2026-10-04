@@ -26,6 +26,8 @@ let stream = null;
 let audioContext = null;
 let sttProvider = null;
 let interimText = "";
+let lastRecognizedText = "";
+let lastRecognizedAt = 0;
 let fontIndex = 0;
 const transcript = [];
 
@@ -45,6 +47,19 @@ function visibleTranscript() {
   return transcript.map((item) => item.text).join(" ").trim();
 }
 
+function rememberRecognizedText(text, timestamp = Date.now()) {
+  const clean = text.trim();
+  if (!clean) return;
+  lastRecognizedText = clean;
+  lastRecognizedAt = timestamp;
+}
+
+function recentRecognizedText(now = Date.now()) {
+  if (!lastRecognizedText) return "";
+  if (now - lastRecognizedAt > ROLLING_WINDOW_MS) return "";
+  return lastRecognizedText;
+}
+
 function renderCaption() {
   const finalText = visibleTranscript();
   const combined = [finalText, interimText].filter(Boolean).join(" ").trim();
@@ -54,13 +69,18 @@ function renderCaption() {
 function addFinalTranscript(text) {
   const clean = text.trim();
   if (!clean) return;
-  transcript.push({ text: clean, time: Date.now() });
-  trimTranscript();
+  const now = Date.now();
+  transcript.push({ text: clean, time: now });
+  rememberRecognizedText(clean, now);
+  trimTranscript(now);
   renderCaption();
 }
 
 function showRecall() {
-  const text = visibleTranscript() || interimText.trim();
+  const text =
+    visibleTranscript() ||
+    interimText.trim() ||
+    recentRecognizedText();
   els.recallText.textContent = text || "目前沒有最近的字幕。";
   els.recallPanel.hidden = false;
   els.recallPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -159,12 +179,16 @@ async function startSession() {
 
   sttProvider = createSttProvider({
     language: "zh-TW",
-    onPartial: ({ text }) => {
+    onPartial: ({ text, timestamp }) => {
       interimText = text;
+      if (text.trim()) {
+        rememberRecognizedText(text, timestamp);
+      }
       renderCaption();
     },
-    onFinal: ({ text }) => {
+    onFinal: ({ text, timestamp }) => {
       interimText = "";
+      rememberRecognizedText(text, timestamp);
       addFinalTranscript(text);
     },
     onStatus: ({ label }) => {
@@ -210,8 +234,9 @@ async function stopSession() {
   audioContext = null;
 
   interimText = "";
-  transcript.length = 0;
-  els.caption.textContent = "字幕會顯示在這裡。";
+  trimTranscript();
+  const recent = visibleTranscript() || recentRecognizedText();
+  els.caption.textContent = recent || "字幕會顯示在這裡。";
   els.diagMic.textContent = "未啟動";
   els.start.disabled = false;
   els.stop.disabled = true;
