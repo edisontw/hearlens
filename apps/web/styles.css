@@ -261,3 +261,9 @@ details > summary {
     background: #20262c;
   }
 }
+
+
+.debug-title {
+  margin: 1rem 0 0;
+  font-size: 0.95rem;
+}
