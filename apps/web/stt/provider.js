@@ -1,7 +1,7 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js";
+} from "./providers/browser-speech.js?v=20261004-stop-graceful-v2";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",

@@ -1,5 +1,6 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-stop-graceful-v2";
 
+const BUILD_ID = "20261004-stop-graceful-v2";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
@@ -35,6 +36,8 @@ let sessionCounter = 0;
 let activeSessionId = 0;
 const transcript = [];
 const debugLines = [];
+
+appendSttLog("build " + BUILD_ID);
 
 function setStatus(text, state = "idle") {
   els.status.textContent = text;
