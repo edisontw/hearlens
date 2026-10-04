@@ -1,6 +1,6 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-gemini-live-mvp1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-gemini-live-mvp2";
 
-const BUILD_ID = "20261004-gemini-live-mvp1";
+const BUILD_ID = "20261004-gemini-live-mvp2";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;

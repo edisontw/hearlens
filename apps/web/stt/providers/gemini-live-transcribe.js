@@ -1,3 +1,5 @@
+import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp2";
+
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
 const TARGET_CHUNK_SAMPLES = 1_600;
@@ -144,6 +146,7 @@ export class GeminiLiveTranscribeProvider {
     const url =
       GEMINI_WS_BASE + "?access_token=" + encodeURIComponent(token);
     const socket = new WebSocket(url);
+    socket.binaryType = "arraybuffer";
     this.socket = socket;
 
     await new Promise((resolve, reject) => {
@@ -171,7 +174,9 @@ export class GeminiLiveTranscribeProvider {
       );
     });
 
-    socket.addEventListener("message", (event) => this.handleMessage(event));
+    socket.addEventListener("message", (event) => {
+      void this.handleMessage(event);
+    });
     socket.addEventListener("close", (event) => {
       this.debug("ws-close", "code=" + event.code);
 
@@ -200,12 +205,19 @@ export class GeminiLiveTranscribeProvider {
     this.setupRejecter = null;
   }
 
-  handleMessage(event) {
-    if (typeof event.data !== "string") return;
+  async handleMessage(event) {
+    const text = await decodeWebSocketData(event.data);
+    if (!text) {
+      this.debug(
+        "ws-unsupported-frame",
+        Object.prototype.toString.call(event.data),
+      );
+      return;
+    }
 
     let message;
     try {
-      message = JSON.parse(event.data);
+      message = JSON.parse(text);
     } catch {
       this.debug("ws-invalid-json");
       return;
