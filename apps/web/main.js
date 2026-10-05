@@ -1,10 +1,10 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261005-adaptive1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261005-test-report1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261005-adaptive1";
+} from "./zh-display.js?v=20261005-test-report1";
 
-const BUILD_ID = "20261005-adaptive1";
+const BUILD_ID = "20261005-test-report1";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
@@ -56,6 +56,12 @@ const els = {
   diagOutputLatency: document.querySelector("#diag-output-latency"),
   diagSettings: document.querySelector("#diag-settings"),
   sttLog: document.querySelector("#stt-log"),
+  testSourceId: document.querySelector("#test-source-id"),
+  testDistance: document.querySelector("#test-distance"),
+  testSourceVolume: document.querySelector("#test-source-volume"),
+  testNotes: document.querySelector("#test-notes"),
+  copyTestReport: document.querySelector("#copy-test-report"),
+  copyTestReportStatus: document.querySelector("#copy-test-report-status"),
 };
 
 let stream = null;
@@ -69,6 +75,7 @@ let fontIndex = 0;
 let sessionCounter = 0;
 let activeSessionId = 0;
 const transcript = [];
+const sessionFinals = [];
 const debugLines = [];
 
 appendSttLog("build " + BUILD_ID);
@@ -142,11 +149,13 @@ function addFinalTranscript(text, rawText = text) {
   const clean = text.trim();
   if (!clean) return;
   const now = Date.now();
-  transcript.push({
+  const item = {
     text: clean,
     rawText: rawText.trim(),
     time: now,
-  });
+  };
+  transcript.push(item);
+  sessionFinals.push(item);
   rememberRecognizedText(clean, now);
   trimTranscript(now);
   renderCaption();
@@ -246,6 +255,7 @@ async function startSession() {
 
   const sessionId = ++sessionCounter;
   activeSessionId = sessionId;
+  sessionFinals.length = 0;
   appendSttLog("S" + sessionId + " session-start");
 
   setStatus("啟動中…");
