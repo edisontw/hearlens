@@ -267,3 +267,60 @@ details > summary {
   margin: 1rem 0 0;
   font-size: 0.95rem;
 }
+
+
+.test-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.test-meta-grid label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.test-meta-grid span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.test-meta-grid input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.test-notes-field {
+  grid-column: 1 / -1;
+}
+
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.copy-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 540px) {
+  .test-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .test-notes-field {
+    grid-column: auto;
+  }
+}
