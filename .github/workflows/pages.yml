@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/web/**"
+      - "testdata/audio/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -28,6 +29,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      - name: Include controlled regression audio
+        run: |
+          mkdir -p apps/web/testdata
+          cp testdata/audio/hearlens-zh-tw-regression-v2.wav apps/web/testdata/
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
