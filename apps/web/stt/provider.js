@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261004-gemini-live-mvp4";
+} from "./providers/browser-speech.js?v=20261005-adaptive1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261004-gemini-live-mvp4";
+  "./providers/gemini-live-transcribe.js?v=20261005-adaptive1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261004-gemini-live-mvp4";
+  "./providers/google-cloud-streaming.js?v=20261005-adaptive1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
@@ -29,6 +29,8 @@ export function createSttProvider({
   tokenUrl = "",
   websocketUrl = "",
   inputGain = 1,
+  inputMode = "adaptive",
+  normalizationConfig = {},
   onPartial,
   onFinal,
   onStatus,
@@ -59,6 +61,8 @@ export function createSttProvider({
     return new GeminiLiveTranscribeProvider({
       tokenUrl,
       inputGain,
+      inputMode,
+      normalizationConfig,
       onPartial,
       onFinal,
       onStatus,

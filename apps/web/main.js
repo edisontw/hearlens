@@ -1,10 +1,10 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261004-gemini-live-mvp4";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261005-adaptive1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261004-gemini-live-mvp4";
+} from "./zh-display.js?v=20261005-adaptive1";
 
-const BUILD_ID = "20261004-gemini-live-mvp4";
+const BUILD_ID = "20261005-adaptive1";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
@@ -21,6 +21,7 @@ function readRuntimeSttConfig() {
           ? "browser-speech"
           : rawProvider;
 
+  const fixedGainRequested = params.has("gain");
   const requestedGain = Number(params.get("gain") || "1");
   const inputGain = Number.isFinite(requestedGain)
     ? Math.min(8, Math.max(1, requestedGain))
@@ -31,6 +32,7 @@ function readRuntimeSttConfig() {
     tokenUrl: (params.get("token") || "").trim(),
     websocketUrl: (params.get("ws") || "").trim(),
     inputGain,
+    inputMode: fixedGainRequested ? "fixed" : "adaptive",
   };
 }
 
@@ -80,7 +82,12 @@ if (runtimeSttConfig.tokenUrl) {
 if (runtimeSttConfig.websocketUrl) {
   appendSttLog("runtime-ws configured");
 }
-appendSttLog("runtime-gain " + runtimeSttConfig.inputGain.toFixed(2) + "x");
+appendSttLog(
+  "runtime-input " +
+    (runtimeSttConfig.inputMode === "adaptive"
+      ? "adaptive"
+      : "fixed gain=" + runtimeSttConfig.inputGain.toFixed(2) + "x"),
+);
 
 function setStatus(text, state = "idle") {
   els.status.textContent = text;
@@ -281,6 +288,7 @@ async function startSession() {
     tokenUrl: runtimeSttConfig.tokenUrl,
     websocketUrl: runtimeSttConfig.websocketUrl,
     inputGain: runtimeSttConfig.inputGain,
+    inputMode: runtimeSttConfig.inputMode,
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
