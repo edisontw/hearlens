@@ -179,6 +179,60 @@ function setFontSize() {
   );
 }
 
+function safeRuntimeConfigForReport() {
+  return {
+    provider: runtimeSttConfig.provider,
+    inputMode: runtimeSttConfig.inputMode,
+    inputGain:
+      runtimeSttConfig.inputMode === "fixed"
+        ? runtimeSttConfig.inputGain
+        : null,
+    tokenConfigured: Boolean(runtimeSttConfig.tokenUrl),
+    websocketConfigured: Boolean(runtimeSttConfig.websocketUrl),
+  };
+}
+
+function parsedDiagnostics() {
+  try {
+    return JSON.parse(els.diagSettings?.textContent || "{}");
+  } catch {
+    return { raw: els.diagSettings?.textContent || "" };
+  }
+}
+
+function buildTestReport() {
+  return {
+    schema: "hearlens-test-report-v1",
+    createdAt: new Date().toISOString(),
+    buildId: BUILD_ID,
+    sessionId: activeSessionId || sessionCounter || null,
+    test: {
+      sourceId: els.testSourceId?.value?.trim() || null,
+      distance: els.testDistance?.value?.trim() || null,
+      sourceVolume: els.testSourceVolume?.value?.trim() || null,
+      notes: els.testNotes?.value?.trim() || null,
+    },
+    runtime: safeRuntimeConfigForReport(),
+    page: {
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+    },
+    browser: {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.userAgentData?.platform || navigator.platform || null,
+    },
+    diagnostics: parsedDiagnostics(),
+    transcript: sessionFinals.map((item) => ({
+      timestamp: new Date(item.time).toISOString(),
+      text: item.text,
+      rawText: item.rawText,
+    })),
+    finalTranscript: sessionFinals.map((item) => item.text).join(" ").trim(),
+    eventLog: [...debugLines],
+  };
+}
+
 function requestedAudioConstraints() {
   return {
     echoCancellation: false,
