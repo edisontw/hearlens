@@ -130,7 +130,7 @@ A phone loudspeaker is acceptable for relative A/B engineering tests but is not 
 
 Recommended quick gate:
 
-- one fixed recording (currently `zh-tw-regression-v1`),
+- one fixed recording (currently `zh-tw-regression-v2`),
 - fixed playback device and volume,
 - fixed receiving-phone position and orientation,
 - 0.5 m / 1 m / 2 m,
