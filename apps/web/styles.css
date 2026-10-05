@@ -324,3 +324,23 @@ details > summary {
     grid-column: auto;
   }
 }
+
+.test-source-card {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.test-source-card a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.test-source-card span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
