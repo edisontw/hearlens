@@ -1,5 +1,5 @@
 import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp4";
-import { processInputAudio } from "./input-audio.mjs?v=20261004-gemini-live-mvp4";
+import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261005-adaptive1";
 
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
@@ -74,6 +74,8 @@ export class GeminiLiveTranscribeProvider {
   constructor({
     tokenUrl = "",
     inputGain = 1,
+    inputMode = "adaptive",
+    normalizationConfig = {},
     onPartial = () => {},
     onFinal = () => {},
     onStatus = () => {},
@@ -84,6 +86,9 @@ export class GeminiLiveTranscribeProvider {
     this.label = "Gemini 3.5 Transcribe Live";
     this.tokenUrl = tokenUrl;
     this.inputGain = Math.min(8, Math.max(1, Number(inputGain) || 1));
+    this.inputMode = inputMode === "fixed" ? "fixed" : "adaptive";
+    this.normalizationConfig = normalizationConfig;
+    this.inputNormalizer = null;
     this.onPartial = onPartial;
     this.onFinal = onFinal;
     this.onStatus = onStatus;
@@ -375,6 +380,20 @@ export class GeminiLiveTranscribeProvider {
     this.zeroGainNode = this.audioContext.createGain();
     this.zeroGainNode.gain.value = 0;
     this.pendingSamples = [];
+    this.inputNormalizer =
+      this.inputMode === "adaptive"
+        ? new AdaptiveInputNormalizer(this.normalizationConfig)
+        : null;
+
+    this.debug(
+      "input-profile",
+      this.inputNormalizer
+        ? JSON.stringify(this.inputNormalizer.getProfile())
+        : JSON.stringify({
+            mode: "fixed",
+            gain: this.inputGain,
+          }),
+    );
 
     this.processorNode.onaudioprocess = (event) => {
       if (!this.active || this.stopping) return;
@@ -385,19 +404,32 @@ export class GeminiLiveTranscribeProvider {
         this.audioContext.sampleRate,
         TARGET_SAMPLE_RATE,
       );
-      const processed = processInputAudio(resampled, this.inputGain);
+      const processed = this.inputNormalizer
+        ? this.inputNormalizer.process(resampled, TARGET_SAMPLE_RATE)
+        : processInputAudio(resampled, this.inputGain);
       const now = Date.now();
 
       if (now - this.lastLevelDebugAt >= 1000) {
         this.lastLevelDebugAt = now;
-        this.debug(
-          "audio-level",
-          "gain=" + this.inputGain.toFixed(2) +
+        const detail = this.inputNormalizer
+          ? "mode=adaptive gain=" + processed.adaptiveGain.toFixed(2) +
+            "x raw-rms=" + processed.rawRmsDbfs.toFixed(1) +
+            "dBFS raw-peak=" + processed.rawPeakDbfs.toFixed(1) +
+            "dBFS noise=" + processed.noiseFloorDbfs.toFixed(1) +
+            "dBFS speech=" +
+            (processed.speechLevelDbfs === null
+              ? "n/a"
+              : processed.speechLevelDbfs.toFixed(1) + "dBFS") +
+            " active=" + (processed.speechActive ? "1" : "0") +
+            " out-peak=" + processed.outputPeakDbfs.toFixed(1) +
+            "dBFS limiter=" + processed.limiterReductionDb.toFixed(1) +
+            "dB clipped=" + processed.clippedPercent.toFixed(2) + "%"
+          : "mode=fixed gain=" + this.inputGain.toFixed(2) +
             "x raw-rms=" + processed.rawRmsDbfs.toFixed(1) +
             "dBFS raw-peak=" + processed.rawPeakDbfs.toFixed(1) +
             "dBFS out-peak=" + processed.outputPeakDbfs.toFixed(1) +
-            "dBFS clipped=" + processed.clippedPercent.toFixed(2) + "%",
-        );
+            "dBFS clipped=" + processed.clippedPercent.toFixed(2) + "%";
+        this.debug("audio-level", detail);
       }
 
       this.pushResampledSamples(processed.samples);
@@ -410,7 +442,10 @@ export class GeminiLiveTranscribeProvider {
     this.debug(
       "capture-ready",
       "source-rate=" + this.audioContext.sampleRate +
-        ", target-rate=16000, gain=" + this.inputGain.toFixed(2) + "x",
+        ", target-rate=16000, mode=" + this.inputMode +
+        (this.inputMode === "fixed"
+          ? ", gain=" + this.inputGain.toFixed(2) + "x"
+          : ""),
     );
   }
 
@@ -474,6 +509,7 @@ export class GeminiLiveTranscribeProvider {
     this.sourceNode = null;
     this.processorNode = null;
     this.zeroGainNode = null;
+    this.inputNormalizer = null;
     this.pendingSamples = [];
 
     for (const track of this.stream?.getTracks?.() ?? []) {
