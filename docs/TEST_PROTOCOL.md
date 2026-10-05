@@ -81,7 +81,7 @@ Manual `?gain=` testing is exploratory only. Formal caption benchmarking starts 
 
 ### Controlled source and report export
 
-For the current engineering gate, use source ID `zh-tw-regression-v1` and record its file hash, receiving-phone distance, playback-device volume, phone orientation, and room condition. The Web Hearing Lab one-click report export is the canonical manual record format.
+For the current engineering gate, use source ID `zh-tw-regression-v2` and record its file hash, receiving-phone distance, playback-device volume, phone orientation, and room condition. The Web Hearing Lab one-click report export is the canonical manual record format.
 
 The report must preserve the complete session transcript and telemetry even though the on-screen rolling caption window is shorter.
 
