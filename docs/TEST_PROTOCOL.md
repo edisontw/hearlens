@@ -79,6 +79,20 @@ During active development, controlled playback from a second phone may be used f
 
 Manual `?gain=` testing is exploratory only. Formal caption benchmarking starts after adaptive normalization, limiter behavior, segmentation, and the selected STT path are frozen.
 
+### Customization / preset validation
+
+Quick presets and advanced tuning are allowed, but every test run must record:
+
+- preset name,
+- resolved target level,
+- minimum / maximum gain,
+- attack / release parameters,
+- enhancement / noise-suppression state,
+- VAD / segmentation overrides when present,
+- software commit / build.
+
+Each preset must have a one-tap reset path to the tested default. Presets are validated as bounded policy changes around adaptive normalization, not as arbitrary device- or speaker-specific fixed gains. Formal comparisons must either use the default profile or explicitly declare the profile under test.
+
 ### Formal caption metrics
 
 Timestamp:

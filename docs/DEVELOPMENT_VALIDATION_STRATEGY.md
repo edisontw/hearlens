@@ -32,6 +32,43 @@ microphone PCM
 
 The parameters that should eventually be stable across devices are target level, gain limits, attack/release behavior, limiter ceiling, and speech/noise decision rules. A fixed manual gain is an engineering probe, not the final control strategy.
 
+## Fast customization layer
+
+Adaptive behavior remains the default, but HearLens should allow fast, reversible customization because real users, phones, speakers, and environments vary.
+
+Use two levels of control:
+
+1. **Quick presets for normal users**
+   - Auto / Recommended,
+   - Near / face-to-face,
+   - Normal room,
+   - Far / quiet room,
+   - Noisy environment.
+
+   Presets must adjust bounded controller targets or policy choices rather than replace adaptive normalization with a hard-coded raw gain.
+
+2. **Advanced tuning for testing / power users**
+   - target speech level,
+   - minimum / maximum adaptive gain,
+   - attack / release speed,
+   - noise-suppression strength,
+   - VAD / segmentation sensitivity when supported,
+   - provider/model-specific options where justified.
+
+Requirements:
+
+- one-tap reset to the tested default,
+- visible indication when a non-default preset is active,
+- all values constrained to validated ranges,
+- settings can be changed quickly without rebuilding the app,
+- settings should be exportable / reproducible as a small profile or URL/config snapshot during development,
+- test logs must record the active preset and resolved parameter values,
+- avoid per-speaker manual tuning as the normal workflow,
+- device-specific overrides are allowed only when telemetry demonstrates a repeatable hardware bias,
+- future hearing-output gain controls must remain downstream of safety limits and must never bypass the final limiter.
+
+The purpose of customization is to handle edge cases and user preference quickly without turning every new device or speaker into a new calibration project.
+
 ## Current evidence
 
 Verified on the current Android Chrome test path:
@@ -202,9 +239,10 @@ Do not repeat the entire formal benchmark after every small code change.
 
 1. Stop manual fixed-gain optimization as a product decision.
 2. Implement adaptive input normalization with noise-floor / speech-level telemetry and limiter protection.
-3. Run a short controlled 0.5 / 1 / 2 m playback gate.
-4. If level is normalized but recognition remains poor, isolate SNR / enhancement.
-5. If identical trials remain unstable, isolate VAD / segmentation / session behavior.
-6. After the audio path is stable, run cross-device tests.
-7. Then expand to multiple speakers and real acoustic scenes.
-8. Freeze a version before the formal benchmark.
+3. Add a bounded quick-preset / advanced-tuning layer with reset and config logging.
+4. Run a short controlled 0.5 / 1 / 2 m playback gate.
+5. If level is normalized but recognition remains poor, isolate SNR / enhancement.
+6. If identical trials remain unstable, isolate VAD / segmentation / session behavior.
+7. After the audio path is stable, run cross-device tests.
+8. Then expand to multiple speakers and real acoustic scenes.
+9. Freeze a version before the formal benchmark.
