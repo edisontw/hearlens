@@ -130,12 +130,13 @@ A phone loudspeaker is acceptable for relative A/B engineering tests but is not 
 
 Recommended quick gate:
 
-- one fixed recording,
+- one fixed recording (currently `zh-tw-regression-v1`),
 - fixed playback device and volume,
 - fixed receiving-phone position and orientation,
 - 0.5 m / 1 m / 2 m,
 - a small number of repeats,
-- record recognition output plus audio telemetry.
+- record recognition output plus audio telemetry,
+- export one versioned test-report JSON object per run.
 
 Purpose: detect regressions and decide the next engineering direction, not produce publication-quality performance estimates.
 
