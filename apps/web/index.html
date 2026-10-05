@@ -85,6 +85,32 @@
 
           <pre id="diag-settings" class="settings">尚未取得裝置設定。</pre>
 
+          <h3 class="debug-title">測試記錄</h3>
+          <div class="test-meta-grid">
+            <label>
+              <span>測試來源</span>
+              <input id="test-source-id" value="zh-tw-regression-v1" />
+            </label>
+            <label>
+              <span>距離</span>
+              <input id="test-distance" placeholder="例如 1 m" />
+            </label>
+            <label>
+              <span>播放裝置音量</span>
+              <input id="test-source-volume" placeholder="例如 70%" />
+            </label>
+            <label class="test-notes-field">
+              <span>備註</span>
+              <input id="test-notes" placeholder="例如安靜房間、手機直立" />
+            </label>
+          </div>
+          <div class="report-actions">
+            <button id="copy-test-report" class="secondary" type="button">
+              一鍵複製完整測試記錄
+            </button>
+            <span id="copy-test-report-status" class="copy-status" aria-live="polite"></span>
+          </div>
+
           <h3 class="debug-title">STT event log</h3>
           <pre id="stt-log" class="settings">尚未開始辨識。</pre>
         </details>
@@ -102,6 +128,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261005-adaptive1"></script>
+    <script type="module" src="./main.js?v=20261005-test-report1"></script>
   </body>
 </html>
