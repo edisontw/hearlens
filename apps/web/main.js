@@ -233,6 +233,21 @@ function buildTestReport() {
   };
 }
 
+async function copyTestReport() {
+  const report = buildTestReport();
+  const reportText = JSON.stringify(report, null, 2);
+
+  try {
+    await navigator.clipboard.writeText(reportText);
+    els.copyTestReportStatus.textContent =
+      "已複製 " + report.eventLog.length + " 行記錄";
+    appendSttLog("test-report copied");
+  } catch {
+    els.copyTestReportStatus.textContent =
+      "瀏覽器禁止自動複製，請直接複製下方記錄";
+  }
+}
+
 function requestedAudioConstraints() {
   return {
     echoCancellation: false,
@@ -482,6 +497,9 @@ els.closeRecall.addEventListener("click", () => {
   els.recallPanel.hidden = true;
 });
 els.fontSize.addEventListener("click", setFontSize);
+els.copyTestReport?.addEventListener("click", () => {
+  void copyTestReport();
+});
 
 window.addEventListener("pagehide", () => {
   void sttProvider?.dispose?.();
