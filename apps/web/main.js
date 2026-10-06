@@ -1,17 +1,18 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261005-test-report1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-gemini-default1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261005-test-report1";
+} from "./zh-display.js?v=20261006-gemini-default1";
 
-const BUILD_ID = "20261005-test-report1";
+const BUILD_ID = "20261006-gemini-default1";
+const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
 
 function readRuntimeSttConfig() {
   const params = new URLSearchParams(window.location.search);
-  const rawProvider = (params.get("stt") || "auto").trim().toLowerCase();
+  const rawProvider = (params.get("stt") || "gemini").trim().toLowerCase();
   const provider =
     rawProvider === "gemini"
       ? "gemini-live-transcribe"
@@ -29,7 +30,7 @@ function readRuntimeSttConfig() {
 
   return {
     provider,
-    tokenUrl: (params.get("token") || "").trim(),
+    tokenUrl: (params.get("token") || DEFAULT_GEMINI_TOKEN_URL).trim(),
     websocketUrl: (params.get("ws") || "").trim(),
     inputGain,
     inputMode: fixedGainRequested ? "fixed" : "adaptive",
@@ -182,6 +183,12 @@ function setFontSize() {
 function safeRuntimeConfigForReport() {
   return {
     provider: runtimeSttConfig.provider,
+    resolvedProvider:
+      runtimeSttConfig.provider === "auto"
+        ? runtimeSttConfig.tokenUrl
+          ? "gemini-live-transcribe"
+          : "browser-speech"
+        : runtimeSttConfig.provider,
     inputMode: runtimeSttConfig.inputMode,
     inputGain:
       runtimeSttConfig.inputMode === "fixed"
