@@ -39,7 +39,9 @@ export function createSttProvider({
 } = {}) {
   const requested =
     provider === STT_PROVIDER_IDS.AUTO
-      ? STT_PROVIDER_IDS.BROWSER
+      ? tokenUrl
+        ? STT_PROVIDER_IDS.GEMINI
+        : STT_PROVIDER_IDS.BROWSER
       : provider;
 
   if (requested === STT_PROVIDER_IDS.BROWSER) {
