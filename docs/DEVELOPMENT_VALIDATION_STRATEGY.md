@@ -106,6 +106,17 @@ The 2 m / playback-volume 40 follow-up completed the distance gate. Median retai
 
 See `testdata/results/2026-10-06-zh-tw-regression-v2-2m-40.md`.
 
+### Next front-end A/B: browser voice processing
+
+Before introducing custom denoising DSP, test the platform capture stack as the lowest-cost reversible intervention. The default remains `capture=raw`, with echo cancellation, noise suppression, and automatic gain control requested off. The experimental `?capture=voice` profile requests these browser voice-processing constraints on the actual Gemini capture stream.
+
+The exported test report records `runtime.captureMode`, and device diagnostics record the requested, supported, and actual track settings. This is important because browsers may ignore unsupported processing constraints.
+
+Decision rule:
+
+- if the 2 m voice-processing run materially restores transcript completeness without unstable gain, clipping, or obvious speech distortion, retain it as a candidate `Far/Noisy` front-end policy;
+- if it does not help, return to raw capture and evaluate custom conservative enhancement rather than stacking unverified processing.
+
 ## Stage A - prove the pipeline
 
 Goal: establish that the architecture functions before optimizing quality.
