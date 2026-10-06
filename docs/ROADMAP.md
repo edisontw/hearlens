@@ -30,7 +30,7 @@ Goal: validate the simplest useful product.
 - [x] replace fixed-gain exploration with adaptive input normalization + limiter,
 - [ ] add fast customization: Auto/near/normal/far/noisy presets plus bounded advanced tuning and one-tap reset,
 - [x] log/export the active tuning profile so tests are reproducible,
-- [ ] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
+- [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [ ] run the formal Taiwan Mandarin latency/accuracy benchmark only after the capture / normalization / segmentation path is frozen,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - 15–30 s rolling transcript,
