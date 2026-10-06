@@ -38,7 +38,7 @@ test("gain is bounded to the safe experiment range", () => {
 
 test("adaptive normalizer raises weak speech without exceeding max gain", () => {
   const normalizer = new AdaptiveInputNormalizer();
-  const weakSpeech = new Float32Array(1600).fill(0.0004);
+  const weakSpeech = new Float32Array(1600).fill(0.0005);
   let result;
 
   for (let i = 0; i < 20; i += 1) {
@@ -54,7 +54,7 @@ test("adaptive normalizer raises weak speech without exceeding max gain", () => 
 
 test("adaptive normalizer backs off when speech approaches the target level", () => {
   const normalizer = new AdaptiveInputNormalizer();
-  const distantSpeech = new Float32Array(1600).fill(0.0004);
+  const distantSpeech = new Float32Array(1600).fill(0.0005);
 
   for (let i = 0; i < 20; i += 1) {
     normalizer.process(distantSpeech, 16000);
@@ -74,7 +74,7 @@ test("adaptive normalizer backs off when speech approaches the target level", ()
 
 test("adaptive limiter protects the ceiling while gain backs off", () => {
   const normalizer = new AdaptiveInputNormalizer();
-  const weakSpeech = new Float32Array(1600).fill(0.0004);
+  const weakSpeech = new Float32Array(1600).fill(0.0005);
 
   for (let i = 0; i < 20; i += 1) {
     normalizer.process(weakSpeech, 16000);
