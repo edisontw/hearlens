@@ -102,6 +102,10 @@ A follow-up 0.5 m / playback-volume 40 run on build `20261006-adaptive-target2` 
 
 See `testdata/results/2026-10-06-zh-tw-regression-v2-0.5m-40.md`.
 
+The 2 m / playback-volume 40 follow-up completed the distance gate. Median retained adaptive gain was approximately 7.65x and 9/10 retained active-speech samples were at or above 7x, yet recognition degraded sharply while limiter reduction and clipping remained zero. Several speech peaks still reached roughly -36 to -40 dBFS after normalization. This shifts the next engineering question from scalar gain to far-field SNR / reverberation / front-end enhancement.
+
+See `testdata/results/2026-10-06-zh-tw-regression-v2-2m-40.md`.
+
 ## Stage A - prove the pipeline
 
 Goal: establish that the architecture functions before optimizing quality.
@@ -260,8 +264,8 @@ Do not repeat the entire formal benchmark after every small code change.
 1. Stop manual fixed-gain optimization as a product decision.
 2. Implement adaptive input normalization with noise-floor / speech-level telemetry and limiter protection.
 3. Add a bounded quick-preset / advanced-tuning layer with reset and config logging.
-4. Run a short controlled 0.5 / 1 / 2 m playback gate.
-5. If level is normalized but recognition remains poor, isolate SNR / enhancement.
+4. Complete the short controlled 0.5 / 1 / 2 m playback gate. **Done 2026-10-06.**
+5. At 2 m the normalized level is adequate but recognition remains poor; isolate SNR / conservative enhancement next.
 6. If identical trials remain unstable, isolate VAD / segmentation / session behavior.
 7. After the audio path is stable, run cross-device tests.
 8. Then expand to multiple speakers and real acoustic scenes.
