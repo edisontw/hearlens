@@ -1,10 +1,14 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-adaptive-target2";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-voice-capture1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261006-adaptive-target2";
+} from "./zh-display.js?v=20261006-voice-capture1";
+import {
+  normalizeCaptureMode,
+  requestedAudioConstraints,
+} from "./stt/providers/capture-profile.mjs?v=20261006-voice-capture1";
 
-const BUILD_ID = "20261006-adaptive-target2";
+const BUILD_ID = "20261006-voice-capture1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -35,6 +39,7 @@ function readRuntimeSttConfig() {
     websocketUrl: (params.get("ws") || "").trim(),
     inputGain,
     inputMode: fixedGainRequested ? "fixed" : "adaptive",
+    captureMode: normalizeCaptureMode(params.get("capture")),
   };
 }
 
@@ -94,7 +99,9 @@ if (els.diagRuntime) {
     " / " +
     (runtimeSttConfig.inputMode === "adaptive"
       ? "adaptive"
-      : "fixed " + runtimeSttConfig.inputGain.toFixed(2) + "x");
+      : "fixed " + runtimeSttConfig.inputGain.toFixed(2) + "x") +
+    " / capture=" +
+    runtimeSttConfig.captureMode;
 }
 void ensureTaiwanTraditionalDisplay().then((ready) => {
   appendSttLog("display-script " + (ready ? "zh-TW-ready" : "raw-fallback"));
@@ -112,6 +119,7 @@ appendSttLog(
       ? "adaptive"
       : "fixed gain=" + runtimeSttConfig.inputGain.toFixed(2) + "x"),
 );
+appendSttLog("runtime-capture " + runtimeSttConfig.captureMode);
 
 async function ensureLatestBuild() {
   try {
@@ -242,6 +250,7 @@ function safeRuntimeConfigForReport() {
       runtimeSttConfig.inputMode === "fixed"
         ? runtimeSttConfig.inputGain
         : null,
+    captureMode: runtimeSttConfig.captureMode,
     tokenConfigured: Boolean(runtimeSttConfig.tokenUrl),
     websocketConfigured: Boolean(runtimeSttConfig.websocketUrl),
   };
@@ -304,19 +313,10 @@ async function copyTestReport() {
   }
 }
 
-function requestedAudioConstraints() {
-  return {
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
-    channelCount: 1,
-  };
-}
-
 function renderDiagnostics(track) {
   const settings = track.getSettings?.() ?? {};
   const supported = navigator.mediaDevices.getSupportedConstraints?.() ?? {};
-  const requested = requestedAudioConstraints();
+  const requested = requestedAudioConstraints(runtimeSttConfig.captureMode);
 
   els.diagMic.textContent = track.label || "已取得麥克風";
   els.diagRate.textContent = audioContext
@@ -391,7 +391,7 @@ async function startSession() {
   // getUserMedia here is used only for permission/device diagnostics.
   // The selected STT provider owns its actual recognition capture.
   stream = await navigator.mediaDevices.getUserMedia({
-    audio: requestedAudioConstraints(),
+    audio: requestedAudioConstraints(runtimeSttConfig.captureMode),
     video: false,
   });
 
@@ -425,6 +425,7 @@ async function startSession() {
     websocketUrl: runtimeSttConfig.websocketUrl,
     inputGain: runtimeSttConfig.inputGain,
     inputMode: runtimeSttConfig.inputMode,
+    captureMode: runtimeSttConfig.captureMode,
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
