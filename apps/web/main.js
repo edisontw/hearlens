@@ -1,14 +1,15 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-preflight1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-adaptive-target2";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261006-preflight1";
+} from "./zh-display.js?v=20261006-adaptive-target2";
 
-const BUILD_ID = "20261006-preflight1";
+const BUILD_ID = "20261006-adaptive-target2";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
+const MAX_REPORT_DEBUG_LINES = 5000;
 
 function readRuntimeSttConfig() {
   const params = new URLSearchParams(window.location.search);
@@ -77,9 +78,11 @@ let lastRecognizedAt = 0;
 let fontIndex = 0;
 let sessionCounter = 0;
 let activeSessionId = 0;
+let activeInputProfile = null;
 const transcript = [];
 const sessionFinals = [];
 const debugLines = [];
+const reportDebugLines = [];
 
 appendSttLog("build " + BUILD_ID);
 if (els.diagBuild) {
@@ -143,7 +146,13 @@ function setStatus(text, state = "idle") {
 
 function appendSttLog(message) {
   const time = new Date().toLocaleTimeString("zh-TW", { hour12: false });
-  debugLines.push(time + " " + message);
+  const line = time + " " + message;
+  debugLines.push(line);
+  reportDebugLines.push(line);
+
+  while (reportDebugLines.length > MAX_REPORT_DEBUG_LINES) {
+    reportDebugLines.shift();
+  }
 
   while (debugLines.length > MAX_DEBUG_LINES) {
     debugLines.shift();
@@ -259,6 +268,7 @@ function buildTestReport() {
       notes: els.testNotes?.value?.trim() || null,
     },
     runtime: safeRuntimeConfigForReport(),
+    inputProfile: activeInputProfile,
     page: {
       origin: window.location.origin,
       pathname: window.location.pathname,
@@ -275,7 +285,7 @@ function buildTestReport() {
       rawText: item.rawText,
     })),
     finalTranscript: sessionFinals.map((item) => item.text).join(" ").trim(),
-    eventLog: [...debugLines],
+    eventLog: [...reportDebugLines],
   };
 }
 
@@ -370,6 +380,7 @@ async function startSession() {
 
   const sessionId = ++sessionCounter;
   activeSessionId = sessionId;
+  activeInputProfile = null;
   sessionFinals.length = 0;
   appendSttLog("S" + sessionId + " session-start");
 
@@ -443,6 +454,13 @@ async function startSession() {
       appendSttLog("S" + sessionId + " provider-error " + (code || message));
     },
     onDebug: ({ event, detail, segmentId }) => {
+      if (event === "input-profile" && detail) {
+        try {
+          activeInputProfile = JSON.parse(detail);
+        } catch {
+          activeInputProfile = { raw: detail };
+        }
+      }
       const suffix = detail ? " " + detail : "";
       appendSttLog(
         "S" + sessionId + " seg" + segmentId + " " + event + suffix,

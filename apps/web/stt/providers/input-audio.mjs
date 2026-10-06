@@ -33,7 +33,7 @@ function measureInput(input) {
 }
 
 export const DEFAULT_ADAPTIVE_INPUT_CONFIG = Object.freeze({
-  targetRmsDbfs: -30,
+  targetRmsDbfs: -48,
   minGain: 1,
   maxGain: 8,
   gainUpMs: 350,

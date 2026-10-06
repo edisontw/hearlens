@@ -1,6 +1,6 @@
 # Development and Validation Strategy
 
-Updated: 2026-10-05
+Updated: 2026-10-06
 
 ## Purpose
 
@@ -82,6 +82,21 @@ Verified on the current Android Chrome test path:
 - The 1 m raw signal in these tests was often around -60 to -70 dBFS RMS, with no clipping even at 8x.
 
 These figures are engineering observations only. They are not a benchmark result because the speaker, acoustic output, and session conditions were not controlled. In particular, the 6x result demonstrates that single-run percentages can be dominated by uncontrolled variation.
+
+### First controlled v2 baseline — 2026-10-06
+
+A valid controlled run using `zh-tw-regression-v2`, Gemini Live, 1 m distance, and playback-volume field `40` showed:
+
+- adaptive gain at 8.00x for every retained level sample,
+- speech estimate around -66.8 dBFS,
+- noise floor around -78 dBFS,
+- no limiter reduction,
+- 0.00% clipped samples,
+- good preservation of the main daily-content sentences and numeric details.
+
+This showed that the previous -30 dBFS target was not functioning as a practical normalization target under the tested capture path: the controller simply remained at its 8x ceiling. Because the successful effective speech level was approximately -48.7 dBFS after 8x gain, the next controller revision uses -48 dBFS as the engineering target. This keeps weak 1 m speech at the bounded ceiling while allowing closer/stronger speech to reduce gain automatically.
+
+See `testdata/results/2026-10-06-zh-tw-regression-v2-1m-40.md`.
 
 ## Stage A - prove the pipeline
 
