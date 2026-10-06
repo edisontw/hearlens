@@ -93,6 +93,12 @@ Implementation status:
 
 The initial proxy defaults to a configurable V2 `us` / `chirp_3` path. Location and model are environment variables so Taiwan latency and regional model behavior can be benchmarked without rebuilding the browser client.
 
+### Current Web default — 2026-10-06
+
+The deployed Web Hearing Lab now defaults to Gemini 3.5 Transcribe Live using the MN4 ephemeral-token broker. Browser SpeechRecognition remains available only as an explicit fallback through `?stt=browser`.
+
+If `?stt=auto` is used, HearLens selects Gemini when a token broker URL is configured and falls back to Browser SpeechRecognition only when no token broker is available.
+
 ### D. OpenAI transcription — comparison benchmark
 
 OpenAI provides dedicated transcription and live-transcription models.

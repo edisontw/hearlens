@@ -27,11 +27,13 @@ curl http://127.0.0.1:8787/healthz
 
 The production endpoint must use HTTPS because HearLens is served from GitHub Pages over HTTPS. Put this service behind the existing MN4 nginx or another TLS reverse proxy.
 
-Example HearLens URL after HTTPS is configured:
+The deployed Web Hearing Lab uses the production broker by default, so the normal URL needs no STT query parameters:
 
 ```text
-https://edisontw.github.io/hearlens/?stt=gemini&token=https%3A%2F%2FYOUR-HOST%2Fhearlens-token
+https://edisontw.github.io/hearlens/
 ```
+
+For engineering overrides, `?stt=browser` explicitly selects Browser SpeechRecognition, while `?token=...` can override the broker endpoint.
 
 Do not expose the long-lived Gemini API key to browser JavaScript, GitHub Actions logs, query strings, or the repository.
 
