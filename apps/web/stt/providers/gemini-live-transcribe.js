@@ -1,5 +1,5 @@
 import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp4";
-import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261005-adaptive1";
+import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261006-adaptive-target2";
 
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
