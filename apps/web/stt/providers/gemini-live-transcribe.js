@@ -1,5 +1,9 @@
 import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp4";
-import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261006-adaptive-target2";
+import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261006-voice-capture1";
+import {
+  normalizeCaptureMode,
+  requestedAudioConstraints,
+} from "./capture-profile.mjs?v=20261006-voice-capture1";
 
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
@@ -22,15 +26,6 @@ function normalizeTokenUrl(value) {
     throw new Error("Gemini token URL must use HTTPS.");
   }
   return url.toString();
-}
-
-function requestedAudioConstraints() {
-  return {
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
-    channelCount: 1,
-  };
 }
 
 function resampleLinear(input, sourceRate, targetRate = TARGET_SAMPLE_RATE) {
@@ -75,6 +70,7 @@ export class GeminiLiveTranscribeProvider {
     tokenUrl = "",
     inputGain = 1,
     inputMode = "adaptive",
+    captureMode = "raw",
     normalizationConfig = {},
     onPartial = () => {},
     onFinal = () => {},
@@ -87,6 +83,7 @@ export class GeminiLiveTranscribeProvider {
     this.tokenUrl = tokenUrl;
     this.inputGain = Math.min(8, Math.max(1, Number(inputGain) || 1));
     this.inputMode = inputMode === "fixed" ? "fixed" : "adaptive";
+    this.captureMode = normalizeCaptureMode(captureMode);
     this.normalizationConfig = normalizationConfig;
     this.inputNormalizer = null;
     this.onPartial = onPartial;
@@ -357,7 +354,7 @@ export class GeminiLiveTranscribeProvider {
 
   async startCapture() {
     this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: requestedAudioConstraints(),
+      audio: requestedAudioConstraints(this.captureMode),
       video: false,
     });
 
@@ -443,6 +440,7 @@ export class GeminiLiveTranscribeProvider {
       "capture-ready",
       "source-rate=" + this.audioContext.sampleRate +
         ", target-rate=16000, mode=" + this.inputMode +
+        ", capture=" + this.captureMode +
         (this.inputMode === "fixed"
           ? ", gain=" + this.inputGain.toFixed(2) + "x"
           : ""),
