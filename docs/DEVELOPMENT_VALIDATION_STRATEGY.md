@@ -98,6 +98,10 @@ This showed that the previous -30 dBFS target was not functioning as a practical
 
 See `testdata/results/2026-10-06-zh-tw-regression-v2-1m-40.md`.
 
+A follow-up 0.5 m / playback-volume 40 run on build `20261006-adaptive-target2` validated adaptive back-off: the retained gain ranged from 1.00x to 6.28x, with active-speech samples roughly 2.19x–6.02x, while limiter reduction and clipping remained zero. This is the first controlled evidence that the -48 dBFS target behaves adaptively rather than acting as a fixed 8x preamp.
+
+See `testdata/results/2026-10-06-zh-tw-regression-v2-0.5m-40.md`.
+
 ## Stage A - prove the pipeline
 
 Goal: establish that the architecture functions before optimizing quality.
