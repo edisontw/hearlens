@@ -1,9 +1,9 @@
 import { decodeWebSocketData } from "./gemini-live-wire.mjs?v=20261004-gemini-live-mvp4";
-import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261006-voice-capture1";
+import { AdaptiveInputNormalizer, processInputAudio } from "./input-audio.mjs?v=20261006-voice-repeat1";
 import {
   normalizeCaptureMode,
   requestedAudioConstraints,
-} from "./capture-profile.mjs?v=20261006-voice-capture1";
+} from "./capture-profile.mjs?v=20261006-voice-repeat1";
 
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
@@ -357,6 +357,15 @@ export class GeminiLiveTranscribeProvider {
       audio: requestedAudioConstraints(this.captureMode),
       video: false,
     });
+
+    const [captureTrack] = this.stream.getAudioTracks();
+    this.debug(
+      "capture-settings",
+      JSON.stringify({
+        requested: requestedAudioConstraints(this.captureMode),
+        actual: captureTrack?.getSettings?.() ?? {},
+      }),
+    );
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) {

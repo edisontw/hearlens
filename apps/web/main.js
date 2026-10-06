@@ -1,14 +1,14 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-voice-capture1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-voice-repeat1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261006-voice-capture1";
+} from "./zh-display.js?v=20261006-voice-repeat1";
 import {
   normalizeCaptureMode,
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261006-voice-capture1";
+} from "./stt/providers/capture-profile.mjs?v=20261006-voice-repeat1";
 
-const BUILD_ID = "20261006-voice-capture1";
+const BUILD_ID = "20261006-voice-repeat1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -84,6 +84,7 @@ let fontIndex = 0;
 let sessionCounter = 0;
 let activeSessionId = 0;
 let activeInputProfile = null;
+let activeCaptureSettings = null;
 const transcript = [];
 const sessionFinals = [];
 const debugLines = [];
@@ -278,6 +279,7 @@ function buildTestReport() {
     },
     runtime: safeRuntimeConfigForReport(),
     inputProfile: activeInputProfile,
+    captureSettings: activeCaptureSettings,
     page: {
       origin: window.location.origin,
       pathname: window.location.pathname,
@@ -381,6 +383,7 @@ async function startSession() {
   const sessionId = ++sessionCounter;
   activeSessionId = sessionId;
   activeInputProfile = null;
+  activeCaptureSettings = null;
   sessionFinals.length = 0;
   appendSttLog("S" + sessionId + " session-start");
 
@@ -460,6 +463,13 @@ async function startSession() {
           activeInputProfile = JSON.parse(detail);
         } catch {
           activeInputProfile = { raw: detail };
+        }
+      }
+      if (event === "capture-settings" && detail) {
+        try {
+          activeCaptureSettings = JSON.parse(detail);
+        } catch {
+          activeCaptureSettings = { raw: detail };
         }
       }
       const suffix = detail ? " " + detail : "";
