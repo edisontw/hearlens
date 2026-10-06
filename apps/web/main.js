@@ -1,10 +1,10 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-gemini-default1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-preflight1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261006-gemini-default1";
+} from "./zh-display.js?v=20261006-preflight1";
 
-const BUILD_ID = "20261006-gemini-default1";
+const BUILD_ID = "20261006-preflight1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -51,6 +51,8 @@ const els = {
   status: document.querySelector("#status"),
   diagMic: document.querySelector("#diag-mic"),
   diagStt: document.querySelector("#diag-stt"),
+  diagBuild: document.querySelector("#diag-build"),
+  diagRuntime: document.querySelector("#diag-runtime"),
   diagRate: document.querySelector("#diag-rate"),
   diagChannels: document.querySelector("#diag-channels"),
   diagBaseLatency: document.querySelector("#diag-base-latency"),
@@ -80,6 +82,17 @@ const sessionFinals = [];
 const debugLines = [];
 
 appendSttLog("build " + BUILD_ID);
+if (els.diagBuild) {
+  els.diagBuild.textContent = BUILD_ID;
+}
+if (els.diagRuntime) {
+  els.diagRuntime.textContent =
+    runtimeSttConfig.provider +
+    " / " +
+    (runtimeSttConfig.inputMode === "adaptive"
+      ? "adaptive"
+      : "fixed " + runtimeSttConfig.inputGain.toFixed(2) + "x");
+}
 void ensureTaiwanTraditionalDisplay().then((ready) => {
   appendSttLog("display-script " + (ready ? "zh-TW-ready" : "raw-fallback"));
 });
@@ -96,6 +109,32 @@ appendSttLog(
       ? "adaptive"
       : "fixed gain=" + runtimeSttConfig.inputGain.toFixed(2) + "x"),
 );
+
+async function ensureLatestBuild() {
+  try {
+    const buildUrl = new URL("./build.json", window.location.href);
+    buildUrl.searchParams.set("_", Date.now().toString());
+    const response = await fetch(buildUrl, { cache: "no-store" });
+    if (!response.ok) return;
+
+    const latest = await response.json();
+    if (!latest?.buildId || latest.buildId === BUILD_ID) return;
+
+    appendSttLog("stale-build latest=" + latest.buildId);
+    setStatus("偵測到新版，重新載入中…");
+
+    const reloadUrl = new URL(window.location.href);
+    reloadUrl.searchParams.set("_build", latest.buildId);
+    window.location.replace(reloadUrl.toString());
+  } catch (error) {
+    appendSttLog(
+      "build-check skipped " +
+        (error instanceof Error ? error.message : "unknown"),
+    );
+  }
+}
+
+void ensureLatestBuild();
 
 function setStatus(text, state = "idle") {
   els.status.textContent = text;
