@@ -32,7 +32,7 @@ Goal: validate the simplest useful product.
 - [x] log/export the active tuning profile so tests are reproducible,
 - [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [x] validate Far/Noisy voice capture on at least one additional receiving phone before considering it for Auto (HTC U23 2 m A/B PASS; post-run distance correction recorded),
-- [ ] run one HTC U23 1 m Auto vs Far/Noisy safety A/B before changing the global Auto capture policy,
+- [x] run one HTC U23 1 m Auto vs Far/Noisy safety A/B (PASS: voice materially improved transcript continuity with zero retained clipping; global Auto remains raw for cross-device conservatism),
 - [ ] run the formal Taiwan Mandarin latency/accuracy benchmark only after the capture / normalization / segmentation path is frozen,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - 15–30 s rolling transcript,

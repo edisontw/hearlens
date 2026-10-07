@@ -153,6 +153,30 @@ Do **not** yet make voice capture the global Auto default. The HTC U23 voice pat
 
 See `testdata/results/2026-10-07-zh-tw-regression-v2-2m-40-htc-u23.md`.
 
+### HTC U23 normal-distance safety A/B — 1 m — 2026-10-07
+
+A second controlled A/B on the same HTC U23 used build `20261007-device-gate1`, source `zh-tw-regression-v2`, receiving distance **1 m**, playback-volume field `40`, and the same room setup.
+
+The exported metadata was incomplete: the Auto/raw report omitted receiver, distance, playback volume, and notes; the Far/Noisy report recorded `distance: "1m"` but omitted receiver and playback volume. The operator supplied the missing controlled-test context after the run. Preserve the raw reports unchanged and treat this result note as the completed metadata record.
+
+Results:
+
+- Auto/raw retained only two short fragmented finals from the first half of the source.
+- Far/Noisy/voice retained a long coherent final from the beginning through the third instruction, substantially more complete than Auto/raw.
+- HTC U23 voice capture again reported `echoCancellation=true`, `noiseSuppression=true`, and `autoGainControl=true`.
+- Retained telemetry showed no limiter reduction and 0.00% clipping, despite substantially stronger voice-processed peaks.
+
+Decision: **PASS** for the HTC U23 1 m safety A/B. Voice capture did not show an obvious 1 m penalty in this controlled run and materially improved transcript continuity.
+
+This does not by itself justify changing the global Auto policy for every browser/device combination. Keep the user-facing policy unchanged for now:
+
+- Auto -> raw capture,
+- Far / Noisy -> voice capture.
+
+The preset/capture behavior is now stable enough to stop adding distance-specific labels or repeating the same distance matrix. The next product-development work should return to bounded advanced tuning / profile export rather than continue retesting the same capture question.
+
+See `testdata/results/2026-10-07-zh-tw-regression-v2-1m-40-htc-u23.md`.
+
 ## Stage A - prove the pipeline
 
 Goal: establish that the architecture functions before optimizing quality.
