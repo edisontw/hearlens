@@ -39,6 +39,17 @@
           <button id="font-size" class="secondary" type="button">字再大一點</button>
         </div>
 
+        <div class="quick-profile" aria-label="快速收音設定">
+          <label for="quick-preset">收音模式</label>
+          <select id="quick-preset">
+            <option value="auto">自動（建議）</option>
+            <option value="far-noisy">遠距離／吵雜</option>
+            <option value="custom" disabled>工程覆寫</option>
+          </select>
+          <button id="reset-preset" class="text-button" type="button">恢復自動</button>
+          <span id="preset-hint"></span>
+        </div>
+
         <p class="hint">
           聽不清楚時，先把手機移到說話者附近。HearLens 目前不會把麥克風聲音放大到手機喇叭。
         </p>
@@ -122,7 +133,7 @@
               在第二支手機開啟測試音檔
             </a>
             <span>只在播放用的第二支手機開啟；辨識用手機不要播放此音檔。</span>
-            <span>2 m 前端 A/B：網址加 <code>?capture=voice</code> 可測試瀏覽器 voice processing；預設仍為 raw。</span>
+            <span>一般使用請直接選上方「遠距離／吵雜」；<code>?capture=...</code> 僅保留作工程覆寫。</span>
           </div>
 
           <div class="report-actions">
@@ -149,6 +160,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261006-voice-repeat1"></script>
+    <script type="module" src="./main.js?v=20261007-presets1"></script>
   </body>
 </html>
