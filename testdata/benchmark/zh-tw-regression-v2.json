@@ -1,0 +1,86 @@
+{
+  "schema": "hearlens-benchmark-definition-v1",
+  "sourceId": "zh-tw-regression-v2",
+  "audioFile": "testdata/audio/hearlens-zh-tw-regression-v2.wav",
+  "audioSha256": "cdd7b9d8d1c94d1f254d7c9fe20b598e1e99982fb1bd96e3555c823ca32b77da",
+  "referenceText": "今天是十月五日，現在進行 HearLens 中文語音辨識測試。請把手機放在固定位置，不要改變播放音量。第一段，今天天氣不錯，我們下午三點在門口見面。第二段，請記得帶健保卡、手機和雨傘。第三段，我的電話末四碼是五七二九，房間號碼是一二零八。第四段，醫師說下週二上午九點半回診。第五段，早餐我想吃蛋餅、豆漿和一杯熱咖啡。第六段，請幫我把客廳的燈關掉，窗戶記得留一點縫。最後一句，這是一段固定的台灣華語測試語音，請記錄完整的辨識結果。",
+  "utteranceAnchors": [
+    {
+      "id": "u01-opening",
+      "label": "opening test sentence",
+      "variants": ["HearLens中文語音辨識測試"]
+    },
+    {
+      "id": "u02-fixed-position",
+      "label": "fixed position / playback volume instruction",
+      "variants": ["手機放在固定位置", "不要改變播放音量"]
+    },
+    {
+      "id": "u03-meeting",
+      "label": "3 PM meeting sentence",
+      "variants": ["下午三點在門口見面", "下午3點在門口見面"]
+    },
+    {
+      "id": "u04-items",
+      "label": "health card / phone / umbrella sentence",
+      "variants": ["健保卡手機和雨傘"]
+    },
+    {
+      "id": "u05-numbers",
+      "label": "phone suffix / room number sentence",
+      "variants": ["電話末四碼", "房間號碼"]
+    },
+    {
+      "id": "u06-appointment",
+      "label": "Tuesday 9:30 appointment sentence",
+      "variants": ["下週二上午九點半回診", "下週二上午9點半回診", "下週二上午9:30回診"]
+    },
+    {
+      "id": "u07-breakfast",
+      "label": "breakfast sentence",
+      "variants": ["蛋餅豆漿和一杯熱咖啡"]
+    },
+    {
+      "id": "u08-living-room",
+      "label": "living-room light / window sentence",
+      "variants": ["客廳的燈關掉", "窗戶記得留一點縫"]
+    },
+    {
+      "id": "u09-closing",
+      "label": "closing fixed Taiwan-Mandarin sentence",
+      "variants": ["固定的台灣華語測試語音"]
+    }
+  ],
+  "keyFields": [
+    {
+      "id": "date",
+      "label": "October 5",
+      "variants": ["十月五日", "10月5日"]
+    },
+    {
+      "id": "meeting-time",
+      "label": "3 PM",
+      "variants": ["下午三點", "下午3點"]
+    },
+    {
+      "id": "health-card",
+      "label": "health card",
+      "variants": ["健保卡"]
+    },
+    {
+      "id": "phone-suffix",
+      "label": "5729",
+      "variants": ["五七二九", "5729"]
+    },
+    {
+      "id": "room-number",
+      "label": "1208",
+      "variants": ["一二零八", "1208"]
+    },
+    {
+      "id": "appointment-time",
+      "label": "Tuesday 9:30 AM",
+      "variants": ["下週二上午九點半", "下週二上午9點半", "下週二上午9:30"]
+    }
+  ]
+}
