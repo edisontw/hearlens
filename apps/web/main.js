@@ -1,17 +1,22 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-device-gate1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-tuning-profile1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261007-device-gate1";
+} from "./zh-display.js?v=20261007-tuning-profile1";
 import {
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261007-device-gate1";
+} from "./stt/providers/capture-profile.mjs?v=20261007-tuning-profile1";
 import {
   QUICK_PRESETS,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261007-device-gate1";
+} from "./stt/providers/quick-presets.mjs?v=20261007-tuning-profile1";
+import {
+  clearAdvancedTuningParams,
+  resolveAdvancedTuning,
+  writeAdvancedTuningParams,
+} from "./stt/providers/tuning-profile.mjs?v=20261007-tuning-profile1";
 
-const BUILD_ID = "20261007-device-gate1";
+const BUILD_ID = "20261007-tuning-profile1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -30,17 +35,19 @@ function readRuntimeSttConfig() {
           ? "browser-speech"
           : rawProvider;
 
-  const quickPreset = resolveQuickPreset({
-    presetValue: params.get("preset"),
-    captureOverridePresent: params.has("capture"),
-    captureValue: params.get("capture"),
-  });
-
+  const tuningProfile = resolveAdvancedTuning(params);
   const fixedGainRequested = params.has("gain");
   const requestedGain = Number(params.get("gain") || "1");
   const inputGain = Number.isFinite(requestedGain)
     ? Math.min(8, Math.max(1, requestedGain))
     : 1;
+  const captureOverridePresent = params.has("capture");
+  const quickPreset = resolveQuickPreset({
+    presetValue: params.get("preset"),
+    captureOverridePresent,
+    captureValue: params.get("capture"),
+    tuningOverridePresent: tuningProfile.enabled || fixedGainRequested,
+  });
 
   return {
     provider,
@@ -50,6 +57,9 @@ function readRuntimeSttConfig() {
     inputMode: fixedGainRequested ? "fixed" : "adaptive",
     preset: quickPreset.preset,
     captureMode: quickPreset.captureMode,
+    captureOverridePresent,
+    tuningProfile,
+    normalizationConfig: tuningProfile.normalizationConfig,
   };
 }
 
@@ -64,6 +74,17 @@ const els = {
   quickPreset: document.querySelector("#quick-preset"),
   resetPreset: document.querySelector("#reset-preset"),
   presetHint: document.querySelector("#preset-hint"),
+  advancedTuningFieldset: document.querySelector("#advanced-tuning-fieldset"),
+  tuningTarget: document.querySelector("#tuning-target"),
+  tuningMinGain: document.querySelector("#tuning-min-gain"),
+  tuningMaxGain: document.querySelector("#tuning-max-gain"),
+  tuningResponse: document.querySelector("#tuning-response"),
+  tuningCapture: document.querySelector("#tuning-capture"),
+  applyTuning: document.querySelector("#apply-tuning"),
+  resetTuning: document.querySelector("#reset-tuning"),
+  copyTuningLink: document.querySelector("#copy-tuning-link"),
+  tuningSummary: document.querySelector("#active-tuning-summary"),
+  tuningCopyStatus: document.querySelector("#tuning-copy-status"),
   caption: document.querySelector("#caption"),
   recallPanel: document.querySelector("#recall-panel"),
   recallText: document.querySelector("#recall-text"),
@@ -118,7 +139,15 @@ if (els.diagRuntime) {
     " / preset=" +
     runtimeSttConfig.preset +
     " / capture=" +
-    runtimeSttConfig.captureMode;
+    runtimeSttConfig.captureMode +
+    " / target=" +
+    runtimeSttConfig.tuningProfile.controls.targetRmsDbfs +
+    "dBFS / gain=" +
+    runtimeSttConfig.tuningProfile.controls.minGain +
+    "-" +
+    runtimeSttConfig.tuningProfile.controls.maxGain +
+    "x / response=" +
+    runtimeSttConfig.tuningProfile.controls.responseSpeed;
 }
 void ensureTaiwanTraditionalDisplay().then((ready) => {
   appendSttLog("display-script " + (ready ? "zh-TW-ready" : "raw-fallback"));
@@ -138,6 +167,9 @@ appendSttLog(
 );
 appendSttLog("runtime-preset " + runtimeSttConfig.preset);
 appendSttLog("runtime-capture " + runtimeSttConfig.captureMode);
+appendSttLog(
+  "runtime-tuning " + JSON.stringify(runtimeSttConfig.tuningProfile),
+);
 
 function renderPresetUi() {
   if (!els.quickPreset) return;
@@ -145,10 +177,103 @@ function renderPresetUi() {
   if (els.presetHint) {
     els.presetHint.textContent =
       runtimeSttConfig.preset === QUICK_PRESETS.FAR_NOISY
-        ? "遠距離／吵雜：使用已在 2 m iPhone 測試中重複改善辨識的 voice capture。"
+        ? "遠距離／吵雜：使用已在 iPhone 與 HTC U23 測試中改善辨識的 voice capture。"
         : runtimeSttConfig.preset === QUICK_PRESETS.CUSTOM
           ? "目前使用工程參數覆寫；按「恢復自動」可回到標準設定。"
           : "自動：使用 raw capture；目前仍是一般情境的標準設定。";
+  }
+}
+
+function selectedAdvancedTuningControls() {
+  return {
+    targetRmsDbfs: Number(els.tuningTarget?.value),
+    minGain: Number(els.tuningMinGain?.value),
+    maxGain: Number(els.tuningMaxGain?.value),
+    responseSpeed: els.tuningResponse?.value || "balanced",
+  };
+}
+
+function renderAdvancedTuningUi() {
+  const controls = runtimeSttConfig.tuningProfile.controls;
+
+  if (els.tuningTarget) els.tuningTarget.value = String(controls.targetRmsDbfs);
+  if (els.tuningMinGain) els.tuningMinGain.value = String(controls.minGain);
+  if (els.tuningMaxGain) els.tuningMaxGain.value = String(controls.maxGain);
+  if (els.tuningResponse) els.tuningResponse.value = controls.responseSpeed;
+  if (els.tuningCapture) {
+    els.tuningCapture.value = runtimeSttConfig.captureOverridePresent
+      ? runtimeSttConfig.captureMode
+      : "";
+  }
+
+  if (els.tuningSummary) {
+    els.tuningSummary.textContent =
+      "目前：" +
+      controls.targetRmsDbfs +
+      " dBFS · " +
+      controls.minGain +
+      "–" +
+      controls.maxGain +
+      "x · " +
+      controls.responseSpeed +
+      " · capture=" +
+      runtimeSttConfig.captureMode +
+      (runtimeSttConfig.tuningProfile.enabled ? " · profile v1" : " · default");
+  }
+}
+
+function setAdvancedTuningDisabled(disabled) {
+  if (els.advancedTuningFieldset) {
+    els.advancedTuningFieldset.disabled = disabled;
+  }
+}
+
+function applyAdvancedTuning() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("gain");
+  url.searchParams.delete("_build");
+  writeAdvancedTuningParams(
+    url.searchParams,
+    selectedAdvancedTuningControls(),
+  );
+
+  const capture = els.tuningCapture?.value || "";
+  if (capture === "raw" || capture === "voice") {
+    url.searchParams.set("capture", capture);
+  } else {
+    url.searchParams.delete("capture");
+  }
+
+  window.location.assign(url.toString());
+}
+
+async function copyAdvancedTuningLink() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("gain");
+  url.searchParams.delete("_build");
+  url.searchParams.delete("token");
+  url.searchParams.delete("ws");
+  writeAdvancedTuningParams(
+    url.searchParams,
+    selectedAdvancedTuningControls(),
+  );
+
+  const capture = els.tuningCapture?.value || "";
+  if (capture === "raw" || capture === "voice") {
+    url.searchParams.set("capture", capture);
+  } else {
+    url.searchParams.delete("capture");
+  }
+
+  try {
+    await navigator.clipboard.writeText(url.toString());
+    if (els.tuningCopyStatus) {
+      els.tuningCopyStatus.textContent = "已複製版本化設定連結";
+    }
+  } catch {
+    if (els.tuningCopyStatus) {
+      els.tuningCopyStatus.textContent = "瀏覽器禁止自動複製";
+    }
   }
 }
 
@@ -157,6 +282,7 @@ function applyQuickPreset(preset) {
   url.searchParams.delete("gain");
   url.searchParams.delete("capture");
   url.searchParams.delete("_build");
+  clearAdvancedTuningParams(url.searchParams);
 
   if (preset === QUICK_PRESETS.FAR_NOISY) {
     url.searchParams.set("preset", QUICK_PRESETS.FAR_NOISY);
@@ -168,6 +294,7 @@ function applyQuickPreset(preset) {
 }
 
 renderPresetUi();
+renderAdvancedTuningUi();
 
 async function ensureLatestBuild() {
   try {
@@ -300,6 +427,7 @@ function safeRuntimeConfigForReport() {
         : null,
     preset: runtimeSttConfig.preset,
     captureMode: runtimeSttConfig.captureMode,
+    tuningProfile: runtimeSttConfig.tuningProfile,
     tokenConfigured: Boolean(runtimeSttConfig.tokenUrl),
     websocketConfigured: Boolean(runtimeSttConfig.websocketUrl),
   };
@@ -441,6 +569,7 @@ async function startSession() {
   els.stop.disabled = true;
   if (els.quickPreset) els.quickPreset.disabled = true;
   if (els.resetPreset) els.resetPreset.disabled = true;
+  setAdvancedTuningDisabled(true);
 
   // getUserMedia here is used only for permission/device diagnostics.
   // The selected STT provider owns its actual recognition capture.
@@ -480,6 +609,7 @@ async function startSession() {
     inputGain: runtimeSttConfig.inputGain,
     inputMode: runtimeSttConfig.inputMode,
     captureMode: runtimeSttConfig.captureMode,
+    normalizationConfig: runtimeSttConfig.normalizationConfig,
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
@@ -580,6 +710,7 @@ async function stopSession() {
   els.stop.disabled = true;
   if (els.quickPreset) els.quickPreset.disabled = false;
   if (els.resetPreset) els.resetPreset.disabled = false;
+  setAdvancedTuningDisabled(false);
   setStatus("已停止");
   appendSttLog("S" + sessionId + " session-stopped");
 }
@@ -615,6 +746,7 @@ els.start.addEventListener("click", async () => {
     els.stop.disabled = true;
     if (els.quickPreset) els.quickPreset.disabled = false;
     if (els.resetPreset) els.resetPreset.disabled = false;
+    setAdvancedTuningDisabled(false);
   }
 });
 
@@ -632,6 +764,13 @@ els.quickPreset?.addEventListener("change", (event) => {
 });
 els.resetPreset?.addEventListener("click", () => {
   applyQuickPreset(QUICK_PRESETS.AUTO);
+});
+els.applyTuning?.addEventListener("click", applyAdvancedTuning);
+els.resetTuning?.addEventListener("click", () => {
+  applyQuickPreset(QUICK_PRESETS.AUTO);
+});
+els.copyTuningLink?.addEventListener("click", () => {
+  void copyAdvancedTuningLink();
 });
 els.copyTestReport?.addEventListener("click", () => {
   void copyTestReport();
