@@ -44,9 +44,9 @@ Goal: validate the simplest useful product.
 Exit criteria:
 
 - usable on current Android Chrome and iOS Safari for caption workflow,
-- partial/final caption latency telemetry,
+- [x] client-observed first partial/final caption startup latency telemetry (first-audio-chunk reference when available; formal end-to-end benchmark remains separate),
 - session transcript clears by default,
-- [ ] older-user manual UX pass (caption size, start/stop clarity, recall, one-handed mobile use).
+- [x] older-user manual UX pass (caption size, start/stop clarity, recall, one-handed mobile use).
 
 ## M02 — Phone-Near-Talker Validation
 
