@@ -1,14 +1,17 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261006-voice-repeat1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-presets1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261006-voice-repeat1";
+} from "./zh-display.js?v=20261007-presets1";
 import {
-  normalizeCaptureMode,
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261006-voice-repeat1";
+} from "./stt/providers/capture-profile.mjs?v=20261007-presets1";
+import {
+  QUICK_PRESETS,
+  resolveQuickPreset,
+} from "./stt/providers/quick-presets.mjs?v=20261007-presets1";
 
-const BUILD_ID = "20261006-voice-repeat1";
+const BUILD_ID = "20261007-presets1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -27,6 +30,12 @@ function readRuntimeSttConfig() {
           ? "browser-speech"
           : rawProvider;
 
+  const quickPreset = resolveQuickPreset({
+    presetValue: params.get("preset"),
+    captureOverridePresent: params.has("capture"),
+    captureValue: params.get("capture"),
+  });
+
   const fixedGainRequested = params.has("gain");
   const requestedGain = Number(params.get("gain") || "1");
   const inputGain = Number.isFinite(requestedGain)
@@ -39,7 +48,8 @@ function readRuntimeSttConfig() {
     websocketUrl: (params.get("ws") || "").trim(),
     inputGain,
     inputMode: fixedGainRequested ? "fixed" : "adaptive",
-    captureMode: normalizeCaptureMode(params.get("capture")),
+    preset: quickPreset.preset,
+    captureMode: quickPreset.captureMode,
   };
 }
 
@@ -51,6 +61,9 @@ const els = {
   recall: document.querySelector("#recall"),
   closeRecall: document.querySelector("#close-recall"),
   fontSize: document.querySelector("#font-size"),
+  quickPreset: document.querySelector("#quick-preset"),
+  resetPreset: document.querySelector("#reset-preset"),
+  presetHint: document.querySelector("#preset-hint"),
   caption: document.querySelector("#caption"),
   recallPanel: document.querySelector("#recall-panel"),
   recallText: document.querySelector("#recall-text"),
@@ -101,6 +114,8 @@ if (els.diagRuntime) {
     (runtimeSttConfig.inputMode === "adaptive"
       ? "adaptive"
       : "fixed " + runtimeSttConfig.inputGain.toFixed(2) + "x") +
+    " / preset=" +
+    runtimeSttConfig.preset +
     " / capture=" +
     runtimeSttConfig.captureMode;
 }
@@ -120,7 +135,38 @@ appendSttLog(
       ? "adaptive"
       : "fixed gain=" + runtimeSttConfig.inputGain.toFixed(2) + "x"),
 );
+appendSttLog("runtime-preset " + runtimeSttConfig.preset);
 appendSttLog("runtime-capture " + runtimeSttConfig.captureMode);
+
+function renderPresetUi() {
+  if (!els.quickPreset) return;
+  els.quickPreset.value = runtimeSttConfig.preset;
+  if (els.presetHint) {
+    els.presetHint.textContent =
+      runtimeSttConfig.preset === QUICK_PRESETS.FAR_NOISY
+        ? "遠距離／吵雜：使用已在 2 m iPhone 測試中重複改善辨識的 voice capture。"
+        : runtimeSttConfig.preset === QUICK_PRESETS.CUSTOM
+          ? "目前使用工程參數覆寫；按「恢復自動」可回到標準設定。"
+          : "自動：使用 raw capture；目前仍是一般情境的標準設定。";
+  }
+}
+
+function applyQuickPreset(preset) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("gain");
+  url.searchParams.delete("capture");
+  url.searchParams.delete("_build");
+
+  if (preset === QUICK_PRESETS.FAR_NOISY) {
+    url.searchParams.set("preset", QUICK_PRESETS.FAR_NOISY);
+  } else {
+    url.searchParams.delete("preset");
+  }
+
+  window.location.assign(url.toString());
+}
+
+renderPresetUi();
 
 async function ensureLatestBuild() {
   try {
@@ -251,6 +297,7 @@ function safeRuntimeConfigForReport() {
       runtimeSttConfig.inputMode === "fixed"
         ? runtimeSttConfig.inputGain
         : null,
+    preset: runtimeSttConfig.preset,
     captureMode: runtimeSttConfig.captureMode,
     tokenConfigured: Boolean(runtimeSttConfig.tokenUrl),
     websocketConfigured: Boolean(runtimeSttConfig.websocketUrl),
@@ -390,6 +437,8 @@ async function startSession() {
   setStatus("啟動中…");
   els.start.disabled = true;
   els.stop.disabled = true;
+  if (els.quickPreset) els.quickPreset.disabled = true;
+  if (els.resetPreset) els.resetPreset.disabled = true;
 
   // getUserMedia here is used only for permission/device diagnostics.
   // The selected STT provider owns its actual recognition capture.
@@ -527,6 +576,8 @@ async function stopSession() {
   activeSessionId = 0;
   els.start.disabled = false;
   els.stop.disabled = true;
+  if (els.quickPreset) els.quickPreset.disabled = false;
+  if (els.resetPreset) els.resetPreset.disabled = false;
   setStatus("已停止");
   appendSttLog("S" + sessionId + " session-stopped");
 }
@@ -560,6 +611,8 @@ els.start.addEventListener("click", async () => {
       error instanceof Error ? error.message : "無法啟動麥克風。";
     els.start.disabled = false;
     els.stop.disabled = true;
+    if (els.quickPreset) els.quickPreset.disabled = false;
+    if (els.resetPreset) els.resetPreset.disabled = false;
   }
 });
 
@@ -572,6 +625,12 @@ els.closeRecall.addEventListener("click", () => {
   els.recallPanel.hidden = true;
 });
 els.fontSize.addEventListener("click", setFontSize);
+els.quickPreset?.addEventListener("change", (event) => {
+  applyQuickPreset(event.target.value);
+});
+els.resetPreset?.addEventListener("click", () => {
+  applyQuickPreset(QUICK_PRESETS.AUTO);
+});
 els.copyTestReport?.addEventListener("click", () => {
   void copyTestReport();
 });

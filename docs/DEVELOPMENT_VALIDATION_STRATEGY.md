@@ -1,6 +1,6 @@
 # Development and Validation Strategy
 
-Updated: 2026-10-06
+Updated: 2026-10-07
 
 ## Purpose
 
@@ -116,6 +116,21 @@ Decision rule:
 
 - if the 2 m voice-processing run materially restores transcript completeness without unstable gain, clipping, or obvious speech distortion, retain it as a candidate `Far/Noisy` front-end policy;
 - if it does not help, return to raw capture and evaluate custom conservative enhancement rather than stacking unverified processing.
+
+### Voice-capture repeat decision — 2026-10-07
+
+Two controlled 2 m / playback-volume 40 runs on the same iPhone showed materially more continuous recognition with voice capture than the raw 2 m baseline. The second run confirmed that the actual Gemini capture stream had `echoCancellation=true`, while clipping and limiter reduction remained zero.
+
+This is sufficient to promote voice capture into a user-selectable `Far / Noisy` quick preset on the current Web prototype. It is **not** sufficient to replace raw capture in Auto because the evidence is device-specific.
+
+Current policy:
+
+- Auto -> raw capture,
+- Far / Noisy -> voice capture,
+- explicit `?capture=` remains an engineering override and is logged as a custom profile,
+- Near / Normal presets remain pending until they have evidence-based behavior rather than duplicate labels.
+
+See `testdata/results/2026-10-07-zh-tw-regression-v2-2m-40-voice-repeat.md`.
 
 ## Stage A - prove the pipeline
 

@@ -28,7 +28,7 @@ Goal: validate the simplest useful product.
 - [x] add Traditional Chinese display conversion for Gemini captions,
 - [x] add manual input-gain and audio-level telemetry as engineering probes,
 - [x] replace fixed-gain exploration with adaptive input normalization + limiter,
-- [ ] add fast customization: Auto/near/normal/far/noisy presets plus bounded advanced tuning and one-tap reset,
+- [ ] add fast customization: Auto/near/normal/far/noisy presets plus bounded advanced tuning and one-tap reset (Auto + Far/Noisy + reset implemented; Near/Normal/advanced tuning pending),
 - [x] log/export the active tuning profile so tests are reproducible,
 - [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [ ] run the formal Taiwan Mandarin latency/accuracy benchmark only after the capture / normalization / segmentation path is frozen,
