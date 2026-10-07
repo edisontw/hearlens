@@ -1,32 +1,39 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-older-ux1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261008-caption-latency1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261007-older-ux1";
+} from "./zh-display.js?v=20261008-caption-latency1";
 import {
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261007-older-ux1";
+} from "./transcript-window.mjs?v=20261008-caption-latency1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
   normalizeCaptionSizeLevel,
-} from "./caption-size.mjs?v=20261007-older-ux1";
+} from "./caption-size.mjs?v=20261008-caption-latency1";
+import {
+  captionLatencySnapshot,
+  createCaptionLatencyTelemetry,
+  markFirstAudioChunk,
+  markFirstFinal,
+  markFirstPartial,
+} from "./caption-latency.mjs?v=20261008-caption-latency1";
 import {
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261007-older-ux1";
+} from "./stt/providers/capture-profile.mjs?v=20261008-caption-latency1";
 import {
   QUICK_PRESETS,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261007-older-ux1";
+} from "./stt/providers/quick-presets.mjs?v=20261008-caption-latency1";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
-} from "./stt/providers/tuning-profile.mjs?v=20261007-older-ux1";
+} from "./stt/providers/tuning-profile.mjs?v=20261008-caption-latency1";
 
-const BUILD_ID = "20261007-older-ux1";
+const BUILD_ID = "20261008-caption-latency1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_SIZE_STORAGE_KEY = "hearlens-caption-size-v1";
@@ -110,6 +117,8 @@ const els = {
   diagChannels: document.querySelector("#diag-channels"),
   diagBaseLatency: document.querySelector("#diag-base-latency"),
   diagOutputLatency: document.querySelector("#diag-output-latency"),
+  diagCaptionPartial: document.querySelector("#diag-caption-partial"),
+  diagCaptionFinal: document.querySelector("#diag-caption-final"),
   diagSettings: document.querySelector("#diag-settings"),
   sttLog: document.querySelector("#stt-log"),
   testSourceId: document.querySelector("#test-source-id"),
@@ -133,6 +142,7 @@ let sessionCounter = 0;
 let activeSessionId = 0;
 let activeInputProfile = null;
 let activeCaptureSettings = null;
+let activeCaptionLatency = null;
 const transcript = [];
 const sessionFinals = [];
 const debugLines = [];
@@ -516,6 +526,35 @@ async function copyRecentTranscript() {
   }
 }
 
+function formatCaptionLatency(value, reference) {
+  if (!Number.isFinite(value)) return "—";
+  return (
+    value +
+    " ms" +
+    (reference === "first-audio-chunk"
+      ? "（首音訊後）"
+      : reference === "session-start"
+        ? "（session 後）"
+        : "")
+  );
+}
+
+function renderCaptionLatencyTelemetry() {
+  const snapshot = captionLatencySnapshot(activeCaptionLatency);
+  if (els.diagCaptionPartial) {
+    els.diagCaptionPartial.textContent = formatCaptionLatency(
+      snapshot.firstPartialMs,
+      snapshot.reference,
+    );
+  }
+  if (els.diagCaptionFinal) {
+    els.diagCaptionFinal.textContent = formatCaptionLatency(
+      snapshot.firstFinalMs,
+      snapshot.reference,
+    );
+  }
+}
+
 function safeRuntimeConfigForReport() {
   return {
     provider: runtimeSttConfig.provider,
@@ -572,6 +611,7 @@ function buildTestReport() {
       platform: navigator.userAgentData?.platform || navigator.platform || null,
     },
     diagnostics: parsedDiagnostics(),
+    captionLatency: captionLatencySnapshot(activeCaptionLatency),
     transcript: sessionFinals.map((item) => ({
       timestamp: new Date(item.time).toISOString(),
       text: item.text,
@@ -666,6 +706,8 @@ async function startSession() {
   activeSessionId = sessionId;
   activeInputProfile = null;
   activeCaptureSettings = null;
+  activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
+  renderCaptionLatencyTelemetry();
   sessionFinals.length = 0;
   appendSttLog("S" + sessionId + " session-start");
 
@@ -718,6 +760,10 @@ async function startSession() {
     language: "zh-TW",
     onPartial: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
+      if (text?.trim()) {
+        markFirstPartial(activeCaptionLatency, timestamp);
+        renderCaptionLatencyTelemetry();
+      }
       rawInterimText = text;
       interimText = toTaiwanTraditional(text);
       if (interimText.trim()) {
@@ -727,6 +773,10 @@ async function startSession() {
     },
     onFinal: ({ text, timestamp }) => {
       if (sessionId !== activeSessionId) return;
+      if (text?.trim()) {
+        markFirstFinal(activeCaptionLatency, timestamp);
+        renderCaptionLatencyTelemetry();
+      }
       const displayText = toTaiwanTraditional(text);
       rawInterimText = "";
       interimText = "";
@@ -743,7 +793,11 @@ async function startSession() {
       els.diagStt.textContent = message;
       appendSttLog("S" + sessionId + " provider-error " + (code || message));
     },
-    onDebug: ({ event, detail, segmentId }) => {
+    onDebug: ({ event, detail, segmentId, timestamp }) => {
+      if (event === "audio-first-chunk") {
+        markFirstAudioChunk(activeCaptionLatency, timestamp);
+        renderCaptionLatencyTelemetry();
+      }
       if (event === "input-profile" && detail) {
         try {
           activeInputProfile = JSON.parse(detail);
