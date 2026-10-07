@@ -16,19 +16,23 @@ export function resolveQuickPreset({
   presetValue = "",
   captureOverridePresent = false,
   captureValue = "",
+  tuningOverridePresent = false,
 } = {}) {
   const requestedPreset = normalizeQuickPreset(presetValue);
+  const presetCaptureMode =
+    requestedPreset === QUICK_PRESETS.FAR_NOISY ? "voice" : "raw";
 
-  if (captureOverridePresent) {
+  if (captureOverridePresent || tuningOverridePresent) {
     return {
       preset: QUICK_PRESETS.CUSTOM,
-      captureMode: normalizeCaptureMode(captureValue),
+      captureMode: captureOverridePresent
+        ? normalizeCaptureMode(captureValue)
+        : presetCaptureMode,
     };
   }
 
   return {
     preset: requestedPreset,
-    captureMode:
-      requestedPreset === QUICK_PRESETS.FAR_NOISY ? "voice" : "raw",
+    captureMode: presetCaptureMode,
   };
 }
