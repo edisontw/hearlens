@@ -47,10 +47,10 @@ export function characterErrorRate(reference, hypothesis) {
   };
 }
 
-export function scoreKeyFields(hypothesis, keyFields = []) {
+export function scoreVariantFields(hypothesis, definitions = []) {
   const normalizedHypothesis = normalizeCerText(hypothesis);
 
-  const fields = keyFields.map((field) => {
+  const fields = definitions.map((field) => {
     const variants = (field.variants || []).map(normalizeCerText).filter(Boolean);
     const matchedVariant =
       variants.find((variant) => normalizedHypothesis.includes(variant)) || null;
@@ -72,11 +72,19 @@ export function scoreKeyFields(hypothesis, keyFields = []) {
   };
 }
 
+export function scoreKeyFields(hypothesis, keyFields = []) {
+  return scoreVariantFields(hypothesis, keyFields);
+}
+
 export function scoreBenchmarkReport(report, benchmark) {
   const hypothesis = String(report?.finalTranscript || "");
   const reference = String(benchmark?.referenceText || "");
   const cer = characterErrorRate(reference, hypothesis);
   const keyFields = scoreKeyFields(hypothesis, benchmark?.keyFields || []);
+  const utteranceCoverage = scoreVariantFields(
+    hypothesis,
+    benchmark?.utteranceAnchors || [],
+  );
 
   return {
     schema: "hearlens-benchmark-score-v1",
@@ -93,6 +101,13 @@ export function scoreBenchmarkReport(report, benchmark) {
       value: cer.cer,
     },
     keyFields,
+    utteranceCoverage: {
+      ...utteranceCoverage,
+      missedRate:
+        utteranceCoverage.total
+          ? 1 - utteranceCoverage.matched / utteranceCoverage.total
+          : null,
+    },
     captionLatency: report?.captionLatency || null,
     finalTranscript: hypothesis,
   };
