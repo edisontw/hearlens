@@ -1,30 +1,35 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-transcript-ux1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-older-ux1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261007-transcript-ux1";
+} from "./zh-display.js?v=20261007-older-ux1";
 import {
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261007-transcript-ux1";
+} from "./transcript-window.mjs?v=20261007-older-ux1";
+import {
+  CAPTION_SIZE_LEVELS,
+  captionSizePixels,
+  normalizeCaptionSizeLevel,
+} from "./caption-size.mjs?v=20261007-older-ux1";
 import {
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261007-transcript-ux1";
+} from "./stt/providers/capture-profile.mjs?v=20261007-older-ux1";
 import {
   QUICK_PRESETS,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261007-transcript-ux1";
+} from "./stt/providers/quick-presets.mjs?v=20261007-older-ux1";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
-} from "./stt/providers/tuning-profile.mjs?v=20261007-transcript-ux1";
+} from "./stt/providers/tuning-profile.mjs?v=20261007-older-ux1";
 
-const BUILD_ID = "20261007-transcript-ux1";
+const BUILD_ID = "20261007-older-ux1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
-const FONT_SIZES = [32, 38, 44, 50];
+const CAPTION_SIZE_STORAGE_KEY = "hearlens-caption-size-v1";
 const MAX_DEBUG_LINES = 120;
 const MAX_REPORT_DEBUG_LINES = 5000;
 
@@ -79,7 +84,7 @@ const els = {
   recallList: document.querySelector("#recall-list"),
   recallMeta: document.querySelector("#recall-meta"),
   recallCopyStatus: document.querySelector("#recall-copy-status"),
-  fontSize: document.querySelector("#font-size"),
+  captionSizeButtons: [...document.querySelectorAll("[data-caption-size]")],
   quickPreset: document.querySelector("#quick-preset"),
   resetPreset: document.querySelector("#reset-preset"),
   presetHint: document.querySelector("#preset-hint"),
@@ -123,7 +128,7 @@ let interimText = "";
 let rawInterimText = "";
 let lastRecognizedText = "";
 let lastRecognizedAt = 0;
-let fontIndex = 0;
+let captionSizeLevel = CAPTION_SIZE_LEVELS.NORMAL;
 let sessionCounter = 0;
 let activeSessionId = 0;
 let activeInputProfile = null;
@@ -304,6 +309,40 @@ function applyQuickPreset(preset) {
 renderPresetUi();
 renderAdvancedTuningUi();
 
+function readStoredCaptionSize() {
+  try {
+    return normalizeCaptionSizeLevel(
+      window.localStorage.getItem(CAPTION_SIZE_STORAGE_KEY),
+    );
+  } catch {
+    return CAPTION_SIZE_LEVELS.NORMAL;
+  }
+}
+
+function applyCaptionSize(level, { persist = true } = {}) {
+  captionSizeLevel = normalizeCaptionSizeLevel(level);
+  document.documentElement.style.setProperty(
+    "--caption-size",
+    captionSizePixels(captionSizeLevel) + "px",
+  );
+
+  for (const button of els.captionSizeButtons) {
+    const selected = button.dataset.captionSize === captionSizeLevel;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  }
+
+  if (persist) {
+    try {
+      window.localStorage.setItem(CAPTION_SIZE_STORAGE_KEY, captionSizeLevel);
+    } catch {
+      // Caption sizing still works when storage is unavailable.
+    }
+  }
+}
+
+applyCaptionSize(readStoredCaptionSize(), { persist: false });
+
 async function ensureLatestBuild() {
   try {
     const buildUrl = new URL("./build.json", window.location.href);
@@ -475,14 +514,6 @@ async function copyRecentTranscript() {
       els.recallCopyStatus.textContent = "瀏覽器禁止自動複製";
     }
   }
-}
-
-function setFontSize() {
-  fontIndex = (fontIndex + 1) % FONT_SIZES.length;
-  document.documentElement.style.setProperty(
-    "--caption-size",
-    FONT_SIZES[fontIndex] + "px",
-  );
 }
 
 function safeRuntimeConfigForReport() {
@@ -836,7 +867,11 @@ els.closeRecall.addEventListener("click", () => {
 els.copyRecentTranscript?.addEventListener("click", () => {
   void copyRecentTranscript();
 });
-els.fontSize.addEventListener("click", setFontSize);
+for (const button of els.captionSizeButtons) {
+  button.addEventListener("click", () => {
+    applyCaptionSize(button.dataset.captionSize);
+  });
+}
 els.quickPreset?.addEventListener("change", (event) => {
   applyQuickPreset(event.target.value);
 });
