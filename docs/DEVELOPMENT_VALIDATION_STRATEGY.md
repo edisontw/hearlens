@@ -177,6 +177,30 @@ The preset/capture behavior is now stable enough to stop adding distance-specifi
 
 See `testdata/results/2026-10-07-zh-tw-regression-v2-1m-40-htc-u23.md`.
 
+## Bounded advanced tuning / reproducible profile layer — 2026-10-07
+
+The current caption pipeline now has a collapsed engineering-only tuning layer. It does not expose arbitrary sliders. A versioned `tuning=v1` URL profile only accepts allow-listed values:
+
+- adaptive target: `-54 / -51 / -48 / -45 dBFS`,
+- minimum adaptive gain: `1 / 1.5 / 2x`,
+- maximum adaptive gain: `4 / 6 / 8x`,
+- response: `fast / balanced / steady`,
+- capture policy: follow the quick preset, or explicitly request `raw` / `voice`.
+
+The default resolved profile remains exactly the validated current controller: target `-48 dBFS`, gain `1–8x`, attack/release `350/120 ms`, limiter ceiling `0.95`, and the existing noise-floor / speech-level settings.
+
+Safety/reproducibility rules:
+
+- limiter and noise-floor parameters are not URL/UI controls,
+- unsupported values fall back to the current defaults,
+- choosing Auto/Far-Noisy or pressing reset clears bounded-tuning overrides,
+- applying a profile creates a versioned URL configuration,
+- the test report records the complete resolved tuning profile in addition to the provider-emitted input profile,
+- profile changes are disabled while a recognition session is active,
+- do not create speaker-specific profiles; use this layer only for bounded, question-specific engineering comparisons.
+
+This closes the previously planned bounded customization layer. Do not reopen the completed raw-vs-voice distance matrix solely because the UI now exposes reproducible profiles.
+
 ## Stage A - prove the pipeline
 
 Goal: establish that the architecture functions before optimizing quality.
@@ -332,12 +356,10 @@ Do not repeat the entire formal benchmark after every small code change.
 
 ## Immediate next path
 
-1. Stop manual fixed-gain optimization as a product decision.
-2. Implement adaptive input normalization with noise-floor / speech-level telemetry and limiter protection.
-3. Add a bounded quick-preset / advanced-tuning layer with reset and config logging.
-4. Complete the short controlled 0.5 / 1 / 2 m playback gate. **Done 2026-10-06.**
-5. At 2 m the normalized level is adequate but recognition remains poor; isolate SNR / conservative enhancement next.
-6. If identical trials remain unstable, isolate VAD / segmentation / session behavior.
-7. After the audio path is stable, run cross-device tests.
-8. Then expand to multiple speakers and real acoustic scenes.
-9. Freeze a version before the formal benchmark.
+1. Keep manual fixed-gain values engineering-only; do not turn them into product presets.
+2. Keep the current adaptive normalization and Auto/raw vs Far-Noisy/voice policy stable unless new telemetry reopens the question.
+3. Use the bounded `tuning=v1` profile only for small, reproducible experiments; reset to Auto after experiments.
+4. Do not repeat the completed 0.5 / 1 / 2 m matrix unless the processing chain changes.
+5. Next product work: improve transcript UX / rolling history, "What did they just say?", text-size controls, and older-user usability.
+6. Revisit SNR / enhancement only with a focused ablation when the product path requires it.
+7. Run the formal multi-device / multi-speaker benchmark only after the relevant processing path is frozen.

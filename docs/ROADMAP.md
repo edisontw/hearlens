@@ -28,7 +28,7 @@ Goal: validate the simplest useful product.
 - [x] add Traditional Chinese display conversion for Gemini captions,
 - [x] add manual input-gain and audio-level telemetry as engineering probes,
 - [x] replace fixed-gain exploration with adaptive input normalization + limiter,
-- [ ] add fast customization: Auto + Far/Noisy + one-tap reset are implemented; Near/Normal are intentionally omitted because current 0.5 m / 1 m telemetry does not justify distinct behavior; bounded advanced tuning remains pending,
+- [x] add fast customization: Auto + Far/Noisy + one-tap reset plus a collapsed bounded engineering profile layer; Near/Normal remain intentionally omitted because current 0.5 m / 1 m telemetry does not justify distinct behavior,
 - [x] log/export the active tuning profile so tests are reproducible,
 - [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [x] validate Far/Noisy voice capture on at least one additional receiving phone before considering it for Auto (HTC U23 2 m A/B PASS; post-run distance correction recorded),

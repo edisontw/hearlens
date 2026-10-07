@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261007-device-gate1" />
+    <link rel="stylesheet" href="./styles.css?v=20261007-tuning-profile1" />
   </head>
   <body>
     <main class="shell">
@@ -66,6 +66,71 @@
       <section class="panel">
         <details>
           <summary>研究／裝置資訊</summary>
+
+          <details class="advanced-tuning">
+            <summary>進階收音調整（工程測試）</summary>
+            <p class="advanced-tuning-note">
+              僅調整送入字幕引擎的收音前處理。所有選項都有固定範圍；limiter 與其他保護參數不開放修改。
+            </p>
+            <fieldset id="advanced-tuning-fieldset">
+              <div class="advanced-tuning-grid">
+                <label>
+                  <span>目標語音位準</span>
+                  <select id="tuning-target">
+                    <option value="-54">-54 dBFS</option>
+                    <option value="-51">-51 dBFS</option>
+                    <option value="-48">-48 dBFS（預設）</option>
+                    <option value="-45">-45 dBFS</option>
+                  </select>
+                </label>
+                <label>
+                  <span>最低 adaptive gain</span>
+                  <select id="tuning-min-gain">
+                    <option value="1">1x（預設）</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                  </select>
+                </label>
+                <label>
+                  <span>最高 adaptive gain</span>
+                  <select id="tuning-max-gain">
+                    <option value="4">4x</option>
+                    <option value="6">6x</option>
+                    <option value="8">8x（預設）</option>
+                  </select>
+                </label>
+                <label>
+                  <span>增益反應速度</span>
+                  <select id="tuning-response">
+                    <option value="steady">穩定</option>
+                    <option value="balanced">平衡（預設）</option>
+                    <option value="fast">快速</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Capture policy</span>
+                  <select id="tuning-capture">
+                    <option value="">跟隨上方收音模式</option>
+                    <option value="raw">固定 raw</option>
+                    <option value="voice">固定 voice</option>
+                  </select>
+                </label>
+              </div>
+              <div class="advanced-tuning-actions">
+                <button id="apply-tuning" class="secondary" type="button">
+                  套用並重新載入
+                </button>
+                <button id="copy-tuning-link" class="secondary" type="button">
+                  複製設定連結
+                </button>
+                <button id="reset-tuning" class="text-button" type="button">
+                  恢復自動
+                </button>
+              </div>
+              <p id="active-tuning-summary" class="advanced-tuning-summary"></p>
+              <span id="tuning-copy-status" class="copy-status" aria-live="polite"></span>
+            </fieldset>
+          </details>
 
           <div class="diagnostics">
             <div>
@@ -164,6 +229,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261007-device-gate1"></script>
+    <script type="module" src="./main.js?v=20261007-tuning-profile1"></script>
   </body>
 </html>
