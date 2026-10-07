@@ -1,6 +1,6 @@
 # Test Data Collection Pipeline
 
-Updated: 2026-10-05
+Updated: 2026-10-07
 
 ## Goal
 
@@ -8,7 +8,7 @@ Make HearLens engineering tests reproducible now and scalable later.
 
 ## Phase 1 — manual export
 
-The Web Hearing Lab exports one `hearlens-test-report-v1` JSON object containing the build, session, test source, distance, playback-volume note, STT/input settings, device diagnostics, browser metadata, full-session final transcript, and retained telemetry log.
+The Web Hearing Lab exports one `hearlens-test-report-v1` JSON object containing the build, session, test source, human-readable receiving-device label/model, distance, playback-volume note, STT/input settings, device diagnostics, browser metadata, full-session final transcript, and retained telemetry log.
 
 The one-click copy button is the canonical manual export path.
 
