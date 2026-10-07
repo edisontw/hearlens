@@ -37,7 +37,7 @@ Goal: validate the simplest useful product.
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - [x] 30 s rolling transcript with segmented recent-history view,
 - [x] "What did they just say?" recent-history panel with copy action,
-- text-size control,
+- [x] explicit persistent text-size control (一般 / 大 / 特大),
 - no login,
 - no audio amplification.
 
@@ -46,7 +46,7 @@ Exit criteria:
 - usable on current Android Chrome and iOS Safari for caption workflow,
 - partial/final caption latency telemetry,
 - session transcript clears by default,
-- older-user manual UX pass.
+- [ ] older-user manual UX pass (caption size, start/stop clarity, recall, one-handed mobile use).
 
 ## M02 — Phone-Near-Talker Validation
 
