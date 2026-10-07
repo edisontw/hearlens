@@ -516,3 +516,47 @@ details > summary {
     grid-template-columns: 1fr;
   }
 }
+
+
+.caption-size-control {
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(3.25rem, 1fr));
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 52px;
+}
+
+.caption-size-control > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.size-option {
+  min-height: 52px;
+  padding: 0.65rem 0.5rem;
+  background: transparent;
+  color: inherit;
+}
+
+.size-option.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.stop-action:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+@media (max-width: 540px) {
+  .caption-size-control {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .caption-size-control > span {
+    grid-column: 1 / -1;
+  }
+}
