@@ -362,10 +362,11 @@ Do not repeat the entire formal benchmark after every small code change.
 
 ## Immediate next path
 
-1. Keep manual fixed-gain values engineering-only; do not turn them into product presets.
-2. Keep the current adaptive normalization and Auto/raw vs Far-Noisy/voice policy stable unless new telemetry reopens the question.
-3. Use the bounded `tuning=v1` profile only for small, reproducible experiments; reset to Auto after experiments.
-4. Do not repeat the completed 0.5 / 1 / 2 m matrix unless the processing chain changes.
-5. Next product work: improve transcript UX / rolling history, "What did they just say?", text-size controls, and older-user usability.
-6. Revisit SNR / enhancement only with a focused ablation when the product path requires it.
-7. Run the formal multi-device / multi-speaker benchmark only after the relevant processing path is frozen.
+1. Treat the current M01 caption pipeline as frozen for benchmark v1 unless a regression is found.
+2. Use `docs/M01_FORMAL_BENCHMARK.md` as the sole formal M01 controlled protocol.
+3. Collect the 24-run controlled core: 2 receiving devices × Auto/Far-Noisy × 0.5/1/2 m × 2 repeats.
+4. Score every valid report with the versioned strict CER / key-field / utterance-coverage tool; do not hand-edit benchmark outputs.
+5. Keep client-observed first-audio-to-caption timing as engineering telemetry. Add a locked speech-onset reference before calling any value formal end-to-end speech latency.
+6. Do not reopen gain, Near/Normal preset, or raw-vs-voice tuning during the benchmark unless telemetry shows a reproducible regression.
+7. After the controlled M01 benchmark is summarized, move real-speaker / noisy-scene / proximity-SNR validation to M02.
+
