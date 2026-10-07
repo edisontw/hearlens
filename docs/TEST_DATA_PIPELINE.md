@@ -8,7 +8,7 @@ Make HearLens engineering tests reproducible now and scalable later.
 
 ## Phase 1 — manual export
 
-The Web Hearing Lab exports one `hearlens-test-report-v1` JSON object containing the build, session, test source, human-readable receiving-device label/model, distance, playback-volume note, STT/input settings, the complete resolved bounded tuning profile, device diagnostics, browser metadata, full-session final transcript, and retained telemetry log.
+The Web Hearing Lab exports one `hearlens-test-report-v1` JSON object containing the build, session, test source, human-readable receiving-device label/model, distance, playback-volume note, STT/input settings, the complete resolved bounded tuning profile, device diagnostics, client-observed caption startup latency (`captionLatency`), browser metadata, full-session final transcript, and retained telemetry log.
 
 The one-click copy button is the canonical manual export path. When engineering tuning is used, `runtime.tuningProfile` records the resolved profile version, bounded controls, and full normalization configuration. The Web lab can also copy a versioned tuning URL for reproducible A/B work; limiter and other non-exposed protection parameters remain fixed by the build.
 

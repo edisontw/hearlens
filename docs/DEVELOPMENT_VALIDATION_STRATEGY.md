@@ -314,6 +314,12 @@ Only after device behavior is stable should testing expand to:
 
 These are STT and acoustic-robustness tests. They should not trigger separate hand-tuned gain values for each speaker.
 
+## M01 client-observed caption startup telemetry
+
+The Web lab records first-partial and first-final startup timing for engineering diagnostics. When the provider exposes an `audio-first-chunk` event, that event is the preferred client-side reference; otherwise the timer falls back to session start.
+
+This is not the formal speech-to-caption latency benchmark. It does not establish acoustic speech onset, network decomposition, or comparable end-to-end latency across uncontrolled devices / rooms. The formal benchmark below remains the place to measure first-partial and final latency against a controlled source after the processing path is frozen.
+
 ## Stage G - formal benchmark
 
 Run the full benchmark only after freezing the relevant version of:
