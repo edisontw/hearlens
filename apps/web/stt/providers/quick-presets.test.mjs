@@ -42,3 +42,28 @@ test("explicit capture override wins and is reported as custom", () => {
     },
   );
 });
+
+
+test("bounded tuning override is reported as custom while retaining preset capture policy", () => {
+  assert.deepEqual(
+    resolveQuickPreset({
+      presetValue: "far-noisy",
+      tuningOverridePresent: true,
+    }),
+    {
+      preset: QUICK_PRESETS.CUSTOM,
+      captureMode: "voice",
+    },
+  );
+
+  assert.deepEqual(
+    resolveQuickPreset({
+      presetValue: "auto",
+      tuningOverridePresent: true,
+    }),
+    {
+      preset: QUICK_PRESETS.CUSTOM,
+      captureMode: "raw",
+    },
+  );
+});
