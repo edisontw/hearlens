@@ -33,7 +33,7 @@ Goal: validate the simplest useful product.
 - [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [x] validate Far/Noisy voice capture on at least one additional receiving phone before considering it for Auto (HTC U23 2 m A/B PASS; post-run distance correction recorded),
 - [x] run one HTC U23 1 m Auto vs Far/Noisy safety A/B (PASS: voice materially improved transcript continuity with zero retained clipping; global Auto remains raw for cross-device conservatism),
-- [ ] run the formal Taiwan Mandarin latency/accuracy benchmark only after the capture / normalization / segmentation path is frozen,
+- [ ] run the locked M01 Taiwan Mandarin formal benchmark (`docs/M01_FORMAL_BENCHMARK.md`): 24 controlled runs, automated strict CER / key-field / utterance-coverage scoring; current client timing remains engineering telemetry until a speech-onset reference is added,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - [x] 30 s rolling transcript with segmented recent-history view,
 - [x] "What did they just say?" recent-history panel with copy action,
@@ -47,6 +47,7 @@ Exit criteria:
 - [x] client-observed first partial/final caption startup latency telemetry (first-audio-chunk reference when available; formal end-to-end benchmark remains separate),
 - session transcript clears by default,
 - [x] older-user manual UX pass (caption size, start/stop clarity, recall, one-handed mobile use).
+- [x] caption-startup telemetry smoke gate PASS on iPhone (`20261008-caption-latency1`).
 
 ## M02 — Phone-Near-Talker Validation
 
