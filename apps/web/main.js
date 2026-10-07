@@ -1,17 +1,17 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-presets1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-device-gate1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261007-presets1";
+} from "./zh-display.js?v=20261007-device-gate1";
 import {
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261007-presets1";
+} from "./stt/providers/capture-profile.mjs?v=20261007-device-gate1";
 import {
   QUICK_PRESETS,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261007-presets1";
+} from "./stt/providers/quick-presets.mjs?v=20261007-device-gate1";
 
-const BUILD_ID = "20261007-presets1";
+const BUILD_ID = "20261007-device-gate1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -79,6 +79,7 @@ const els = {
   diagSettings: document.querySelector("#diag-settings"),
   sttLog: document.querySelector("#stt-log"),
   testSourceId: document.querySelector("#test-source-id"),
+  testReceiverDevice: document.querySelector("#test-receiver-device"),
   testDistance: document.querySelector("#test-distance"),
   testSourceVolume: document.querySelector("#test-source-volume"),
   testNotes: document.querySelector("#test-notes"),
@@ -320,6 +321,7 @@ function buildTestReport() {
     sessionId: activeSessionId || sessionCounter || null,
     test: {
       sourceId: els.testSourceId?.value?.trim() || null,
+      receiverDevice: els.testReceiverDevice?.value?.trim() || null,
       distance: els.testDistance?.value?.trim() || null,
       sourceVolume: els.testSourceVolume?.value?.trim() || null,
       notes: els.testNotes?.value?.trim() || null,

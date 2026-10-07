@@ -128,7 +128,11 @@ Current policy:
 - Auto -> raw capture,
 - Far / Noisy -> voice capture,
 - explicit `?capture=` remains an engineering override and is logged as a custom profile,
-- Near / Normal presets remain pending until they have evidence-based behavior rather than duplicate labels.
+- Near / Normal presets are intentionally **not added** at this stage: the 0.5 m run already backs adaptive gain down automatically, while the 1 m run remains accurate under the same Auto/raw policy. There is no measured need yet for a different target, gain range, or capture mode.
+
+This closes the Near/Normal labeling question for the current input policy. Re-open it only if controlled telemetry shows a repeatable failure mode that Auto cannot absorb.
+
+Before considering voice capture for Auto, validate the existing Far / Noisy preset on at least one additional receiving device. Record a human-readable receiving-device label/model in the exported report in addition to browser metadata and actual capture settings.
 
 See `testdata/results/2026-10-07-zh-tw-regression-v2-2m-40-voice-repeat.md`.
 
