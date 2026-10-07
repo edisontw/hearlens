@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261007-tuning-profile1" />
+    <link rel="stylesheet" href="./styles.css?v=20261007-transcript-ux1" />
   </head>
   <body>
     <main class="shell">
@@ -57,10 +57,21 @@
 
       <section id="recall-panel" class="panel recall-panel" hidden>
         <div class="status-row">
-          <h2>剛剛說什麼？</h2>
+          <div>
+            <h2>剛剛說什麼？</h2>
+            <p id="recall-meta" class="recall-meta">最近 30 秒</p>
+          </div>
           <button id="close-recall" class="text-button" type="button">關閉</button>
         </div>
-        <div id="recall-text" class="recall-text">目前沒有最近的字幕。</div>
+        <div id="recall-list" class="recall-list" aria-live="polite">
+          <div class="recall-empty">目前沒有最近 30 秒的字幕。</div>
+        </div>
+        <div class="recall-actions">
+          <button id="copy-recent-transcript" class="secondary" type="button">
+            複製近期字幕
+          </button>
+          <span id="recall-copy-status" class="copy-status" aria-live="polite"></span>
+        </div>
       </section>
 
       <section class="panel">
@@ -229,6 +240,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261007-tuning-profile1"></script>
+    <script type="module" src="./main.js?v=20261007-transcript-ux1"></script>
   </body>
 </html>
