@@ -42,10 +42,17 @@ test("benchmark report combines strict CER, key fields, and latency", () => {
       sourceId: "sample",
       referenceText: "下午三點見面",
       keyFields: [{ id: "time", variants: ["下午三點", "下午3點"] }],
+      utteranceAnchors: [
+        { id: "meeting", variants: ["下午三點見面", "下午3點見面"] },
+        { id: "missing", variants: ["健保卡"] },
+      ],
     },
   );
 
   assert.equal(scored.cer.edits, 1);
   assert.equal(scored.keyFields.matched, 1);
+  assert.equal(scored.utteranceCoverage.matched, 1);
+  assert.equal(scored.utteranceCoverage.total, 2);
+  assert.equal(scored.utteranceCoverage.missedRate, 0.5);
   assert.equal(scored.captionLatency.firstPartialMs, 1000);
 });
