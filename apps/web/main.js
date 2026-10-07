@@ -1,22 +1,27 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-tuning-profile1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261007-transcript-ux1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
-} from "./zh-display.js?v=20261007-tuning-profile1";
+} from "./zh-display.js?v=20261007-transcript-ux1";
+import {
+  recentTranscriptItems,
+  recentTranscriptText,
+  relativeTranscriptTime,
+} from "./transcript-window.mjs?v=20261007-transcript-ux1";
 import {
   requestedAudioConstraints,
-} from "./stt/providers/capture-profile.mjs?v=20261007-tuning-profile1";
+} from "./stt/providers/capture-profile.mjs?v=20261007-transcript-ux1";
 import {
   QUICK_PRESETS,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261007-tuning-profile1";
+} from "./stt/providers/quick-presets.mjs?v=20261007-transcript-ux1";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
-} from "./stt/providers/tuning-profile.mjs?v=20261007-tuning-profile1";
+} from "./stt/providers/tuning-profile.mjs?v=20261007-transcript-ux1";
 
-const BUILD_ID = "20261007-tuning-profile1";
+const BUILD_ID = "20261007-transcript-ux1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
@@ -70,6 +75,10 @@ const els = {
   stop: document.querySelector("#stop"),
   recall: document.querySelector("#recall"),
   closeRecall: document.querySelector("#close-recall"),
+  copyRecentTranscript: document.querySelector("#copy-recent-transcript"),
+  recallList: document.querySelector("#recall-list"),
+  recallMeta: document.querySelector("#recall-meta"),
+  recallCopyStatus: document.querySelector("#recall-copy-status"),
   fontSize: document.querySelector("#font-size"),
   quickPreset: document.querySelector("#quick-preset"),
   resetPreset: document.querySelector("#reset-preset"),
@@ -391,16 +400,82 @@ function addFinalTranscript(text, rawText = text) {
   rememberRecognizedText(clean, now);
   trimTranscript(now);
   renderCaption();
+  if (els.recallPanel && !els.recallPanel.hidden) {
+    renderRecall();
+  }
+}
+
+function renderRecall() {
+  if (!els.recallList || !els.recallMeta) return;
+
+  const now = Date.now();
+  const items = recentTranscriptItems(transcript, now, ROLLING_WINDOW_MS);
+  els.recallList.replaceChildren();
+
+  if (!items.length) {
+    const fallback = interimText.trim() || recentRecognizedText(now);
+    const empty = document.createElement("div");
+    empty.className = "recall-empty";
+    empty.textContent = fallback || "目前沒有最近 30 秒的字幕。";
+    els.recallList.append(empty);
+    els.recallMeta.textContent = fallback ? "目前辨識中的內容" : "最近 30 秒";
+    return;
+  }
+
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = "recall-item";
+
+    const time = document.createElement("span");
+    time.className = "recall-item-time";
+    time.textContent = relativeTranscriptTime(item.time, now);
+
+    const text = document.createElement("div");
+    text.className = "recall-item-text";
+    text.textContent = item.text;
+
+    row.append(time, text);
+    els.recallList.append(row);
+  }
+
+  els.recallMeta.textContent =
+    "最近 30 秒 · " + items.length + " 段字幕";
 }
 
 function showRecall() {
-  const text =
-    visibleTranscript() ||
-    interimText.trim() ||
-    recentRecognizedText();
-  els.recallText.textContent = text || "目前沒有最近的字幕。";
+  renderRecall();
   els.recallPanel.hidden = false;
   els.recallPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function copyRecentTranscript() {
+  const items = recentTranscriptItems(
+    transcript,
+    Date.now(),
+    ROLLING_WINDOW_MS,
+  );
+  const text =
+    recentTranscriptText(items) ||
+    interimText.trim() ||
+    recentRecognizedText();
+
+  if (!text) {
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "目前沒有可複製的近期字幕";
+    }
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "已複製近期字幕";
+    }
+  } catch {
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "瀏覽器禁止自動複製";
+    }
+  }
 }
 
 function setFontSize() {
@@ -757,6 +832,10 @@ els.stop.addEventListener("click", () => {
 els.recall.addEventListener("click", showRecall);
 els.closeRecall.addEventListener("click", () => {
   els.recallPanel.hidden = true;
+  if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
+});
+els.copyRecentTranscript?.addEventListener("click", () => {
+  void copyRecentTranscript();
 });
 els.fontSize.addEventListener("click", setFontSize);
 els.quickPreset?.addEventListener("change", (event) => {
