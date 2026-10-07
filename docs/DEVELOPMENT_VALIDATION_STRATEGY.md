@@ -136,6 +136,23 @@ Before considering voice capture for Auto, validate the existing Far / Noisy pre
 
 See `testdata/results/2026-10-07-zh-tw-regression-v2-2m-40-voice-repeat.md`.
 
+### Second-device Far/Noisy validation — HTC U23 — 2026-10-07
+
+A controlled A/B on an HTC U23 used build `20261007-device-gate1`, source `zh-tw-regression-v2`, playback-volume field `40`, and an actual receiving distance of **2 m**. The exported reports were mistakenly labeled `1 m` / `1m`; the tester confirmed after the run that both trials were performed at 2 m. Preserve the original report metadata and record this as a post-run correction rather than silently rewriting the raw report.
+
+Results:
+
+- Auto/raw produced only one short final fragment despite substantial non-clipped input/output levels.
+- Far/Noisy/voice produced multiple coherent final segments spanning instructions, time, everyday-item content, numeric content, and the closing sentence.
+- On the HTC U23 voice capture actually reported `echoCancellation=true`, `noiseSuppression=true`, and `autoGainControl=true`.
+- Limiter reduction and clipping remained zero in the retained telemetry.
+
+Decision: the Far/Noisy benefit now has evidence on a second receiving device and is not limited to the first iPhone test path. The cross-device Far/Noisy gate is therefore **passed**.
+
+Do **not** yet make voice capture the global Auto default. The HTC U23 voice path is more aggressive than the tested iPhone path because NS and AGC are actually enabled. The next smallest safety gate is one controlled **1 m Auto vs Far/Noisy A/B on the HTC U23**. If voice capture preserves or improves normal-distance recognition without clipping or obvious distortion, reconsider whether Auto should use voice capture or an automatic capture-selection policy.
+
+See `testdata/results/2026-10-07-zh-tw-regression-v2-2m-40-htc-u23.md`.
+
 ## Stage A - prove the pipeline
 
 Goal: establish that the architecture functions before optimizing quality.
