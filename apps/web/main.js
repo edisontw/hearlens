@@ -96,7 +96,6 @@ const els = {
   tuningCopyStatus: document.querySelector("#tuning-copy-status"),
   caption: document.querySelector("#caption"),
   recallPanel: document.querySelector("#recall-panel"),
-  recallText: document.querySelector("#recall-text"),
   status: document.querySelector("#status"),
   diagMic: document.querySelector("#diag-mic"),
   diagStt: document.querySelector("#diag-stt"),
