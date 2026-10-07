@@ -35,8 +35,8 @@ Goal: validate the simplest useful product.
 - [x] run one HTC U23 1 m Auto vs Far/Noisy safety A/B (PASS: voice materially improved transcript continuity with zero retained clipping; global Auto remains raw for cross-device conservatism),
 - [ ] run the formal Taiwan Mandarin latency/accuracy benchmark only after the capture / normalization / segmentation path is frozen,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
-- 15–30 s rolling transcript,
-- "What did they just say?",
+- [x] 30 s rolling transcript with segmented recent-history view,
+- [x] "What did they just say?" recent-history panel with copy action,
 - text-size control,
 - no login,
 - no audio amplification.
