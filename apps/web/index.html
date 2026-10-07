@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261007-transcript-ux1" />
+    <link rel="stylesheet" href="./styles.css?v=20261007-older-ux1" />
   </head>
   <body>
     <main class="shell">
@@ -30,13 +30,18 @@
         </div>
 
         <div class="actions">
-          <button id="start" class="primary" type="button">開始</button>
-          <button id="stop" class="secondary" type="button" disabled>停止</button>
+          <button id="start" class="primary" type="button">開始聆聽</button>
+          <button id="stop" class="secondary stop-action" type="button" disabled>停止聆聽</button>
         </div>
 
         <div class="actions secondary-actions">
           <button id="recall" class="secondary" type="button">剛剛說什麼？</button>
-          <button id="font-size" class="secondary" type="button">字再大一點</button>
+          <div class="caption-size-control" role="group" aria-label="字幕大小">
+            <span>字幕大小</span>
+            <button class="size-option selected" type="button" data-caption-size="normal" aria-pressed="true">一般</button>
+            <button class="size-option" type="button" data-caption-size="large" aria-pressed="false">大</button>
+            <button class="size-option" type="button" data-caption-size="xlarge" aria-pressed="false">特大</button>
+          </div>
         </div>
 
         <div class="quick-profile" aria-label="快速收音設定">
@@ -240,6 +245,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261007-transcript-ux1"></script>
+    <script type="module" src="./main.js?v=20261007-older-ux1"></script>
   </body>
 </html>
