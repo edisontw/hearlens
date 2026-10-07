@@ -344,3 +344,47 @@ details > summary {
   font-size: 0.85rem;
   line-height: 1.45;
 }
+
+
+.quick-profile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.quick-profile label {
+  font-weight: 700;
+}
+
+.quick-profile select {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.quick-profile span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 540px) {
+  .quick-profile {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-profile span {
+    grid-column: auto;
+  }
+}
