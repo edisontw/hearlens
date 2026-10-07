@@ -4,9 +4,12 @@ import {
   toTaiwanTraditional,
 } from "./zh-display.js?v=20261007-presets1";
 import {
-  normalizeCaptureMode,
   requestedAudioConstraints,
 } from "./stt/providers/capture-profile.mjs?v=20261007-presets1";
+import {
+  QUICK_PRESETS,
+  resolveQuickPreset,
+} from "./stt/providers/quick-presets.mjs?v=20261007-presets1";
 
 const BUILD_ID = "20261007-presets1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
@@ -14,17 +17,6 @@ const ROLLING_WINDOW_MS = 30_000;
 const FONT_SIZES = [32, 38, 44, 50];
 const MAX_DEBUG_LINES = 120;
 const MAX_REPORT_DEBUG_LINES = 5000;
-const QUICK_PRESETS = Object.freeze({
-  AUTO: "auto",
-  FAR_NOISY: "far-noisy",
-  CUSTOM: "custom",
-});
-
-function normalizeQuickPreset(value) {
-  return String(value || "").trim().toLowerCase() === QUICK_PRESETS.FAR_NOISY
-    ? QUICK_PRESETS.FAR_NOISY
-    : QUICK_PRESETS.AUTO;
-}
 
 function readRuntimeSttConfig() {
   const params = new URLSearchParams(window.location.search);
@@ -38,13 +30,11 @@ function readRuntimeSttConfig() {
           ? "browser-speech"
           : rawProvider;
 
-  const preset = normalizeQuickPreset(params.get("preset"));
-  const captureOverride = params.has("capture");
-  const captureMode = captureOverride
-    ? normalizeCaptureMode(params.get("capture"))
-    : preset === QUICK_PRESETS.FAR_NOISY
-      ? "voice"
-      : "raw";
+  const quickPreset = resolveQuickPreset({
+    presetValue: params.get("preset"),
+    captureOverridePresent: params.has("capture"),
+    captureValue: params.get("capture"),
+  });
 
   const fixedGainRequested = params.has("gain");
   const requestedGain = Number(params.get("gain") || "1");
@@ -58,8 +48,8 @@ function readRuntimeSttConfig() {
     websocketUrl: (params.get("ws") || "").trim(),
     inputGain,
     inputMode: fixedGainRequested ? "fixed" : "adaptive",
-    preset: captureOverride ? QUICK_PRESETS.CUSTOM : preset,
-    captureMode,
+    preset: quickPreset.preset,
+    captureMode: quickPreset.captureMode,
   };
 }
 
