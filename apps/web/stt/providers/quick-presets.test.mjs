@@ -20,6 +20,15 @@ test("Far/Noisy preset resolves to voice capture", () => {
   });
 });
 
+test("Near/Normal remain Auto until distinct behavior is evidence-based", () => {
+  for (const presetValue of ["near", "normal"]) {
+    assert.deepEqual(resolveQuickPreset({ presetValue }), {
+      preset: QUICK_PRESETS.AUTO,
+      captureMode: "raw",
+    });
+  }
+});
+
 test("explicit capture override wins and is reported as custom", () => {
   assert.deepEqual(
     resolveQuickPreset({
