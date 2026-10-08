@@ -54,7 +54,7 @@ Before starting or restarting the 24-run core after any processing-path change:
 
 These two preflight runs are pipeline checks, not part of the 24-run analysis set. If the source tail is systematically absent, stop and fix finalization / segmentation before spending time on the full matrix.
 
-## 6. Core M01 matrix
+## 5. Core M01 matrix
 
 Use the smallest matrix that answers the product question without repeating the exploratory development matrix.
 
