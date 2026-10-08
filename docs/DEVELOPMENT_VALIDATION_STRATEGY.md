@@ -362,12 +362,13 @@ Do not repeat the entire formal benchmark after every small code change.
 
 ## Immediate next path
 
-1. Treat the 2026-10-08 iPhone intake as **pre-fix diagnostic evidence**, not the final M01 benchmark set; only 11 reports were present and the Auto / 1 m repeat-2 report was missing.
-2. The intake exposed systematic long-source finalization loss even at 0.5 m. Pause the 24-run benchmark until the Gemini stop/drain fix passes the two-run preflight gate.
-3. After deploying the stop/drain fix, run only one 0.5 m Auto and one 0.5 m Far/Noisy preflight with the full locked 45.554 s source. Confirm the retained transcript reaches the closing sentence.
-4. If the preflight passes, freeze that build as the new benchmark-v1 build and restart the 24-run controlled matrix. Do not mix pre-fix and post-fix runs in one formal set.
-5. Use `docs/M01_FORMAL_BENCHMARK.md` as the sole formal M01 controlled protocol and score every valid report with the versioned scorer.
-6. Keep client-observed first-audio-to-caption timing as engineering telemetry until a locked speech-onset reference exists.
-7. Do not reopen gain, Near/Normal preset, or raw-vs-voice tuning unless post-fix telemetry shows a reproducible regression.
-8. After the controlled M01 benchmark is summarized, move real-speaker / noisy-scene / proximity-SNR validation to M02.
+1. Correct the 2026-10-08 iPhone intake as **operator-truncated exploratory evidence**. The source was intentionally stopped around the end of section 3, so unplayed sections must not be counted as recognition deletions.
+2. Keep the Gemini stop/drain hardening as a defensive correctness change only; this batch does not prove a prior stop-flush failure. Google Live input transcription is independently delivered and ordering with other server messages is not guaranteed.
+3. Use the reduced-disturbance benchmark definition `testdata/benchmark/zh-tw-regression-v2-short.json`: play from the beginning and stop immediately after the complete `房間號碼是一二零八。` sentence.
+4. Restart the formal set with that standardized short protocol. Do not mix the approximate-cutoff exploratory runs with the formal set.
+5. Keep the 24-run controlled matrix (2 devices × Auto/Far-Noisy × 0.5/1/2 m × 2 repeats), but each run now uses only the fixed short source prefix.
+6. Score every valid report with the versioned scorer; ensure receiving-device model, distance, source-volume field and notes are filled before export.
+7. Keep client-observed caption timing as engineering telemetry until a locked acoustic speech-onset reference exists.
+8. Do not reopen gain, Near/Normal preset, or raw-vs-voice tuning unless the standardized short benchmark shows a reproducible regression.
+9. After the controlled M01 benchmark is summarized, move real-speaker / noisy-scene / proximity-SNR validation to M02.
 
