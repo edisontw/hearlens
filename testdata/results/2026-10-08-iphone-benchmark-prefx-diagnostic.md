@@ -1,10 +1,12 @@
-# iPhone formal-benchmark intake — pre-fix diagnostic — 2026-10-08
+# iPhone shortened-source intake — operator-truncated exploratory set — 2026-10-08
 
-## Status
+## Correction
 
-**Do not count these runs as the final M01 benchmark set.**
+The earlier interpretation of this batch as evidence of long-source finalization loss was incorrect.
 
-The operator supplied a batch described in this intended order:
+The operator clarified that, to avoid disturbing other people, playback was intentionally stopped around the end of section 3. Therefore the missing sections 4–6 and closing sentence were **not presented acoustically** and must not be counted as recognition errors.
+
+The attachment contains **11 report headers**. The intended sequence was:
 
 1. Auto 0.5 m ×2
 2. Auto 1 m ×2
@@ -13,60 +15,73 @@ The operator supplied a batch described in this intended order:
 5. Far/Noisy 1 m ×2
 6. Far/Noisy 0.5 m ×2
 
-The pasted attachment contains only **11 report headers**. Cross-checking each report's runtime preset / capture mode / distance shows that **Auto / 1 m repeat 2 is missing from the attachment**. The raw reports also omit receiving-device model, source-volume field, and notes, so this intake is diagnostic rather than a complete formal metadata set.
+Cross-checking runtime preset / capture mode / distance shows that **Auto / 1 m repeat 2 is absent from the attachment**.
 
-All received reports use build `20261008-caption-latency1`, Gemini Live, adaptive normalization, target `-48 dBFS`, gain range `1–8x`.
+The raw reports also omit receiving-device model, source-volume field, and notes. Keep them as exploratory evidence rather than the final formal set.
 
-## Locked scorer results
+## Corrected scoring basis
 
-Scores use the version-controlled `zh-tw-regression-v2` benchmark definition and strict CER scorer.
+For this intake, use the shortened reference ending after:
 
-| Received run | Condition | Repeat | CER | Key fields | Utterance anchors | First partial* | First final* |
+`第三段，我的電話末四碼是五七二九，房間號碼是一二零八。`
+
+Definition:
+
+- `testdata/benchmark/zh-tw-regression-v2-short.json`
+
+Because the operator described the cutoff as approximately after section 3 rather than a machine-timed cutoff, these values are still **exploratory**. They are nevertheless much more meaningful than scoring against unplayed source material.
+
+## Corrected per-run scores
+
+| Received run | Condition | Repeat | Short-reference CER | Key fields | Short anchors | First partial* | First final* |
 | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | Auto / 0.5 m | 1 | 52.7% | 5/6 | 4/9 | 3.833 s | 20.642 s |
-| 2 | Auto / 0.5 m | 2 | 59.0% | 4/6 | 3/9 | 4.079 s | 16.161 s |
-| 3 | Auto / 1 m | 1 | 70.7% | 4/6 | 4/9 | 15.138 s | 17.109 s |
+| 1 | Auto / 0.5 m | 1 | 20.2% | 5/5 | 4/5 | 3.833 s | 20.642 s |
+| 2 | Auto / 0.5 m | 2 | 26.0% | 4/5 | 3/5 | 4.079 s | 16.161 s |
+| 3 | Auto / 1 m | 1 | 47.1% | 4/5 | 4/5 | 15.138 s | 17.109 s |
 | — | Auto / 1 m | 2 | **missing** | — | — | — | — |
-| 4 | Auto / 2 m | 1 | 93.6% | 1/6 | 1/9 | 25.120 s | 27.132 s |
-| 5 | Auto / 2 m | 2 | 80.9% | 1/6 | 2/9 | 13.953 s | 16.033 s |
-| 6 | Far/Noisy / 2 m | 1 | 79.3% | 3/6 | 2/9 | 13.813 s | 18.394 s |
-| 7 | Far/Noisy / 2 m | 2 | 67.0% | 3/6 | 3/9 | 12.562 s | 20.974 s |
-| 8 | Far/Noisy / 1 m | 1 | 54.8% | 3/6 | 4/9 | 5.534 s | 8.490 s |
-| 9 | Far/Noisy / 1 m | 2 | 48.9% | 5/6 | 4/9 | 4.602 s | 16.023 s |
-| 10 | Far/Noisy / 0.5 m | 1 | 55.9% | 4/6 | 4/9 | 2.127 s | 26.893 s |
-| 11 | Far/Noisy / 0.5 m | 2 | 48.9% | 5/6 | 4/9 | 2.745 s | 27.804 s |
+| 4 | Auto / 2 m | 1 | 88.5% | 1/5 | 1/5 | 25.120 s | 27.132 s |
+| 5 | Auto / 2 m | 2 | 65.4% | 1/5 | 2/5 | 13.953 s | 16.033 s |
+| 6 | Far/Noisy / 2 m | 1 | 62.5% | 3/5 | 2/5 | 13.813 s | 18.394 s |
+| 7 | Far/Noisy / 2 m | 2 | 46.2% | 3/5 | 3/5 | 12.562 s | 20.974 s |
+| 8 | Far/Noisy / 1 m | 1 | 18.3% | 3/5 | 4/5 | 5.534 s | 8.490 s |
+| 9 | Far/Noisy / 1 m | 2 | 36.5% | 4/5 | 3/5 | 4.602 s | 16.023 s |
+| 10 | Far/Noisy / 0.5 m | 1 | 24.0% | 4/5 | 4/5 | 2.127 s | 26.893 s |
+| 11 | Far/Noisy / 0.5 m | 2 | 7.7% | 5/5 | 4/5 | 2.745 s | 27.804 s |
 
 * Client-observed from first audio chunk; not formal acoustic speech-onset latency.
 
-### Two-repeat cell summaries
+## Cell summaries
 
-| Condition | n | Median CER | CER range | Median key-field accuracy | Median utterance coverage |
+| Condition | n | Median short CER | CER range | Median key-field accuracy | Median short-anchor coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Auto / 0.5 m | 2 | 55.9% | 52.7–59.0% | 75.0% | 38.9% |
-| Auto / 1 m | 1 | 70.7% | single run | 66.7% | 44.4% |
-| Auto / 2 m | 2 | 87.2% | 80.9–93.6% | 16.7% | 16.7% |
-| Far/Noisy / 2 m | 2 | 73.1% | 67.0–79.3% | 50.0% | 27.8% |
-| Far/Noisy / 1 m | 2 | 51.9% | 48.9–54.8% | 66.7% | 44.4% |
-| Far/Noisy / 0.5 m | 2 | 52.4% | 48.9–55.9% | 75.0% | 44.4% |
+| Auto / 0.5 m | 2 | **23.1%** | 20.2–26.0% | 90% | 70% |
+| Auto / 1 m | 1 | **47.1%** | single run | 80% | 80% |
+| Auto / 2 m | 2 | **76.9%** | 65.4–88.5% | 20% | 30% |
+| Far/Noisy / 2 m | 2 | **54.3%** | 46.2–62.5% | 60% | 50% |
+| Far/Noisy / 1 m | 2 | **27.4%** | 18.3–36.5% | 70% | 70% |
+| Far/Noisy / 0.5 m | 2 | **15.9%** | 7.7–24.0% | 90% | 80% |
 
-## Main finding
+## Interpretation
 
-This batch exposes a pipeline-completeness problem before it can serve as the formal benchmark.
+The corrected short-reference analysis supports the earlier qualitative direction:
 
-Even at 0.5 m, the retained final transcripts usually stop around source sections 3–4. None of the 11 received reports reaches the locked closing-sentence anchor. The problem therefore cannot be explained by far-field scalar level alone.
+- performance worsens substantially with distance under Auto/raw,
+- Far/Noisy/voice improves the 1 m and 2 m cells relative to Auto/raw in this exploratory iPhone set,
+- 0.5 m is already strong under both policies, with Far/Noisy slightly better in these two repeats,
+- repeat variability is still large enough that this batch should not be promoted to the final benchmark.
 
-The current Gemini provider's stop path is a plausible truncation mechanism:
+Do not use the earlier full-source CER values. They were invalid because unplayed material was incorrectly counted as deletion errors.
 
-- it sends `audioStreamEnd`,
-- waits only 1.5 s,
-- and resolves the stop wait as soon as the first final transcription arrives while stopping.
+## Stop-flush change
 
-Gemini Live documents input transcription as independently delivered with no guaranteed ordering relative to other server content. Closing immediately after the first stopping-time final can therefore discard later transcription packets.
+The stop/drain hardening merged in build `20261008-stop-flush1` is retained as a defensive protocol fix, not as a bug proven by this batch.
+
+Google Live API documents input transcription as being sent independently from other server messages with no guaranteed ordering. Therefore waiting for `turnComplete` plus a short drain grace is a reasonable correctness safeguard, but this operator-truncated dataset does not demonstrate that the previous implementation actually lost the source tail.
 
 ## Decision
 
-1. Pause the 24-run formal benchmark. Do not run the HTC half yet.
-2. Fix Gemini stop/drain handling.
-3. After deployment, run only two 0.5 m preflight gates: Auto once and Far/Noisy once.
-4. Confirm that the source tail / closing sentence is retained before restarting the formal matrix.
-5. Treat this 11-report batch as pre-fix diagnostic evidence, not the final benchmark result.
+1. Keep these 11 runs as corrected shortened-source exploratory evidence.
+2. Do not require replay of a full 45.554 s source for every benchmark cell.
+3. Use the reduced-disturbance short protocol through section 3 for the next formal set.
+4. Standardize the cutoff after the complete `房間號碼是一二零八` sentence rather than stopping at an approximate arbitrary time.
+5. Collect the missing cells only as part of the new standardized short benchmark; do not try to repair the old intake by mixing protocols.
