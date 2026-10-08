@@ -1,0 +1,93 @@
+{
+  "schema": "hearlens-benchmark-definition-v1",
+  "sourceId": "zh-tw-regression-v2-short-through-section3",
+  "sourceAudio": "testdata/audio/hearlens-zh-tw-regression-v2.wav",
+  "playbackInstruction": "Play from the beginning and stop immediately after the sentence ending with 房間號碼是一二零八。",
+  "referenceText": "今天是十月五日，現在進行 HearLens 中文語音辨識測試。請把手機放在固定位置，不要改變播放音量。第一段，今天天氣不錯，我們下午三點在門口見面。第二段，請記得帶健保卡、手機和雨傘。第三段，我的電話末四碼是五七二九，房間號碼是一二零八。",
+  "utteranceAnchors": [
+    {
+      "id": "u01-opening",
+      "label": "opening test sentence",
+      "variants": [
+        "HearLens中文語音辨識測試"
+      ]
+    },
+    {
+      "id": "u02-fixed-position",
+      "label": "fixed position / playback volume instruction",
+      "variants": [
+        "手機放在固定位置",
+        "不要改變播放音量"
+      ]
+    },
+    {
+      "id": "u03-meeting",
+      "label": "3 PM meeting sentence",
+      "variants": [
+        "下午三點在門口見面",
+        "下午3點在門口見面"
+      ]
+    },
+    {
+      "id": "u04-items",
+      "label": "health card / phone / umbrella sentence",
+      "variants": [
+        "健保卡手機和雨傘"
+      ]
+    },
+    {
+      "id": "u05-numbers",
+      "label": "phone suffix / room number sentence",
+      "variants": [
+        "電話末四碼",
+        "房間號碼"
+      ]
+    }
+  ],
+  "keyFields": [
+    {
+      "id": "date",
+      "label": "October 5",
+      "variants": [
+        "十月五日",
+        "10月5日"
+      ]
+    },
+    {
+      "id": "meeting-time",
+      "label": "3 PM",
+      "variants": [
+        "下午三點",
+        "下午3點"
+      ]
+    },
+    {
+      "id": "health-card",
+      "label": "health card",
+      "variants": [
+        "健保卡"
+      ]
+    },
+    {
+      "id": "phone-suffix",
+      "label": "5729",
+      "variants": [
+        "五七二九",
+        "5729"
+      ]
+    },
+    {
+      "id": "room-number",
+      "label": "1208",
+      "variants": [
+        "一二零八",
+        "1208"
+      ]
+    }
+  ],
+  "notes": [
+    "This is the reduced-disturbance controlled source for M01.",
+    "Manual cutoff must occur only after the complete section-3 sentence.",
+    "A run cut earlier or materially later is exploratory, not formal."
+  ]
+}
