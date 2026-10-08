@@ -42,7 +42,19 @@ Scoring definition:
 
 - `testdata/benchmark/zh-tw-regression-v2.json`
 
-## 4. Core M01 matrix
+## 4. Preflight completeness gate
+
+Before starting or restarting the 24-run core after any processing-path change:
+
+1. run one 0.5 m Auto trial,
+2. run one 0.5 m Far / Noisy trial,
+3. play the entire locked 45.554 s source,
+4. confirm the retained final transcript reaches the source tail / closing sentence,
+5. inspect the event log for stop-flush timeout or capture mismatch.
+
+These two preflight runs are pipeline checks, not part of the 24-run analysis set. If the source tail is systematically absent, stop and fix finalization / segmentation before spending time on the full matrix.
+
+## 5. Core M01 matrix
 
 Use the smallest matrix that answers the product question without repeating the exploratory development matrix.
 
@@ -80,7 +92,7 @@ Core total:
 
 This is the locked M01 controlled core. Do not expand to TV / restaurant / car / clinic scenes until these 24 runs are complete and reviewed. Those robustness scenes belong to the later scene-validation stage.
 
-## 5. Controlled setup
+## 6. Controlled setup
 
 For every run:
 
@@ -104,7 +116,7 @@ Every exported report must fill:
 
 A report with missing controlled metadata can be retained for debugging but is not part of the formal analysis set.
 
-## 6. Primary and secondary metrics
+## 7. Primary and secondary metrics
 
 ### 6.1 Primary: strict display CER
 
@@ -164,7 +176,7 @@ Record:
 
 Any run with clipping or unexpected capture-policy mismatch should be flagged before accuracy comparison.
 
-## 7. Automated scoring
+## 8. Automated scoring
 
 Given a copied HearLens report saved as `report.json`:
 
@@ -183,7 +195,7 @@ The scorer outputs:
 
 Scoring code and benchmark definition are version-controlled with the reports.
 
-## 8. Analysis unit
+## 9. Analysis unit
 
 Keep every individual run.
 
@@ -197,7 +209,7 @@ For each device × preset × distance cell, report both repeats and summarize:
 
 Do not average away an obvious failed session. A catastrophic outlier is itself evidence of reliability problems.
 
-## 9. Initial decision rules
+## 10. Initial decision rules
 
 Benchmark v1 is descriptive first; avoid inventing pass thresholds after seeing results.
 
@@ -211,7 +223,7 @@ The following trigger investigation rather than automatic retuning:
 
 If Far / Noisy materially improves completeness at distance without causing a normal-distance penalty, retain the current two-preset policy. Do not automatically promote voice capture to global Auto from one device alone.
 
-## 10. What closes M01
+## 11. What closes M01
 
 M01 formal validation is complete when:
 

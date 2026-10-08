@@ -362,11 +362,12 @@ Do not repeat the entire formal benchmark after every small code change.
 
 ## Immediate next path
 
-1. Treat the current M01 caption pipeline as frozen for benchmark v1 unless a regression is found.
-2. Use `docs/M01_FORMAL_BENCHMARK.md` as the sole formal M01 controlled protocol.
-3. Collect the 24-run controlled core: 2 receiving devices × Auto/Far-Noisy × 0.5/1/2 m × 2 repeats.
-4. Score every valid report with the versioned strict CER / key-field / utterance-coverage tool; do not hand-edit benchmark outputs.
-5. Keep client-observed first-audio-to-caption timing as engineering telemetry. Add a locked speech-onset reference before calling any value formal end-to-end speech latency.
-6. Do not reopen gain, Near/Normal preset, or raw-vs-voice tuning during the benchmark unless telemetry shows a reproducible regression.
-7. After the controlled M01 benchmark is summarized, move real-speaker / noisy-scene / proximity-SNR validation to M02.
+1. Treat the 2026-10-08 iPhone intake as **pre-fix diagnostic evidence**, not the final M01 benchmark set; only 11 reports were present and the Auto / 1 m repeat-2 report was missing.
+2. The intake exposed systematic long-source finalization loss even at 0.5 m. Pause the 24-run benchmark until the Gemini stop/drain fix passes the two-run preflight gate.
+3. After deploying the stop/drain fix, run only one 0.5 m Auto and one 0.5 m Far/Noisy preflight with the full locked 45.554 s source. Confirm the retained transcript reaches the closing sentence.
+4. If the preflight passes, freeze that build as the new benchmark-v1 build and restart the 24-run controlled matrix. Do not mix pre-fix and post-fix runs in one formal set.
+5. Use `docs/M01_FORMAL_BENCHMARK.md` as the sole formal M01 controlled protocol and score every valid report with the versioned scorer.
+6. Keep client-observed first-audio-to-caption timing as engineering telemetry until a locked speech-onset reference exists.
+7. Do not reopen gain, Near/Normal preset, or raw-vs-voice tuning unless post-fix telemetry shows a reproducible regression.
+8. After the controlled M01 benchmark is summarized, move real-speaker / noisy-scene / proximity-SNR validation to M02.
 

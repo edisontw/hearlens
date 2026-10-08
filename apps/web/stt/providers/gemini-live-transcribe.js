@@ -10,7 +10,8 @@ const TARGET_SAMPLE_RATE = 16_000;
 const TARGET_CHUNK_SAMPLES = 1_600;
 const OPEN_TIMEOUT_MS = 8_000;
 const SETUP_TIMEOUT_MS = 8_000;
-const STOP_TIMEOUT_MS = 1_500;
+const STOP_TIMEOUT_MS = 5_000;
+const STOP_DRAIN_GRACE_MS = 1_000;
 const GEMINI_WS_BASE =
   "wss://generativelanguage.googleapis.com/ws/" +
   "google.ai.generativelanguage.v1beta.GenerativeService." +
@@ -105,6 +106,7 @@ export class GeminiLiveTranscribeProvider {
     this.setupResolver = null;
     this.setupRejecter = null;
     this.stopResolver = null;
+    this.stopDrainTimer = null;
     this.firstAudioSent = false;
     this.lastLevelDebugAt = 0;
   }
@@ -192,8 +194,7 @@ export class GeminiLiveTranscribeProvider {
       }
 
       if (this.stopResolver) {
-        this.stopResolver();
-        this.stopResolver = null;
+        this.stopResolver("socket-close");
       }
 
       if (this.active && !this.stopping) {
@@ -209,6 +210,24 @@ export class GeminiLiveTranscribeProvider {
   clearSetupWaiters() {
     this.setupResolver = null;
     this.setupRejecter = null;
+  }
+
+  clearStopDrainTimer() {
+    if (this.stopDrainTimer !== null) {
+      window.clearTimeout(this.stopDrainTimer);
+      this.stopDrainTimer = null;
+    }
+  }
+
+  scheduleStopDrain(reason) {
+    if (!this.stopping || !this.stopResolver) return;
+
+    this.clearStopDrainTimer();
+    this.debug("stop-drain-scheduled", reason);
+    this.stopDrainTimer = window.setTimeout(() => {
+      this.stopDrainTimer = null;
+      this.stopResolver?.("drain-complete");
+    }, STOP_DRAIN_GRACE_MS);
   }
 
   async handleMessage(event) {
@@ -270,15 +289,13 @@ export class GeminiLiveTranscribeProvider {
         timestamp: Date.now(),
       });
 
-      if (this.stopping && this.stopResolver) {
-        this.stopResolver();
-        this.stopResolver = null;
+      if (this.stopping && this.stopDrainTimer !== null) {
+        this.scheduleStopDrain("late-final");
       }
     }
 
     if (this.stopping && content.turnComplete && this.stopResolver) {
-      this.stopResolver();
-      this.stopResolver = null;
+      this.scheduleStopDrain("turn-complete");
     }
   }
 
@@ -556,9 +573,18 @@ export class GeminiLiveTranscribeProvider {
     }
 
     await new Promise((resolve) => {
-      const timeout = window.setTimeout(resolve, STOP_TIMEOUT_MS);
-      this.stopResolver = () => {
+      const timeout = window.setTimeout(() => {
+        this.debug("stop-flush-timeout", "ms=" + STOP_TIMEOUT_MS);
+        this.clearStopDrainTimer();
+        this.stopResolver = null;
+        resolve();
+      }, STOP_TIMEOUT_MS);
+
+      this.stopResolver = (reason = "server-complete") => {
         window.clearTimeout(timeout);
+        this.clearStopDrainTimer();
+        this.stopResolver = null;
+        this.debug("stop-flush-complete", reason);
         resolve();
       };
     });
@@ -593,9 +619,9 @@ export class GeminiLiveTranscribeProvider {
 
     this.socket = null;
     this.clearSetupWaiters();
+    this.clearStopDrainTimer();
     if (this.stopResolver) {
-      this.stopResolver();
-      this.stopResolver = null;
+      this.stopResolver("dispose");
     }
   }
 }
