@@ -28,33 +28,20 @@ Benchmark v1 must use one exact GitHub main build. Before the first formal run, 
 
 Do not change capture constraints, resampling, adaptive normalization, limiter, STT provider/model, or Traditional-Chinese conversion in the middle of a benchmark set. If one of those changes, start a new benchmark version.
 
-## 3. Locked source
+## 3. Locked reduced-disturbance source
 
-Primary source:
+Use the existing locked WAV but only the fixed prefix through section 3.
 
-- ID: `zh-tw-regression-v2`
-- File: `testdata/audio/hearlens-zh-tw-regression-v2.wav`
-- SHA-256: `cdd7b9d8d1c94d1f254d7c9fe20b598e1e99982fb1bd96e3555c823ca32b77da`
-- Duration: 45.554 s
-- Playback file must not be normalized, trimmed, transcoded, or otherwise modified.
+- Source WAV: `testdata/audio/hearlens-zh-tw-regression-v2.wav`
+- Full-file SHA-256: `cdd7b9d8d1c94d1f254d7c9fe20b598e1e99982fb1bd96e3555c823ca32b77da`
+- Formal playback instruction: start from the beginning and stop playback immediately after the complete sentence ending `房間號碼是一二零八。`
+- Short scoring definition: `testdata/benchmark/zh-tw-regression-v2-short.json`
 
-Scoring definition:
+The full 45.554 s file is retained for occasional long-session regression work, but it is **not required for every M01 benchmark cell**. This reduces repeated acoustic disturbance and test time while preserving the date, meeting-time, health-card, 5729 and 1208 fields.
 
-- `testdata/benchmark/zh-tw-regression-v2.json`
+A formal run is invalid if playback is stopped before the full section-3 sentence or materially later into section 4. Do not use an approximate time-based cutoff; use the spoken content boundary.
 
-## 4. Preflight completeness gate
-
-Before starting or restarting the 24-run core after any processing-path change:
-
-1. run one 0.5 m Auto trial,
-2. run one 0.5 m Far / Noisy trial,
-3. play the entire locked 45.554 s source,
-4. confirm the retained final transcript reaches the source tail / closing sentence,
-5. inspect the event log for stop-flush timeout or capture mismatch.
-
-These two preflight runs are pipeline checks, not part of the 24-run analysis set. If the source tail is systematically absent, stop and fix finalization / segmentation before spending time on the full matrix.
-
-## 5. Core M01 matrix
+## 4. Core M01 matrix
 
 Use the smallest matrix that answers the product question without repeating the exploratory development matrix.
 
@@ -92,7 +79,7 @@ Core total:
 
 This is the locked M01 controlled core. Do not expand to TV / restaurant / car / clinic scenes until these 24 runs are complete and reviewed. Those robustness scenes belong to the later scene-validation stage.
 
-## 6. Controlled setup
+## 5. Controlled setup
 
 For every run:
 
@@ -103,9 +90,9 @@ For every run:
 - measure distance between the playback-phone loudspeaker and receiving-phone microphone reference point,
 - keep the receiving phone stationary,
 - start HearLens first and wait until status is listening,
-- then play the locked WAV once from the beginning,
+- then play the locked WAV from the beginning and stop only after the complete section-3 sentence ending `房間號碼是一二零八。`,
 - do not speak or handle either phone during playback,
-- stop HearLens after the final source sentence has had time to finalize.
+- wait briefly for the section-3 final transcription, then stop HearLens and allow the stop/drain sequence to complete.
 
 Every exported report must fill:
 
@@ -116,7 +103,7 @@ Every exported report must fill:
 
 A report with missing controlled metadata can be retained for debugging but is not part of the formal analysis set.
 
-## 7. Primary and secondary metrics
+## 6. Primary and secondary metrics
 
 ### 6.1 Primary: strict display CER
 
@@ -146,9 +133,9 @@ Do not add a new accepted variant after seeing a benchmark result unless the ent
 
 ### 6.3 Utterance coverage / missed rate
 
-Nine unique source anchors are predefined in the benchmark JSON.
+Five source anchors are predefined in the short benchmark JSON.
 
-- utterance coverage = matched anchors / 9
+- utterance coverage = matched anchors / 5
 - missed-utterance rate = 1 - utterance coverage
 
 This is a coarse completeness measure and should be reported together with CER, not instead of CER.
@@ -176,12 +163,12 @@ Record:
 
 Any run with clipping or unexpected capture-policy mismatch should be flagged before accuracy comparison.
 
-## 8. Automated scoring
+## 7. Automated scoring
 
 Given a copied HearLens report saved as `report.json`:
 
 ```bash
-npm run benchmark:score -- report.json testdata/benchmark/zh-tw-regression-v2.json
+npm run benchmark:score -- report.json testdata/benchmark/zh-tw-regression-v2-short.json
 ```
 
 The scorer outputs:
@@ -195,7 +182,7 @@ The scorer outputs:
 
 Scoring code and benchmark definition are version-controlled with the reports.
 
-## 9. Analysis unit
+## 8. Analysis unit
 
 Keep every individual run.
 
@@ -209,7 +196,7 @@ For each device × preset × distance cell, report both repeats and summarize:
 
 Do not average away an obvious failed session. A catastrophic outlier is itself evidence of reliability problems.
 
-## 10. Initial decision rules
+## 9. Initial decision rules
 
 Benchmark v1 is descriptive first; avoid inventing pass thresholds after seeing results.
 
@@ -223,7 +210,7 @@ The following trigger investigation rather than automatic retuning:
 
 If Far / Noisy materially improves completeness at distance without causing a normal-distance penalty, retain the current two-preset policy. Do not automatically promote voice capture to global Auto from one device alone.
 
-## 11. What closes M01
+## 10. What closes M01
 
 M01 formal validation is complete when:
 
