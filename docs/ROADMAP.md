@@ -33,7 +33,7 @@ Goal: validate the simplest useful product.
 - [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [x] validate Far/Noisy voice capture on at least one additional receiving phone before considering it for Auto (HTC U23 2 m A/B PASS; post-run distance correction recorded),
 - [x] run one HTC U23 1 m Auto vs Far/Noisy safety A/B (PASS: voice materially improved transcript continuity with zero retained clipping; global Auto remains raw for cross-device conservatism),
-- [ ] run the locked M01 Taiwan Mandarin formal benchmark (`docs/M01_FORMAL_BENCHMARK.md`): 24 controlled runs, automated strict CER / key-field / utterance-coverage scoring; current client timing remains engineering telemetry until a speech-onset reference is added,
+- [ ] run the locked reduced-disturbance M01 Taiwan Mandarin benchmark (`docs/M01_FORMAL_BENCHMARK.md`): 24 short-prefix controlled runs through section 3, automated strict CER / key-field / utterance-coverage scoring; current client timing remains engineering telemetry until a speech-onset reference is added,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - [x] 30 s rolling transcript with segmented recent-history view,
 - [x] "What did they just say?" recent-history panel with copy action,
