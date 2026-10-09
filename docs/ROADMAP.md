@@ -65,8 +65,9 @@ Exit: evidence that proximity improves useful speech capture under target scenes
 
 Goal: build the personalization domain layer before live output.
 
-- per-ear audiogram model,
-- log-frequency interpolation,
+- [x] M03 Part A: versioned per-ear audiogram model, validation, safe serialization, provenance and explicit missing data,
+- [x] M03 Part A: bounded log-frequency interpolation (no extrapolation), golden unit tests and documentation; no live output,
+- [ ] prescription/I-O representation and independent target generation,
 - target I/O representation,
 - 6–8 band WDRC prototype,
 - limiter,
