@@ -13,6 +13,7 @@ Important intake limitations:
 - Original `test.sourceId` remains `zh-tw-regression-v2`; re-scoring uses the shorter, fixed section-3 definition `testdata/benchmark/zh-tw-regression-v2-short.json`.
 - `sourceVolume` and `notes` are null in every exported report; several `receiverDevice` fields are null. HTC identity comes from the operator's accompanying statement and is **not** silently inserted into raw reports.
 - Exact acoustic playback cutoff and cross-cell volume constancy cannot be independently proven from the report.
+- **Operator clarification (2026-10-09): test runs may have taken place in different rooms or under other uncontrolled conditions.** Same-room setup, playback environment, and comparable acoustic conditions across runs are not established; differences cannot be attributed solely to device, capture preset, distance, or Gemini behavior.
 - No distinct post-hoc reports should be invented to fill missing repeats.
 
 ## Scoring protocol
@@ -48,21 +49,20 @@ Do not average one-repeat cells as if their variability is known.
 
 ## Capture / audio diagnostic notes
 
-- Auto/raw's actual `echoCancellation`, `noiseSuppression`, `autoGainControl` were all false in each report.
-- Far/Noisy/voice's actual EC, NS, AGC were all true.
+- Auto/raw's browser **reported** `MediaStreamTrack.getSettings()` values for `echoCancellation`, `noiseSuppression`, and `autoGainControl` as false.
+- Far/Noisy/voice's browser **reported** values for those three settings as true. These are browser-exposed capture settings, **not independent verification that the corresponding acoustic processing was effective or consistent**. The operator cannot independently confirm actual HTC EC/NS/AGC operation.
 - Available truncated event-log excerpts show **0.00% clipped** at retained logged level samples; **full-run clipping is not verifiable**.
 - Available Far/Noisy log excerpts contain stretches with `raw-rms=-160 dBFS`, consistent with strong platform voice gating / suppression. This is an observation, not proof it caused the 2 m transcript failure.
 - Despite successful PCM capture and nonzero audio levels in the Auto 1/2 m excerpts, those sessions retained no caption text. The reports alone cannot attribute the failure to microphone acoustics, model behavior, or finalization.
 - One Auto 0.5 m transcript extends into `第四段`, which suggests minor cutoff variation; treat this batch as exploratory.
 
-## Interpretation / next minimal gate
+## Interpretation and deferred verification decision
 
-1. **Near range works**, especially HTC Far/Noisy 0.5 m (5/5 high-value fields).
-2. **Auto/raw recognition fails at longer distance** in this particular batch: empty final transcript at 1 m and both 2 m repetitions.
-3. **Far/Noisy/voice 1 m remains usable**, whereas its single 2 m run is empty, conflicting with earlier successful HTC 2 m voice-capture evidence. Avoid generalizing from n=1.
-4. Do **not** repeat every near-distance run or re-tune gain now.
-5. The next lowest-cost gate is **one HTC Far/Noisy 2 m replay** with the same playback device/volume and the full short-prefix through `房間號碼是一二零八。`; allow a few seconds of silence after the last spoken word before pressing Stop Listening, and export the full JSON report rather than a truncated concatenated paste.
-6. If the repeat also yields no transcript, investigate the actual voice capture waveform/gating and Gemini event timing before adding more acoustic matrix tests. If it succeeds, characterize repeat-to-repeat instability; do not change global Auto policy on this dataset.
-7. Complete source-volume and receiver metadata before future exports.
+1. The HTC Far/Noisy 0.5 m run retained all five predefined key fields, while Auto/raw 1–2 m and the single Far/Noisy 2 m run retained no final transcript. These observations are **specific to the reported runs**, not controlled proof of a distance/preset/device effect.
+2. The 2 m Far/Noisy result conflicts with earlier successful HTC 2 m voice-capture evidence. **Unrecorded room/acoustic conditions, playback level/orientation, and unknown effective OS processing** are plausible confounders. No single cause is established.
+3. **No immediate retest is required.** The operator explicitly prefers to pause repeat testing unless resolving the discrepancy becomes necessary for a concrete development decision.
+4. Do not alter adaptive gain, global Auto capture policy, or safety settings based on these exploratory differences. Continue planned product work independently.
+5. Reopen a focused, matched-condition HTC Auto/Far-Noisy test **only** if a reproducible caption failure blocks product use, if a global capture-policy change is being considered, or if quantitative cross-device claims will be made. At that point, fix room, playback source/volume, device orientations, source cutoff and log capture details before interpreting discrepancies.
+6. Fill receiver, source-volume, and environment metadata in future exports without retroactively altering existing raw reports.
 
 The earlier iPhone operator-truncated exploratory intake remains separately documented. Do not pool scores across devices as a formal controlled comparison without matching source cutoff, playback level, build and metadata.
