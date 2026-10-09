@@ -85,3 +85,12 @@ After M03 Part A, follow the roadmap through prescription-target research, multi
 - Tests: `packages/audiogram/audiogram.test.mjs` is included in root `npm test`.
 - No M01 STT, capture preset, gain, Pages build or cloud token changes; M01 formal 24-run benchmark remains deferred.
 - Next focused slice after merging: M03 Part B offline prescription-target representation and research acceptance gates, **not** live amplification.
+
+## M03 Part B implementation update (2026-10-09)
+
+- Versioned, browser-independent offline research I/O target module: `packages/prescription-targets/prescription-targets.mjs`; documentation in `docs/M03_PRESCRIPTION_TARGETS.md`.
+- Explicit per-ear 1–8 band target gain curves at nominal input 50/65/80 dB SPL; a missing ear or band is unavailable. Interpolation within supplied input anchors only, with no extrapolation or frequency-band inference.
+- Provenance is synthetic fixture or unverified external research input. `offline-research-only` cannot be promoted to a clinical/certified/ready flag; no NAL-NL2/DSL matching and no audiogram-derived gains.
+- Nine deterministic tests added under `packages/prescription-targets/prescription-targets.test.mjs` to root `npm test` alongside M01 + M03A tests; no M01 parameters, DSP execution, Web build or deployment modified.
+- Next focus: investigate offline research-only WDRC curve consumption and final-output-limiter regression boundaries with synthetic fixtures, and separately plan genuinely validated audiogram-to-target mapping. Do not start live output before device calibration, routing and final-limiter gates.
+- M01 formal 24-run benchmark remains deferred. No new phone matrix needed for these data-domain changes.
