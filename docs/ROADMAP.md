@@ -67,13 +67,12 @@ Goal: build the personalization domain layer before live output.
 
 - [x] M03 Part A: versioned per-ear audiogram model, validation, safe serialization, provenance and explicit missing data,
 - [x] M03 Part A: bounded log-frequency interpolation (no extrapolation), golden unit tests and documentation; no live output,
-- [ ] prescription/I-O representation and independent target generation,
-- target I/O representation,
-- 6–8 band WDRC prototype,
-- limiter,
-- gain ramp,
-- golden vectors,
-- no-bypass limiter regression test.
+- [x] M03 Part B: versioned offline per-ear prescription-target/I-O representation with 50/65/80 dB SPL nominal input anchors, independent 1–8 band target data, bounded interpolation and golden tests (no live output),
+- [ ] independent audiogram-to-target prescription generation with externally verified reference targets, numerical parity evaluation and provenance review,
+- [ ] offline 6–8 band WDRC prototype driven by research fixtures, not direct dB HL conversion,
+- [ ] final hearing-output limiter and no-bypass safety tests,
+- [ ] per-ear gain bounds and start/reconnect ramp,
+- [ ] calibration and headset-disconnect fail-safe gates before any live hearing path.
 
 No live-ear safety claim.
 

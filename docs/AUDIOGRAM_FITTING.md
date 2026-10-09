@@ -90,3 +90,10 @@ Preferred controls are bounded perceptual adjustments rather than per-band techn
 - loud sounds uncomfortable.
 
 MPO / safety ceilings are not general-user controls.
+
+## Implemented offline data layers (M03 A–B)
+
+- Audiogram domain: [M03_AUDIOGRAM_PROFILE.md](./M03_AUDIOGRAM_PROFILE.md) — measured dB HL, missing-data handling and frequency interpolation only.
+- Research target domain: [M03_PRESCRIPTION_TARGETS.md](./M03_PRESCRIPTION_TARGETS.md) — separately supplied nominal 50/65/80 dB SPL input labels and per-band target gain curves, no NAL-NL2/DSL calculations and no audio output.
+
+Research I/O curves are data and cannot override calibrated-device, final-limiter, per-ear gain or disconnected-headset fail-closed requirements.
