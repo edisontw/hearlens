@@ -76,3 +76,12 @@ After M03 Part A, follow the roadmap through prescription-target research, multi
 - Keep changes small, reviewable, testable. Prefer branch -> unit/CI -> PR -> merge -> verify `main` and CI.
 - Avoid re-running the already examined 0.5/1/2 m matrix just because new code or documentation is added.
 - Record material product/safety decisions in docs, not merely in chat.
+
+## M03 Part A implementation update (2026-10-09)
+
+- Following this handoff, M03 Part A is implemented in `packages/audiogram/audiogram.mjs`; see `docs/M03_AUDIOGRAM_PROFILE.md`.
+- Pure offline ES module: v1 canonical per-ear thresholds at 250/500/1000/2000/4000/8000 Hz, explicit nulls, strict numeric and provenance checks, JSON round-trip.
+- Log-frequency interpolation is only between real measured anchors; outside range/single-anchor/absent-ear cases yield unavailable rather than fabricated thresholds.
+- Tests: `packages/audiogram/audiogram.test.mjs` is included in root `npm test`.
+- No M01 STT, capture preset, gain, Pages build or cloud token changes; M01 formal 24-run benchmark remains deferred.
+- Next focused slice after merging: M03 Part B offline prescription-target representation and research acceptance gates, **not** live amplification.
