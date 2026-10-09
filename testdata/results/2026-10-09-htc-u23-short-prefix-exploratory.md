@@ -1,0 +1,68 @@
+# HTC U23 — shortened Taiwan-Mandarin exploratory intake — 2026-10-09
+
+## Source and status
+
+Operator submitted one concatenated text attachment of HearLens reports and confirmed receiving device was HTC, with distance tests at 0.5 / 1 / 2 m and intentionally fewer repeats for some near cells.
+
+**Exploratory evidence; not a completed formal 24-run matrix.**
+
+Important intake limitations:
+- Eight report headers and eight complete report **summary portions** (through `finalTranscript`) were received.
+- Each report's `eventLog` was truncated in the pasted attachment at roughly 10,000 characters, so full stop/flush events and whole-run safety telemetry are **not available**.
+- All eight report headers identify Web build `20261008-stop-flush1`.
+- Original `test.sourceId` remains `zh-tw-regression-v2`; re-scoring uses the shorter, fixed section-3 definition `testdata/benchmark/zh-tw-regression-v2-short.json`.
+- `sourceVolume` and `notes` are null in every exported report; several `receiverDevice` fields are null. HTC identity comes from the operator's accompanying statement and is **not** silently inserted into raw reports.
+- Exact acoustic playback cutoff and cross-cell volume constancy cannot be independently proven from the report.
+- No distinct post-hoc reports should be invented to fill missing repeats.
+
+## Scoring protocol
+
+Strict display CER uses NFKC, lowercasing, and removal of whitespace / punctuation only, preserving number-format and word substitutions; denominator: **104 normalized reference characters**.
+
+Key-field score: five predefined fields (date, afternoon 3, 健保卡, 5729, 1208).
+
+Anchor coverage: five predefined anchors from the locked short definition.
+
+These CER figures are descriptive, conditional on the intended section-3 cutoff, and **not valid calibrated efficacy estimates**.
+
+## Individual HTC results
+
+| Run | Mode | Distance | CER (edits / 104) | Key fields | Anchors | First partial* | First final* |
+| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | Auto/raw | 0.5 m | 41.3% (43) | 3/5 | 3/5 | 3959 ms | 11929 ms |
+| 2 | Auto/raw | 0.5 m | 42.3% (44) | 4/5 | 4/5 | 11293 ms | 15749 ms |
+| 3 | Auto/raw | 1 m | 100.0% (104) | 0/5 | 0/5 | null | null |
+| 4 | Auto/raw | 2 m | 100.0% (104) | 0/5 | 0/5 | null | null |
+| 5 | Auto/raw | 2 m | 100.0% (104) | 0/5 | 0/5 | null | null |
+| 6 | Far/Noisy/voice | 2 m | 100.0% (104) | 0/5 | 0/5 | null | null |
+| 7 | Far/Noisy/voice | 1 m | 23.1% (24) | 4/5 | 4/5 | 9442 ms | 33446 ms |
+| 8 | Far/Noisy/voice | 0.5 m | 9.6% (10) | 5/5 | 4/5 | 14195 ms | 39415 ms |
+
+* Client-observed first-audio-chunk-to-caption startup timing, **not acoustic speech-to-caption latency**. Null means no final/partial event recorded in the complete report summary.
+
+Per-cell median (only where n=2):
+- HTC Auto 0.5 m: **41.8% CER**.
+- HTC Auto 2 m: **100.0% CER**.
+
+Do not average one-repeat cells as if their variability is known.
+
+## Capture / audio diagnostic notes
+
+- Auto/raw's actual `echoCancellation`, `noiseSuppression`, `autoGainControl` were all false in each report.
+- Far/Noisy/voice's actual EC, NS, AGC were all true.
+- Available truncated event-log excerpts show **0.00% clipped** at retained logged level samples; **full-run clipping is not verifiable**.
+- Available Far/Noisy log excerpts contain stretches with `raw-rms=-160 dBFS`, consistent with strong platform voice gating / suppression. This is an observation, not proof it caused the 2 m transcript failure.
+- Despite successful PCM capture and nonzero audio levels in the Auto 1/2 m excerpts, those sessions retained no caption text. The reports alone cannot attribute the failure to microphone acoustics, model behavior, or finalization.
+- One Auto 0.5 m transcript extends into `第四段`, which suggests minor cutoff variation; treat this batch as exploratory.
+
+## Interpretation / next minimal gate
+
+1. **Near range works**, especially HTC Far/Noisy 0.5 m (5/5 high-value fields).
+2. **Auto/raw recognition fails at longer distance** in this particular batch: empty final transcript at 1 m and both 2 m repetitions.
+3. **Far/Noisy/voice 1 m remains usable**, whereas its single 2 m run is empty, conflicting with earlier successful HTC 2 m voice-capture evidence. Avoid generalizing from n=1.
+4. Do **not** repeat every near-distance run or re-tune gain now.
+5. The next lowest-cost gate is **one HTC Far/Noisy 2 m replay** with the same playback device/volume and the full short-prefix through `房間號碼是一二零八。`; allow a few seconds of silence after the last spoken word before pressing Stop Listening, and export the full JSON report rather than a truncated concatenated paste.
+6. If the repeat also yields no transcript, investigate the actual voice capture waveform/gating and Gemini event timing before adding more acoustic matrix tests. If it succeeds, characterize repeat-to-repeat instability; do not change global Auto policy on this dataset.
+7. Complete source-volume and receiver metadata before future exports.
+
+The earlier iPhone operator-truncated exploratory intake remains separately documented. Do not pool scores across devices as a formal controlled comparison without matching source cutoff, playback level, build and metadata.
