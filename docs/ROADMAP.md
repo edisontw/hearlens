@@ -71,7 +71,7 @@ Goal: build the personalization domain layer before live output.
 - [ ] independent audiogram-to-target prescription generation with externally verified reference targets, numerical parity evaluation and provenance review,
 - [x] M03 Part C: offline synthetic-only 6–8 band STFT WDRC prototype with per-ear independent processing, bounded target gains, attack/release smoothing and a final digital PCM limiter; deterministic no-bypass tests (not hearing-output safety validation),
 - [x] M03 Part D: deterministic synthetic frequency, input/output compression, envelope and final-limiter characterization; CLI + CI numerical report, non-gating machine-specific throughput baseline (see `docs/M03_DSP_CHARACTERIZATION.md`),
-- [ ] M03 Part E: replace/mitigate hard FFT-bin boundaries; measured 3.618 dB response jump across 1410–1420 Hz in selective synthetic fixture (critical sound-quality blocker),
+- [x] M03 Part E: add opt-in smooth cosine-overlap frequency weighting and matched synthetic crossover/identity/limiter regression; preserve default hard mode until broader validation.
 - [ ] production-grade filterbank, frequency/temporal artifact quantification, phase/delay and stream-boundary characterization before hearing output,
 - [ ] calibrated final hearing-output limiter, no-bypass safety tests and MPO verification,
 - [ ] per-ear production gain bounds and start/reconnect ramp,

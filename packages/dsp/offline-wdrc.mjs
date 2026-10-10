@@ -65,19 +65,29 @@ function fft(real, imag, inverse = false) {
 /* Assign full positive-frequency bins to non-overlapping log-midpoint bands.
  * This is a simple research filterbank, not a hearing-aid-quality crossover.
  */
-function frequencyBins(centers, sampleRate) {
-  const boundaries = [];
-  for (let j = 1; j < centers.length; j++) {
-    boundaries.push(Math.sqrt(centers[j - 1] * centers[j]));
-  }
-  const result = new Uint8Array(OFFLINE_WDRC_FRAME_SIZE / 2 + 1);
+function frequencyBins(centers, sampleRate, mode) {
+  const boundaries = centers.slice(1).map((f, i) => Math.sqrt(centers[i] * f));
+  const count = OFFLINE_WDRC_FRAME_SIZE / 2 + 1;
+  const lowBand = new Uint8Array(count), highBand = new Uint8Array(count);
+  const highWeight = new Float64Array(count);
+  const halfWidthOctaves = 0.18;
   let band = 0;
-  for (let k = 0; k < result.length; k++) {
+  for (let k = 0; k < count; k++) {
     const hz = k * sampleRate / OFFLINE_WDRC_FRAME_SIZE;
     while (band < boundaries.length && hz >= boundaries[band]) band++;
-    result[k] = band;
+    lowBand[k] = highBand[k] = band;
+    if (mode !== "smooth" || hz <= 0) continue;
+    for (let j = 0; j < boundaries.length; j++) {
+      const octaves = Math.log2(hz / boundaries[j]);
+      if (Math.abs(octaves) > halfWidthOctaves) continue;
+      const t = (octaves + halfWidthOctaves) / (2 * halfWidthOctaves);
+      lowBand[k] = j;
+      highBand[k] = j + 1;
+      highWeight[k] = 0.5 - 0.5 * Math.cos(Math.PI * t);
+      break;
+    }
   }
-  return result;
+  return { lowBand, highBand, highWeight };
 }
 
 /**
@@ -96,6 +106,7 @@ export function renderOfflineWDRC({
   limiterCeiling = 0.8,
   attackMs = 15,
   releaseMs = 500,
+  crossoverMode = "hard",
 }) {
   if (!(samples instanceof Float32Array) || samples.length < 1 ||
       samples.length > OFFLINE_WDRC_MAX_SAMPLES) {
@@ -115,6 +126,9 @@ export function renderOfflineWDRC({
   boundedNumber(limiterCeiling, "limiterCeiling", 0.05, 0.95);
   boundedNumber(attackMs, "attackMs", 5, 100);
   boundedNumber(releaseMs, "releaseMs", 100, 2000);
+  if (crossoverMode !== "hard" && crossoverMode !== "smooth") {
+    throw new RangeError("crossoverMode must be hard or smooth");
+  }
 
   const normalized = normalizePrescriptionTargets(targets);
   if (normalized.usage !== TARGET_USAGE || normalized.origin.kind !== "synthetic-fixture") {
@@ -131,7 +145,7 @@ export function renderOfflineWDRC({
 
   const n = OFFLINE_WDRC_FRAME_SIZE;
   const hop = OFFLINE_WDRC_HOP_SIZE;
-  const bins = frequencyBins(centers, sampleRate);
+  const bins = frequencyBins(centers, sampleRate, crossoverMode);
   const window = Float64Array.from({ length: n }, (_, i) =>
     0.5 - 0.5 * Math.cos(2 * Math.PI * (i + 0.5) / n));
   const windowPower = window.reduce((sum, w) => sum + w * w, 0);
@@ -158,7 +172,10 @@ export function renderOfflineWDRC({
     const energy = new Float64Array(centers.length);
     for (let k = 0; k <= n / 2; k++) {
       const factor = (k === 0 || k === n / 2) ? 1 : 2;
-      energy[bins[k]] += factor * (real[k] * real[k] + imag[k] * imag[k]);
+      const power = factor * (real[k] * real[k] + imag[k] * imag[k]);
+      const w = bins.highWeight[k];
+      energy[bins.lowBand[k]] += power * (1 - w);
+      if (w > 0) energy[bins.highBand[k]] += power * w;
     }
     const gains = new Float64Array(centers.length);
     for (let b = 0; b < centers.length; b++) {
@@ -177,7 +194,8 @@ export function renderOfflineWDRC({
     }
 
     for (let k = 0; k <= n / 2; k++) {
-      const gain = gains[bins[k]];
+      const gain = gains[bins.lowBand[k]] * (1 - bins.highWeight[k])
+        + gains[bins.highBand[k]] * bins.highWeight[k];
       real[k] *= gain; imag[k] *= gain;
       if (k > 0 && k < n / 2) {
         real[n - k] *= gain;
@@ -214,6 +232,7 @@ export function renderOfflineWDRC({
     samples: output,
     diagnostics: Object.freeze({
       kind: "offline-synthetic-only",
+      crossoverMode,
       ear,
       bandCentersHz: Object.freeze([...centers]),
       frames,
