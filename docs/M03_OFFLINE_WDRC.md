@@ -63,3 +63,7 @@ No automatic live playback, no browser APIs, no state persistence, and no networ
 Run `npm test`. Golden/adversarial cases verify zero-gain reconstruction, deterministic repeatability, L/R independence, 6- and 8-band research fixtures, silence, strict sample/config/provenance validation, Nyquist rejection and **final limiter cannot be bypassed by high summed synthetic bands** (including Float32 rounding). Regression failures must block merge.
 
 The prototype does **not** establish numerical prescription parity with NAL-NL2/DSL, output SPL, reliable 6–8 band clinical frequency response, processing latency P95, background operation, headset routing, reconnect/mute, or medical-device suitability. Before any live audio path: validate acoustically calibrated input and output, device/earphone route, per-ear MPO and gain limits, start/reconnect ramps, a production-grade final limiter and watchdog/disconnect fail-safe with real hardware (see [SAFETY.md](./SAFETY.md) and [TEST_PROTOCOL.md](./TEST_PROTOCOL.md)). Do not request new HTC/iPhone caption distance tests for this offline module.
+
+## M03 Part D — Objective synthetic characterization
+
+See [M03_DSP_CHARACTERIZATION.md](./M03_DSP_CHARACTERIZATION.md) for reproducible tone/noise/impulse, synthetic compression and step-response probes, numerical output, a critical band-boundary finding, and environment-dependent throughput. **These results do not validate acoustic or human hearing quality.** The current hard FFT-bin allocation remains a tracked blocker.
