@@ -16,3 +16,5 @@ jobs:
         run: npm test
       - name: Deterministic offline DSP research characterization
         run: npm run characterize:dsp
+      - name: Optional machine-dependent offline throughput probe
+        run: npm run characterize:dsp -- --benchmark
