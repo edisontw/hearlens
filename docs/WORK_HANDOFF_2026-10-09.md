@@ -94,3 +94,12 @@ After M03 Part A, follow the roadmap through prescription-target research, multi
 - Nine deterministic tests added under `packages/prescription-targets/prescription-targets.test.mjs` to root `npm test` alongside M01 + M03A tests; no M01 parameters, DSP execution, Web build or deployment modified.
 - Next focus: investigate offline research-only WDRC curve consumption and final-output-limiter regression boundaries with synthetic fixtures, and separately plan genuinely validated audiogram-to-target mapping. Do not start live output before device calibration, routing and final-limiter gates.
 - M01 formal 24-run benchmark remains deferred. No new phone matrix needed for these data-domain changes.
+
+## M03 Part C implementation update (2026-10-10)
+
+- Pure offline 6–8 band STFT/WOLA WDRC research renderer in `packages/dsp/offline-wdrc.mjs`; golden and adversarial cases under `packages/dsp/offline-wdrc.test.mjs`.
+- Data source is strictly synthetic Part B target fixtures; supplied simulation dBFS reference is **not** microphone calibration. No audiogram-to-gain formula, NAL-NL2/DSL parity, external unverified clinical targets or live/output use.
+- Frequency bins use nearest log-midpoint band; gain lookup on 50/65/80 nominal input anchors with bounded level clamping, frequency-specific attack/release smoothing, capped algorithmic gain, and final post-overlap-add digital ceiling applied before Float32 return.
+- Tests verify identity reconstruction with zero gain, deterministic repeatability, left/right independence, 6/8 band fixtures, malformed/unsafe input fail-closed, and post-mix limiter including Float32 rounding. This is **not** a calibrated final limiter or a real-ear SPL guarantee.
+- No changes to M01, Gemini, Web build, Pages or microphone/phone policies. M01 formal benchmark remains deferred; no new phone test.
+- Next: controlled offline response/latency/regression characterization for the research filterbank and separate calibrated-device route research, not live microphone amplification.
