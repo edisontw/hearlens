@@ -103,3 +103,8 @@ Research I/O curves are data and cannot override calibrated-device, final-limite
 - [M03_OFFLINE_WDRC.md](./M03_OFFLINE_WDRC.md) — **synthetic-only** 6–8-band FFT overlap-add research renderer, per-band gain smoothing, per-ear numerical gain cap and post-mix digital limiter. No phone, calibrated routing, gain prescription or SPL measurement.
 - The synthetic dBFS-to-nominal-dB-SPL reference is a *test fixture coordinate*, never a microphone calibration.
 - Digital clipping safety tests do not replace physical acoustic output, on-headset disconnect fail-safe, frequency/latency characterization, production output limiter or real-ear verification.
+
+## M03 Part D measurement status
+
+- [M03_DSP_CHARACTERIZATION.md](./M03_DSP_CHARACTERIZATION.md) characterizes **synthetic-only** response and speed. The current hard spectral band boundaries show an abrupt transition in selective-gain fixtures.
+- Good arithmetic throughput on CI cannot establish low-latency microphone-to-earphone operation; no calibrated SPL, streaming buffer-delay measurement, distortion acceptance or real-ear validation exists.
