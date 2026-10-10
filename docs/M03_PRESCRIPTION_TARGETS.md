@@ -57,7 +57,7 @@ The following remain **explicitly unimplemented**:
 1. Independently verified prescription algorithm and numerical parity against trusted reference target tables, including defined transducer/test condition, hearing-loss category and prescription assumptions.
 2. Validated interface between the audiogram's dB HL representation and those reference targets. **Never use `threshold dB HL = prescribed dB gain`.**
 3. Calibrated environmental input SPL to ADC dBFS and calibrated headphone/coupler output, including gain reference semantics.
-4. Offline WDRC smoothing, independent per-ear maximum gain, ramp on start/reconnect, **final output limiter after every processing stage**, and no-bypass regression.
+4. Production WDRC validation, calibrated per-ear maximum gain and start/reconnect ramp, **a physically verified final hearing-output limiter**, and no-bypass regression for the eventual hardware path. The synthetic-only offline STFT renderer and digital no-bypass tests in [M03_OFFLINE_WDRC.md](./M03_OFFLINE_WDRC.md) are an exploratory algorithm foundation, **not** satisfaction of these production requirements.
 5. Physical route state, disconnect immediate mute, prevention of fallback to the phone speaker, supported device profiles, clipping/underrun logging and latency checks.
 
 **Fail closed:** even mathematically valid curves cannot make hearing output safe or clinically fitted. Keep audiogram/profile data private/local by default in later storage integrations. M01 captions remain fully separate. No new HTC/iPhone distance matrix is requested for Part B.

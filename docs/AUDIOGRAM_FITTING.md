@@ -97,3 +97,9 @@ MPO / safety ceilings are not general-user controls.
 - Research target domain: [M03_PRESCRIPTION_TARGETS.md](./M03_PRESCRIPTION_TARGETS.md) — separately supplied nominal 50/65/80 dB SPL input labels and per-band target gain curves, no NAL-NL2/DSL calculations and no audio output.
 
 Research I/O curves are data and cannot override calibrated-device, final-limiter, per-ear gain or disconnected-headset fail-closed requirements.
+
+## Implemented offline DSP research slice (M03 Part C)
+
+- [M03_OFFLINE_WDRC.md](./M03_OFFLINE_WDRC.md) — **synthetic-only** 6–8-band FFT overlap-add research renderer, per-band gain smoothing, per-ear numerical gain cap and post-mix digital limiter. No phone, calibrated routing, gain prescription or SPL measurement.
+- The synthetic dBFS-to-nominal-dB-SPL reference is a *test fixture coordinate*, never a microphone calibration.
+- Digital clipping safety tests do not replace physical acoustic output, on-headset disconnect fail-safe, frequency/latency characterization, production output limiter or real-ear verification.
