@@ -175,7 +175,7 @@ export function characterizeCrossoverAB() {
       worstSmoothJumpDb:round(Math.max(...[...six,...eight].map(r=>r.smoothMaxAdjacentJumpDb))),
     },
     uniform,
-    harmonics:MODES.map(mode=>harmonicProbe(mode,1000,harmonicTarget)),
+    harmonics:MODES.flatMap(mode=>[1000,1410,1700].map(frequencyHz=>harmonicProbe(mode,frequencyHz,harmonicTarget))),
     twoTone:MODES.map(twoToneProbe),
     transient:MODES.map(transientProbe),
     limiter:MODES.map(finalLimiterProbe),

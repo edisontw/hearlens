@@ -35,7 +35,11 @@ test("all crossover responses and comparison summary are finite and internally c
     assert(row.smoothMaxAdjacentJumpDb>=0);
     assert(Math.abs((row.hardMaxAdjacentJumpDb-row.smoothMaxAdjacentJumpDb)-row.improvementDb)<0.002);
   }
-  assert(data.summary.improvedCrossovers>=0&&data.summary.improvedCrossovers<=12);
+  // Empirical synthetic-only regression thresholds from the M03F baseline.
+  // NOT pre-registered perceptual safety tolerances or clinical claims.
+  assert(data.summary.improvedCrossovers===12);
+  assert(seams.every(row=>row.improvementDb>0.4));
+  assert(seams.every(row=>row.smoothMaxAdjacentJumpDb<2.0));
   assert(data.summary.worstHardJumpDb>=0&&data.summary.worstSmoothJumpDb>=0);
 });
 
@@ -47,6 +51,8 @@ test("uniform targets do not introduce a large hard/smooth difference at six cen
 });
 
 test("harmonic-only and two-tone sideband probes are coherent and finite",()=>{
+  assert.equal(data.harmonics.length,6);
+  assert(data.harmonics.filter(r=>r.frequencyHz===1700).every(r=>r.fundamentalGainDb>1));
   for(const r of data.harmonics){
     assert(r.projectedHarmonicPercent>=0&&Number.isFinite(r.projectedHarmonicPercent));
     assert(r.harmonics.length>=3);
