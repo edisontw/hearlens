@@ -124,8 +124,8 @@ export function createOfflineStatefulWDRC(config) {
       for(let i=0;i<chunk.length;i++){
         input[accepted%N]=chunk[i];accepted++;
         while(nextStart+N<=accepted)frame(false,result);
+        maxPending=Math.max(maxPending,accepted-emitted);
       }
-      maxPending=Math.max(maxPending,accepted-emitted);
       return Float32Array.from(result);
     }catch(error){faulted=true;throw error;}
   }

@@ -32,6 +32,7 @@ function verify(input,chunks,cfg){
     assert(stream.diagnostics.pendingSamples<=1024);
     assert.equal(stream.diagnostics.inputCapacitySamples,1024);
     assert.equal(stream.diagnostics.wolaCapacitySamples,1024);
+    assert(stream.diagnostics.maxPendingSamplesObserved<=1024);
   }
   parts.push(stream.finish());
   const ref=renderOfflineWDRC({...cfg,samples:input});
