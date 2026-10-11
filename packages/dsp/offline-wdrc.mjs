@@ -243,3 +243,6 @@ export function renderOfflineWDRC({
     }),
   });
 }
+
+// Shared OFFLINE numerical primitives for stateful equivalence validation.
+export { fft as offlineFFT, frequencyBins as offlineFrequencyBins };
