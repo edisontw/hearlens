@@ -108,3 +108,8 @@ Research I/O curves are data and cannot override calibrated-device, final-limite
 
 - [M03_DSP_CHARACTERIZATION.md](./M03_DSP_CHARACTERIZATION.md) characterizes **synthetic-only** response and speed. The current hard spectral band boundaries show an abrupt transition in selective-gain fixtures.
 - Good arithmetic throughput on CI cannot establish low-latency microphone-to-earphone operation; no calibrated SPL, streaming buffer-delay measurement, distortion acceptance or real-ear validation exists.
+
+## M03 Part F quality decision
+
+- [M03_DENSE_CROSSOVER_AB.md](./M03_DENSE_CROSSOVER_AB.md): dense matched synthetic A/B across every six-/eight-band crossover, limited harmonic and two-tone projection, impulsive ringing proxy and post-synthesis limiter.
+- All 12 synthetic boundaries show a smoother response with the experimental cosine-overlap mode; some intermodulation-like two-tone sidebands are slightly higher. **Do not automatically promote smooth to production/default** until wider spectral/temporal DSP gates and physical route/calibration safety requirements are satisfied.
