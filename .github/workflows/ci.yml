@@ -16,5 +16,7 @@ jobs:
         run: npm test
       - name: Deterministic offline DSP research characterization
         run: npm run characterize:dsp
+      - name: Dense synthetic crossover A/B report
+        run: npm run characterize:crossover
       - name: Optional machine-dependent offline throughput probe
         run: npm run characterize:dsp -- --benchmark
