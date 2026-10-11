@@ -133,3 +133,18 @@ test("mutable caller target changes never affect already configured stream",()=>
   assert.deepEqual(join(pieces),
     renderOfflineWDRC({...options("hard"),samples:input}).samples);
 });
+
+test("stream rejects explicitly null numerical options just like the reference",()=>{
+  for(const key of ["maxGainDb","limiterCeiling","attackMs","releaseMs","crossoverMode"]){
+    assert.throws(()=>createOfflineStatefulWDRC({...options("hard"),[key]:null}),
+      "null "+key+" must not silently become a default");
+  }
+});
+test("startup emits first hop after one full FFT analysis window",()=>{
+  const st=createOfflineStatefulWDRC(options("hard"));
+  assert.equal(st.push(tone(1023)).length,0);
+  assert.equal(st.diagnostics.acceptedSamples,1023);
+  assert.equal(st.push(tone(1)).length,256);
+  assert.equal(st.diagnostics.emittedSamples,256);
+  assert.equal(st.diagnostics.algorithmicLookaheadSamples,768);
+});

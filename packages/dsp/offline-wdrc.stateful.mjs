@@ -17,9 +17,9 @@ export function createOfflineStatefulWDRC(config) {
   const cfg = {
     sampleRate: config.sampleRate, targets: normalizePrescriptionTargets(config.targets),
     ear: config.ear, syntheticRmsDbFSAt65DbSPL: config.syntheticRmsDbFSAt65DbSPL,
-    maxGainDb: config.maxGainDb ?? 12, limiterCeiling: config.limiterCeiling ?? 0.8,
-    attackMs: config.attackMs ?? 15, releaseMs: config.releaseMs ?? 500,
-    crossoverMode: config.crossoverMode ?? "hard",
+    maxGainDb: config.maxGainDb === undefined ? 12 : config.maxGainDb, limiterCeiling: config.limiterCeiling === undefined ? 0.8 : config.limiterCeiling,
+    attackMs: config.attackMs === undefined ? 15 : config.attackMs, releaseMs: config.releaseMs === undefined ? 500 : config.releaseMs,
+    crossoverMode: config.crossoverMode === undefined ? "hard" : config.crossoverMode,
   };
   // Same parameter and provenance guards as authoritative full-clip renderer.
   renderOfflineWDRC({...cfg, samples: new Float32Array(1)});
