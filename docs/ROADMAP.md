@@ -73,6 +73,8 @@ Goal: build the personalization domain layer before live output.
 - [x] M03 Part D: deterministic synthetic frequency, input/output compression, envelope and final-limiter characterization; CLI + CI numerical report, non-gating machine-specific throughput baseline (see `docs/M03_DSP_CHARACTERIZATION.md`),
 - [x] M03 Part E: add opt-in smooth cosine-overlap frequency weighting and matched synthetic crossover/identity/limiter regression; preserve default hard mode until broader validation.
 - [x] M03 Part F: deterministic 6- and 8-band dense A/B across all 12 boundaries, selected harmonic/two-tone/transient and final-limiter probes; CI JSON report. Smooth reduces jumps in all tested synthetic seams but remains opt-in pending broader DSP/artifact verification.
+- [x] M03 Part G: offline replay-based chunk adapter, exact full-reference equivalence across chunk sizes and modes, final flush/atomic validation, no live output; **not** a bounded-memory real-time stream,
+- [ ] M03 Part H: true persistent STFT/WOLA streaming state, bounded buffers, latency/underrun/reconnect tests,
 - [ ] production-grade filterbank, frequency/temporal artifact quantification, phase/delay and stream-boundary characterization before hearing output,
 - [ ] calibrated final hearing-output limiter, no-bypass safety tests and MPO verification,
 - [ ] per-ear production gain bounds and start/reconnect ramp,
