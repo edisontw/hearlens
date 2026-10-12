@@ -65,11 +65,14 @@ export function createOfflineMockHearingPort(dspConfig, {
   function observeRoute(info) {
     return attempt(()=>{route.observeRoute(info);return status();},"mock-route-lost-or-switched");
   }
-  function disconnect() {return latch("simulated-disconnect");}
-  function signalInterruption() {return latch("simulated-audio-interruption");}
-  function signalUnderrun() {return latch("simulated-underrun");}
-  function process({startSample,samples,clockSample,observedRoute} = {}) {
+  function disconnect() {requireClean();return latch("simulated-disconnect");}
+  function signalInterruption() {requireClean();return latch("simulated-audio-interruption");}
+  function signalUnderrun() {requireClean();return latch("simulated-underrun");}
+  function process(packet = {}) {
     requireClean();
+    if(!packet || typeof packet!=="object" || Array.isArray(packet))
+      return latch("malformed-mock-callback");
+    const {startSample,samples,clockSample,observedRoute}=packet;
     // "syntheticCandidateAuthorized" is ONLY an offline policy flag.
     if(!route.diagnostics.syntheticOutputAuthorized)return latch("no-mock-authorization");
     try {
