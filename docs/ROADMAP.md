@@ -97,7 +97,7 @@ No live-ear safety claim.
 **M04 priority correction:** Bluetooth is still the preferred daily accessory/parameter interface, but primary nearby-conversation hearing must use **ear-local microphone and local DSP** *if* vendor/hardware gates pass. A phone microphone carried through LE Audio/A2DP is not the same architecture. Current M03L remains entirely synthetic; **no real-ear amplification**.
 
 
-Goal: determine whether the preferred user-facing Bluetooth headset path is feasible for useful and safe phone-near-talker hearing, without assuming standard Bluetooth has hearing-aid-grade delay.
+Goal: determine whether the preferred everyday Bluetooth-controlled headset can provide **near-ear microphone → local DSP → open-ear receiver** processing under documented vendor firmware control, with phone-microphone → Bluetooth evaluated separately on a nonhuman bench for optional remote scenarios. Neither BLE/LE Audio transport nor a local chip alone proves acoustic feasibility.
 
 References:
 
