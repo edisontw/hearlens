@@ -78,7 +78,7 @@ Goal: build the personalization domain layer before live output.
 - [x] M03 Part I: offline sample-clock continuity gate (gap/overlap/reordering, invalid timestamps, clock regression, simulated underrun) with explicit reset and no gap concealment; bounded state and non-gating Node CPU/heap probe; no physical route or output,
 - [x] M03 Part J: reusable per-instance Float64 FFT, energy and gain scratch arrays (preserved exact offline parity), plus a PURE synthetic route authorization/start ramp/disconnect fail-stop model; does not actually enforce device routing or calibrated SPL,
 - [x] M03 Part K (offline prototype): caller-reused output buffer API, per-instance prevalidated target anchor cache, numerical no-overwrite regression, non-gating callback CPU/heap probe and native physical-route/per-ear MPO architecture requirements; **no actual audio route**,
-- [ ] M03 Part K exit gates: verified allocation/GC and realtime behavior on target phone, physical wired route/no speaker fallback and hard mute on disconnect, independent measured L/R MPO and acoustic calibration before any live amplification,
+- [ ] M03 Part K exit gates: verified allocation/GC and realtime behavior on target phone, verified headset route (Bluetooth-first feasibility; wired control), no speaker fallback and hard mute on disconnect, independent measured L/R MPO and acoustic calibration before any live amplification,
 - [x] M03 Part L: isolated timestamp-guarded reusable-buffer processInto and no-PCM mock route-port negative fixtures for disconnect, route switch, missing observations, sample-clock faults, reset and rearm; **only model semantics, no physical mute or output**,
 - [ ] production-grade filterbank, frequency/temporal artifact quantification, phase/delay and stream-boundary characterization before hearing output,
 - [ ] calibrated final hearing-output limiter, no-bypass safety tests and MPO verification,
@@ -87,26 +87,26 @@ Goal: build the personalization domain layer before live output.
 
 No live-ear safety claim.
 
-## M04 — Controlled Wired Hearing Path
+## M04 — Controlled Bluetooth Hearing Path Feasibility (Wired Control)
 
-Goal: create the first calibrated research audio route.
+Goal: determine whether the preferred user-facing Bluetooth headset path is feasible for useful and safe phone-near-talker hearing, without assuming standard Bluetooth has hearing-aid-grade delay.
 
-Reference:
+References:
 
-- selected Android phone(s),
-- one wired USB-C earbud/headset,
-- fixed route/volume state,
-- acoustic fixture calibration.
+- one selected Android phone and **one fixed Bluetooth earbud/headset**, preferably with verifiable LE Audio support; retain standard Bluetooth/A2DP as a compatibility comparison,
+- **one wired USB-C pair as low-latency baseline**, not the default product requirement,
+- fixed output volume, actual audio route and microphone source verified independently (phone mic must remain the source),
+- acoustic fixture for independently measured left/right calibration.
 
 Measure:
 
-- input calibration,
-- output response,
-- end-to-end P50/P95 latency,
-- disconnect fail-safe,
-- gain accuracy,
-- maximum output,
-- CPU/battery.
+- true microphone-to-ear P50/P95, worst observed delays and jitter (do not infer from codec labels),
+- subjective delayed/direct-sound coexistence in nearby conversation vs remote microphone scenarios,
+- BT disconnect/codec change/reconnection/phone call interruptions and **physical no-speaker-fallback** traces,
+- per-ear frequency response, peak output/MPO at verified volume, channel mapping and worst-case limits,
+- CPU/battery/thermal effects and reliability.
+
+**Stop gate:** never enable actual hearing amplification until hardware route lock/mute and independently calibrated per-ear protection are physically demonstrated. Use caption-only fallback if latency or safety is unacceptable. See [M04_BLUETOOTH_EVALUATION.md](./M04_BLUETOOTH_EVALUATION.md).
 
 ## M05 — Speech Enhancement Ablation
 

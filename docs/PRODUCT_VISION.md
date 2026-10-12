@@ -29,7 +29,7 @@ may improve speech understanding and reduce listening effort in real-world situa
 - replacing a professionally fitted hearing aid,
 - fitting severe/profound hearing loss,
 - claiming medical-grade compensation on arbitrary phones/headphones,
-- relying on Bluetooth for a transparent low-latency live-hearing path,
+- claiming universal low-latency or acoustically safe live hearing output on arbitrary Bluetooth earbuds; Bluetooth is the **preferred user-facing headset direction**, subject to device-specific latency, actual-route/no-speaker-fallback and per-ear calibration gates,
 - requiring another person to wear a microphone,
 - requiring account creation.
 
@@ -43,3 +43,7 @@ The older user's home screen should expose only the minimum actions:
 - optional simple "sound too soft / too loud" controls only after a supported hearing path exists.
 
 Technical settings belong in family/admin/research mode.
+
+## Headset direction (2026-10-12)
+
+Prefer comfortable everyday **Bluetooth earbuds/headphones** in the eventual user experience. Start M04 with measured Bluetooth feasibility, prioritizing LE Audio-compatible Android phone/headset pairs where available, but do not equate LE Audio capability with proven low delay. Retain a fixed wired USB-C pair as a reference baseline, not an assumed product requirement. See [M04_BLUETOOTH_EVALUATION.md](./M04_BLUETOOTH_EVALUATION.md).
