@@ -37,3 +37,9 @@ Alternatively, the GitHub Actions **Android SW1 Probe** workflow builds the same
 ## Field protocol update (2026-10-12)
 
 Two Android field sessions from moto g62 5G / AIR31 have confirmed **phone** builtin microphone input at 48 kHz mono. User's fixed speech playback lasted approximately 11–13 s/trial. See [updated SW1 analysis](../../docs/SW1_FOLLOWUP_PHONE_MIC_PRIMARY_2026-10-12.md). **Do not request a Bluetooth SCO microphone test as a mandatory next step:** user chose *phone mic primary*, earbud mic optional later. MIC was functional when voice played; no more UNPROCESSED or multi-distance repeats now. SW2 software-only processing latency/quality analysis is next. The no-output safety contract is unchanged.
+
+## SW3-Native passive MEDIA-output route prediction (2026-10-13)
+
+Same Android diagnostic APK now offers **「檢查媒體輸出預測（完全不播放）」**. On Android API 33+ (including moto g62 5G Android 13), `AudioManager.getAudioDevicesForAttributes` returns outputs **anticipated** for MEDIA/speech and ASSISTANCE_ACCESSIBILITY/speech. It does not play sound or certify the *active* audio output route, codec, latency, headset wearing state, no-speaker-fallback or calibrated MPO. Android <33 shows `UNAVAILABLE_API_BELOW_33` for this query. The communication-device selector is logged **separately** and is not assumed to be media playback. The OS device callback can miss non-device-list media routing changes or arrive after a physical reroute.
+
+**No need to start a microphone capture or play a second phone's speech** to use this passive output prediction. On a newly built debug APK, optionally connect normal Bluetooth earbuds, open app, press the new button and export one JSON metadata log. The previous SW1 APK does not contain this button. Keep all hearing-output safety gates blocked. See [SW3-Native evidence boundary](../../docs/SW3_NATIVE_ANDROID_OUTPUT_OBSERVABILITY_2026-10-13.md).
