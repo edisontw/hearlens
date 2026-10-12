@@ -73,3 +73,7 @@ When route state, calibration state or audio constraints are uncertain, captions
 ## SW2 causal research-only DSP (2026-10-12)
 
 [SW2 causal IIR/WDRC](./SW2_CAUSAL_DSP_SOFTWARE_CEILING_2026-10-12.md) is an isolated **synthetic/offline** processor with no device connection or audio sink. Its zero **future-input lookahead** does **not** mean zero phase/group delay or any measured microphone-to-ear Bluetooth delay. Its post-sum PCM limiter is not calibrated ear-level SPL/MPO. All mandatory physical output route, hard-mute, left/right acoustic calibration and clinical checks remain **blocked**. Do not wire SW2 output to the experimental Android input-only probe or any Bluetooth headphone route.
+
+## SW3 Bluetooth output-policy simulation (2026-10-13)
+
+[SW3 route model](./SW3_BLUETOOTH_OUTPUT_FAIL_CLOSED_MODEL_2026-10-13.md) is a **count-only synthetic fixture**, not Bluetooth output authorization. A2DP/LE endpoints, headset identities, two-ear state and calibration/profile IDs are **mock metadata**. The tested failure cases (speaker fallback, disconnect, HFP change, phone call, focus/background, stale route, one-ear removal, reconnect) revoke model permission, **but Android may route previously queued sound to a phone speaker before an app receives any notification**. No current Android route, sample timestamp, software flag or CI test proves physical hard mute or calibrated ear SPL. The user has deferred hardware POCs; real hearing playback stays prohibited.
