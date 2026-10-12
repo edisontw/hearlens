@@ -16,6 +16,8 @@ jobs:
         run: npm test
       - name: SW2 deterministic causal DSP software-ceiling report
         run: npm run characterize:causal
+      - name: SW2 optional host-only causal-versus-STFT callback timing
+        run: npm run benchmark:causal
       - name: Deterministic offline DSP research characterization
         run: npm run characterize:dsp
       - name: Dense synthetic crossover A/B report
