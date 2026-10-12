@@ -30,9 +30,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       # GitHub ubuntu runner already has Android SDK cmdline-tools; avoid deprecated 'tools' installer.
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+      - name: Inspect runner-provided Android and Gradle toolchain
+        run: |
+          gradle --version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" | tail -5
       - name: Compile Android input-only debug APK
         run: gradle --no-daemon -p apps/android-mic-probe assembleDebug
       - name: Publish unsigned debug artifact for manual input-only testing
