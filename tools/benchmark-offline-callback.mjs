@@ -17,19 +17,23 @@ if(!Number.isInteger(seconds)||seconds<1||seconds>12||
   const input=Float32Array.from({length:256},(_,i)=>
     0.015*Math.sin(2*Math.PI*1000*i/sampleRate));
   const dst=new Float32Array(512);
-  const passes=seconds*sampleRate/256;
+  const totalSamples=seconds*sampleRate;
+  const passes=Math.ceil(totalSamples/256);
+  const lastLength=totalSamples%256;
+  const lastInput=lastLength?input.subarray(0,lastLength):input;
   function measure(mode){
     const stream=createOfflineStatefulWDRC(config);
     let written=0,checksum=0,high=process.memoryUsage().heapUsed;
     const before=high,timings=[];
     for(let k=0;k<passes;k++){
+      const payload=k===passes-1?lastInput:input;
       const start=performance.now();
       let part,count;
       if(mode==="processInto"){
-        count=stream.processInto(input,dst);
+        count=stream.processInto(payload,dst);
         part=dst;
       }else{
-        part=stream.push(input);
+        part=stream.push(payload);
         count=part.length;
       }
       timings.push(performance.now()-start);
@@ -54,7 +58,7 @@ if(!Number.isInteger(seconds)||seconds<1||seconds>12||
   }
   const legacy=measure("push");
   const reused=measure("processInto");
-  if(legacy.outputSamples!==seconds*sampleRate||
+  if(legacy.outputSamples!==totalSamples||
      reused.outputSamples!==legacy.outputSamples||
      legacy.checksum!==reused.checksum||
      legacy.faulted||reused.faulted)throw new Error("benchmark output mismatch");
