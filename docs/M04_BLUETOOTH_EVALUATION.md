@@ -1,5 +1,9 @@
 # M04 Bluetooth-first hearing feasibility — decision record (2026-10-12)
 
+## M04-A evidence decision (2026-10-12)
+
+**Read [M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md) first.** This initial phone-mic → Bluetooth study is retained as the controlled **measurement/optional remote-mic** track, *not* the default continuous face-to-face hearing architecture. Public Android/iOS/Bluetooth HAP/VCP APIs do **not** provide generic arbitrary-earbud local multiband WDRC/transparent mic controls. Preferred research path: near-ear built-in microphone → firmware/ODM-controlled local low-delay DSP → open-ear receiver, with phone/BLE for settings and independent captions. Procurement/physical calibration are still blockers; no live output is authorized.
+
 ## Product direction
 
 **User preference: Bluetooth earbuds/headphones first for convenience and everyday adoption.** The former wired-only M04 plan is superseded. Keep a known wired USB-C headset solely as a controlled latency, route and frequency-response reference, not as the target product requirement.
@@ -15,7 +19,7 @@ Existing commercial use cases establish feasibility in principle: Android Sound 
 - Android LE Audio overview: https://developer.android.com/develop/connectivity/bluetooth/ble-audio/overview
 - Comparative headphone/codec delay: https://www.rtings.com/headphones/learn/wired-vs-wireless-headphones
 
-The **microphone must remain the PHONE's microphone** near the talker, with headset serving as output only; Bluetooth bidirectional call profiles can cause system capture device/quality changes. Never assume selecting a headset output preserves a phone input route.
+**For the phone-microphone → Bluetooth measurement/optional remote-listening track only**, the **microphone must remain the PHONE's microphone**, with headset serving as output only; Bluetooth bidirectional call profiles can cause system capture device/quality changes. Never assume selecting a headset output preserves a phone input route.
 
 ## Key challenge: total time and sound mixing
 

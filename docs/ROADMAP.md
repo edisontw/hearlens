@@ -87,9 +87,17 @@ Goal: build the personalization domain layer before live output.
 
 No live-ear safety claim.
 
-## M04 — Controlled Bluetooth Hearing Path Feasibility (Wired Control)
+## M04 — Earbud-local DSP feasibility first; controlled Bluetooth hearing bench second (wired reference only)
 
-Goal: determine whether the preferred user-facing Bluetooth headset path is feasible for useful and safe phone-near-talker hearing, without assuming standard Bluetooth has hearing-aid-grade delay.
+- [x] **M04-A (2026-10-12):** desk API/standards/vendor evidence matrix, model-specific first-party versus third-party boundaries, architecture GO/CONDITIONAL/NO-GO, two bench POCs, and no-live-output decision. See [M04A evidence and decision record](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md).
+- [ ] **M04-B1:** select licensed/documented programmable local-DSP hardware or research platform, confirm device/firmware/SDK, predeclare ear-coupler/safety, fail-closed hardware and latency measurement plan.
+- [ ] **M04-B2:** perform *nonhuman* acoustic latency/routing/limiter/mute bench trials; a dedicated phone→Bluetooth route-only benchmark is secondary, never proof of daily open-fit amplification.
+- [ ] **M03M scope decision:** pause further generic STFT development until M04-B confirms an actual controllable acoustic path; then select ported on-device DSP or narrow measured remote-mic prototype.
+
+**M04 priority correction:** Bluetooth is still the preferred daily accessory/parameter interface, but primary nearby-conversation hearing must use **ear-local microphone and local DSP** *if* vendor/hardware gates pass. A phone microphone carried through LE Audio/A2DP is not the same architecture. Current M03L remains entirely synthetic; **no real-ear amplification**.
+
+
+Goal: determine whether the preferred everyday Bluetooth-controlled headset can provide **near-ear microphone → local DSP → open-ear receiver** processing under documented vendor firmware control, with phone-microphone → Bluetooth evaluated separately on a nonhuman bench for optional remote scenarios. Neither BLE/LE Audio transport nor a local chip alone proves acoustic feasibility.
 
 References:
 
