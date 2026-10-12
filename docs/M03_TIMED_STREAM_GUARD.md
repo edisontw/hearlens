@@ -47,3 +47,9 @@ The new benchmark `npm run benchmark:stream` runs 6 seconds of synthetic 16 kHz 
 - A digital PCM ceiling is not an acoustic maximum output. NAL-NL2/DSL fitting and calibrated per-ear MPO are not implemented.
 
 **Next M03 Part J:** reduce per-frame allocations and test scheduling/heap stability, then formalize a fail-closed hardware route state machine (muted until validated route and calibration; fail immediately when route is lost). Preserve M01 captions; do not retest HTC distance benchmarks in response to an offline DSP change.
+
+## First GitHub Actions runner observation (not a performance acceptance threshold)
+
+The first synthetic CI probe [run #38187887741](https://github.com/edisontw/hearlens/actions/runs/38187887741), 6 seconds at 16 kHz with 375 chunks of 256 samples, returned 96,000/96,000 PCM input/output samples and no reported faults. Batch CPU wall time **70.375 ms**, observed single-push P50 **0.126 ms**, P95 **0.335 ms**, largest observed push **3.862 ms**. These values reflect one Node 22 GitHub Linux runner, not phone measurements. Heap sizes depend on garbage collection and the sampling schedule and cannot be interpreted as an audio callback allocation bound.
+
+The script separately prints observed heap-before, peak sampled heap and heap-after; the last snapshot is included in the reported sampled maximum. Reproducibility here refers to the input workload and counters, **not** identical timing or heap bytes between runs.

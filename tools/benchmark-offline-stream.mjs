@@ -44,6 +44,8 @@ if(!Number.isInteger(seconds)||seconds<1||seconds>12||
   const totalMs=performance.now()-start;
   const sorted=[...pushMs].sort((a,b)=>a-b);
   const rank=p=>sorted[Math.min(sorted.length-1,Math.max(0,Math.ceil(p*sorted.length)-1))];
+  const heapAfter=process.memoryUsage().heapUsed;
+  heapHigh=Math.max(heapHigh,heapAfter);
   const data={
     schema:"hearlens-m03i-offline-throughput-v1",
     offlineSyntheticOnly:true,nonGatingEnvironmentDependent:true,
@@ -54,7 +56,7 @@ if(!Number.isInteger(seconds)||seconds<1||seconds>12||
     pushP95Ms:Number(rank(0.95).toFixed(3)),
     maxPushMs:Number(sorted.at(-1).toFixed(3)),
     heapBeforeBytes:heapBefore,heapHighObservedBytes:heapHigh,
-    heapAfterBytes:process.memoryUsage().heapUsed,
+    heapAfterBytes:heapAfter,
     fixedInputRingSamples:stream.diagnostics.inputCapacitySamples,
     fixedWolaRingSamples:stream.diagnostics.wolaCapacitySamples,
     faultCount:stream.diagnostics.faultCount,
