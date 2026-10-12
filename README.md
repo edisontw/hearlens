@@ -58,3 +58,7 @@ Live hearing amplification is deliberately not the first feature.
 HearLens is currently a **research prototype** for communication assistance. It is not presented as a clinically fitted hearing aid, treatment for hearing loss, or replacement for professional assessment.
 
 See [docs/SAFETY.md](docs/SAFETY.md) before implementing any audio-output feature.
+
+## M04 software-first SW1 Android mic probe
+
+A separate **input-only** Android diagnostic app now lives at [apps/android-mic-probe](apps/android-mic-probe/README.md). It probes actual phone/Bluetooth headset microphone routing and short foreground PCM level statistics, **without producing any output audio, saving raw speech or using network permission**. This is a development diagnostics APK, not part of the website or an approved hearing amplifier. See [M04 software-first feasibility](docs/M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md) and [SAFETY](docs/SAFETY.md). Hardware POCs remain deferred.
