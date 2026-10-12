@@ -14,6 +14,8 @@ jobs:
           node-version: 22
       - name: Unit tests and JavaScript syntax
         run: npm test
+      - name: SW2 deterministic causal DSP software-ceiling report
+        run: npm run characterize:causal
       - name: Deterministic offline DSP research characterization
         run: npm run characterize:dsp
       - name: Dense synthetic crossover A/B report
