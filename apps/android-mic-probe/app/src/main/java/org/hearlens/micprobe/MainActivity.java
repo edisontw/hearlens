@@ -224,9 +224,9 @@ public final class MainActivity extends Activity {
             + " true_earbud_wear_state=UNKNOWN");
         if (outputRouteStatus != null) {
             outputRouteStatus.setText("輸出路由預測（不是實際播放）"
-                + "\\n一般媒體語音：" + media
-                + "\\n輔助使用語音：" + accessibility
-                + "\\n實際輸出：未播放，無法驗證；不可據此啟用助聽擴音。");
+                + "\n一般媒體語音：" + media
+                + "\n輔助使用語音：" + accessibility
+                + "\n實際輸出：未播放，無法驗證；不可據此啟用助聽擴音。");
         }
     }
 
@@ -638,6 +638,11 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             log("metadata_export_error=" + e.getClass().getSimpleName());
         }
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        inspectOutputRoute("activity-resumed");
     }
 
     @Override protected void onPause() {
