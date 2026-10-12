@@ -33,3 +33,7 @@ Alternatively, the GitHub Actions **Android SW1 Probe** workflow builds the same
 **Limitations:** `setPreferredDevice` and `setCommunicationDevice` are requests, not guarantees. On Android 11 or earlier the tool intentionally does not initiate legacy SCO routing; test ordinary phone input and diagnostic listings. Headset HFP/LE microphone behavior differs between models. Mic-direction setting is just an UNSPECIFIED baseline hint (not yet a directional sweep); raw synchronized earbud ANC/transparency microphones are **not** exposed by this app.
 
 **Safety:** no real-time amplified sound, no AudioTrack, no acoustic output, no internet permission or background microphone service. This cannot validate calibrated MPO or safe physical speaker fallback. The original HearLens M03L fail-stop remains synthetic, and the output safety gate in `docs/SAFETY.md` remains fully blocked.
+
+## Field protocol update (2026-10-12)
+
+Two Android field sessions from moto g62 5G / AIR31 have confirmed **phone** builtin microphone input at 48 kHz mono. User's fixed speech playback lasted approximately 11–13 s/trial. See [updated SW1 analysis](../../docs/SW1_FOLLOWUP_PHONE_MIC_PRIMARY_2026-10-12.md). **Do not request a Bluetooth SCO microphone test as a mandatory next step:** user chose *phone mic primary*, earbud mic optional later. MIC was functional when voice played; no more UNPROCESSED or multi-distance repeats now. SW2 software-only processing latency/quality analysis is next. The no-output safety contract is unchanged.

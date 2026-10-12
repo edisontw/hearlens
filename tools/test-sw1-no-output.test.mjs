@@ -40,3 +40,9 @@ test('probe documents key acoustic and software uncertainty', () => {
     assert.ok(guide.toLowerCase().includes(term.toLowerCase()), term);
   }
 });
+
+test('SW1 does not mislabel an expected stop-unblocked read as an input fault', () => {
+  assert.match(main, /if \(size <= 0\)\s*\{[\s\S]*?finishReason = running\.get\(\) \? "read_error_" \+ size : "capture_stopped";/);
+  assert.match(main, /if \(!running\.getAndSet\(false\)\) return;/);
+  assert.match(main, /stop_requested=/);
+});

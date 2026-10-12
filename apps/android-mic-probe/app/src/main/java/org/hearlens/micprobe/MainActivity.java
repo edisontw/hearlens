@@ -366,7 +366,9 @@ public final class MainActivity extends Activity {
             while (running.get()) {
                 int size = rec.read(buffer, 0, buffer.length, AudioRecord.READ_BLOCKING);
                 if (size <= 0) {
-                    finishReason = "read_error_" + size;
+                    // AudioRecord.stop() may unblock READ_BLOCKING with 0.
+                    // When Stop was explicitly requested this is expected, not a mic fault.
+                    finishReason = running.get() ? "read_error_" + size : "capture_stopped";
                     break;
                 }
                 totalFrames += size;
