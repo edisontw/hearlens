@@ -38,6 +38,11 @@ export function createOfflineStatefulWDRC(config) {
   const overlap=new Float64Array(N);
   const weights=new Float64Array(N);
   const gainDb=new Float64Array(centers.length);
+  // M03J: scratch is allocated ONCE per instance, and cleared before every
+  // FFT frame. The full-clip oracle remains the reference for bitwise parity.
+  const fftReal=new Float64Array(N),fftImag=new Float64Array(N);
+  const bandEnergy=new Float64Array(centers.length);
+  const frameGains=new Float64Array(centers.length);
   let accepted=0,emitted=0,nextStart=-N+HOP,frames=0,limited=0,capped=0;
   let faulted=false,closed=false,maxPending=0;
   function diagnostic() {
@@ -50,6 +55,9 @@ export function createOfflineStatefulWDRC(config) {
       algorithmicLookaheadSamples:STREAM_LOOKAHEAD_SAMPLES,
       theoreticalLookaheadMs:1000*STREAM_LOOKAHEAD_SAMPLES/sampleRate,
       faulted,finalized:closed,
+      reusableFrameScratchBuffers:4,
+      frameScratchFloat64Elements:2*N+2*centers.length,
+      perFrameScratchBufferAllocations:0,
     });
   }
   function emitUntil(end,result) {
@@ -64,13 +72,15 @@ export function createOfflineStatefulWDRC(config) {
   }
   function frame(padded,result) {
     const start=nextStart;
-    const real=new Float64Array(N),imag=new Float64Array(N);
+    const real=fftReal,imag=fftImag;
+    real.fill(0);imag.fill(0);
     for(let i=0;i<N;i++){
       const index=start+i;
       if(index>=0&&index<accepted)real[i]=input[index%N]*window[i];
     }
     offlineFFT(real,imag);
-    const energy=new Float64Array(centers.length);
+    const energy=bandEnergy;
+    energy.fill(0);
     for(let k=0;k<=N/2;k++){
       const factor=(k===0||k===N/2)?1:2;
       const power=factor*(real[k]*real[k]+imag[k]*imag[k]);
@@ -78,7 +88,7 @@ export function createOfflineStatefulWDRC(config) {
       energy[bins.lowBand[k]]+=power*(1-w);
       if(w>0)energy[bins.highBand[k]]+=power*w;
     }
-    const gains=new Float64Array(centers.length);
+    const gains=frameGains;
     for(let b=0;b<centers.length;b++){
       const rms=Math.sqrt(energy[b]/(N*windowPower));
       const dbfs=20*Math.log10(Math.max(rms,1e-12));

@@ -149,3 +149,15 @@ test("startup emits first hop after one full FFT analysis window",()=>{
   assert.equal(st.diagnostics.emittedSamples,256);
   assert.equal(st.diagnostics.algorithmicLookaheadSamples,768);
 });
+
+test("M03J reusable FFT scratch is constant and preserves bitwise oracle in both modes",()=>{
+  const length=12289, input=tone(length);
+  for(const mode of ["hard","smooth"]){
+    for(const ear of ["left","right"]){
+      const st=verify(input,[1,257,4096,3,15,2048,511],options(mode,ear));
+      assert.equal(st.diagnostics.reusableFrameScratchBuffers,4);
+      assert.equal(st.diagnostics.frameScratchFloat64Elements,2060);
+      assert.equal(st.diagnostics.perFrameScratchBufferAllocations,0);
+    }
+  }
+});
