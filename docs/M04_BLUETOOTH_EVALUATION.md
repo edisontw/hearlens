@@ -1,5 +1,8 @@
 # M04 Bluetooth-first hearing feasibility — decision record (2026-10-12)
 
+> **LATEST PRIORITY UPDATE:** [M04 software-first capture feasibility](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md) supersedes both the original phone-mic-only investigation priority and the later custom earbud-local hardware POC priority. Explore **normal phone/earbud capture → phone native DSP → Bluetooth output** first, with output disabled during diagnostics. User has deferred all hardware POCs. Do not consider old POC sequence permission to do hardware work or live amplification.
+
+
 ## M04-A evidence decision (2026-10-12)
 
 **Read [M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md) first.** This initial phone-mic → Bluetooth study is retained as the controlled **measurement/optional remote-mic** track, *not* the default continuous face-to-face hearing architecture. Public Android/iOS/Bluetooth HAP/VCP APIs do **not** provide generic arbitrary-earbud local multiband WDRC/transparent mic controls. Preferred research path: near-ear built-in microphone → firmware/ODM-controlled local low-delay DSP → open-ear receiver, with phone/BLE for settings and independent captions. Procurement/physical calibration are still blockers; no live output is authorized.
