@@ -22,3 +22,5 @@ jobs:
         run: npm run characterize:dsp -- --benchmark
       - name: Offline guarded streaming throughput (non-gating timing interpretation)
         run: npm run benchmark:stream
+      - name: Offline callback buffer CPU and heap probe (non-gating timing interpretation)
+        run: npm run benchmark:callback && node tools/benchmark-offline-callback.mjs 1 24000
