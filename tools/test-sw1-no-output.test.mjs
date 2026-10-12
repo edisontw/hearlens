@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const base = 'apps/android-mic-probe';
+const main = readFileSync(`${base}/app/src/main/java/org/hearlens/micprobe/MainActivity.java`, 'utf8');
+const manifest = readFileSync(`${base}/app/src/main/AndroidManifest.xml`, 'utf8');
+
+test('SW1 is an explicitly foreground, input-only, no-output probe', () => {
+  for (const forbidden of [
+    /new\s+AudioTrack\s*\(/,
+    /AudioTrack\.Builder/,
+    /\bMediaPlayer\s*\(/,
+    /\bSoundPool\s*\(/,
+    /\bAudioTrack\.write\s*\(/,
+    /\bsetContentUri\s*\(/,
+    /\bFileOutputStream\s*\(/,
+    /\bHttpURLConnection\b/,
+    /\bWebSocket\b/,
+  ]) {
+    assert.doesNotMatch(main, forbidden);
+  }
+  assert.match(main, /new AudioRecord\.Builder\(\)/);
+  assert.match(main, /buffer\[i\] = 0;/);
+  assert.match(main, /MAX_CAPTURE_MS\s*=\s*30_000L/);
+  assert.match(main, /onPause\(\)[\s\S]*?stopCapture\("app_left_foreground"\)/);
+  assert.match(main, /getRoutedDevice\(\)/);
+  assert.match(main, /selected_input_route_changed/);
+  assert.match(main, /selected_mic_unplugged/);
+  assert.doesNotMatch(manifest, /android\.permission\.INTERNET/);
+  assert.doesNotMatch(manifest, /<service\b/);
+  assert.match(manifest, /android\.permission\.RECORD_AUDIO/);
+  assert.match(manifest, /android\.permission\.BLUETOOTH_CONNECT/);
+});
+
+test('probe documents key acoustic and software uncertainty', () => {
+  const guide = readFileSync(`${base}/README.md`, 'utf8');
+  for (const term of ['UNPROCESSED', 'actual Bluetooth acoustic end-to-end latency',
+      'no AudioTrack', 'no internet permission', 'calibrated MPO', 'not guarantees']) {
+    assert.ok(guide.toLowerCase().includes(term.toLowerCase()), term);
+  }
+});

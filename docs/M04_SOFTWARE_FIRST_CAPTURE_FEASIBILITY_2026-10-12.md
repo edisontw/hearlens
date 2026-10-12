@@ -93,3 +93,9 @@ Existing M03H–L 1024 sample frame, 256 hop, 768 sample lookahead = **16 ms at 
 ## Decision summary
 
 **Current top priority: phone DSP and mic-routing software feasibility, NOT local-earbud SDK/ODM procurement.** S1 is the easiest controllable software baseline; S2 best explores already-integrated near-ear microphones but may be worse for delay; S3 is a realistic user-first fallback leveraging manufacturer's local transparency feature and independent HearLens captions. Preserve the prior M04-A manufacturer-local-DSP study for future context; no present hardware work.
+
+## SW1 implementation note — 2026-10-12
+
+SW1 input-only Android probe is implemented in [apps/android-mic-probe](../apps/android-mic-probe/README.md). This separate Gradle project builds a **debug diagnostic APK**. It has no output-audio engine, no INTERNET permission, no recording files, 30-second foreground-only recording limit, and opt-in metadata share. It requests input route and separately logs observed `AudioRecord.getRoutedDevice()`, `AudioRecordingConfiguration` format and effects, RMS/peak statistics, Android mic source, and input/output **availability** (not actual output playing route). Android 12+ may request a matching communication sink **only for selected Bluetooth input**, clearing route after capture; no legacy SCO initiation. Strict stop on disconnect, route mismatch or leaving app.
+
+**Evidence stage:** implement/CI compilation and no-output source checks first; **actual Android phone/earbud verification pending**. The program cannot measure acoustic E2E latency, true mic signal linearity, individual ANC raw microphones, or calibrated hearing-output SPL; all real-ear amplification gates remain blocked. No M03 playback and no extra hardware POC were added.

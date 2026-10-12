@@ -1,0 +1,46 @@
+name: Android SW1 Probe
+
+on:
+  push:
+    paths:
+      - 'apps/android-mic-probe/**'
+      - 'tools/test-sw1-no-output.test.mjs'
+      - '.github/workflows/android-sw1-probe.yml'
+  pull_request:
+    paths:
+      - 'apps/android-mic-probe/**'
+      - 'tools/test-sw1-no-output.test.mjs'
+      - '.github/workflows/android-sw1-probe.yml'
+  workflow_dispatch:
+
+jobs:
+  android-sw1-debug:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enforce no-playback/no-network contract
+        run: node --test tools/test-sw1-no-output.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # GitHub ubuntu runner already has Android SDK cmdline-tools; avoid deprecated 'tools' installer.
+      - name: Inspect runner-provided Android and Gradle toolchain
+        run: |
+          gradle --version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" | tail -5
+      - name: Compile Android input-only debug APK
+        run: gradle --no-daemon -p apps/android-mic-probe assembleDebug
+      - name: Publish unsigned debug artifact for manual input-only testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-sw1-android-input-only-debug
+          path: apps/android-mic-probe/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
