@@ -21,3 +21,7 @@ Run `npm test`. Tests compare **exact Float32 output sample-for-sample** with th
 Persistent DSP state does **not** make the implementation a production audio callback. FFTs and result buffers still allocate per frame/chunk; no verified callback jitter, garbage-collector pause, CPU/energy, input clock drift, gaps/underrun concealment, start/reconnect ramp or hardware mute. Numerical ceiling is not measured ear SPL or maximum power output. No NAL-NL2/DSL clinical parity, acoustic calibration, headphone/speaker route protections, watchdog or actual hearing amplification. See `docs/SAFETY.md`.
 
 Next M03 Part I: test timestamped missing chunks and fail-closed transitions, device-independent CPU/allocation bounds and well-defined recovery; M04 only after route/calibration safety gate. Leave M01 caption lab unchanged.
+
+## M03 Part I — integrity guard
+
+See [M03_TIMED_STREAM_GUARD.md](./M03_TIMED_STREAM_GUARD.md) for explicit sample-offset continuity, simulated capture-clock/underrun fail-stop rules and a non-gating Node throughput/heap probe. The gate does not mute physical headphone output; safe device routing remains unimplemented.

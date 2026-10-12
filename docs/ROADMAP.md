@@ -75,7 +75,8 @@ Goal: build the personalization domain layer before live output.
 - [x] M03 Part F: deterministic 6- and 8-band dense A/B across all 12 boundaries, selected harmonic/two-tone/transient and final-limiter probes; CI JSON report. Smooth reduces jumps in all tested synthetic seams but remains opt-in pending broader DSP/artifact verification.
 - [x] M03 Part G: offline replay-based chunk adapter, exact full-reference equivalence across chunk sizes and modes, final flush/atomic validation, no live output; **not** a bounded-memory real-time stream,
 - [x] M03 Part H: persistent synthetic-only 1024/256 STFT/WOLA, fixed 1024-sample input/sum/weight rings and 6–8 gain envelopes, exact Float32 offline-reference checks, flush, reset, strict chunk validation and fail-stop; algorithmic lookahead is not measured acoustic latency,
-- [ ] M03 Part I: timestamped dropout/underrun policies, sustained callback CPU/allocation profiling and reconnect behavior research before any live route,
+- [x] M03 Part I: offline sample-clock continuity gate (gap/overlap/reordering, invalid timestamps, clock regression, simulated underrun) with explicit reset and no gap concealment; bounded state and non-gating Node CPU/heap probe; no physical route or output,
+- [ ] M03 Part J: scheduling/heap-allocation improvements and disconnected-route/start/reconnect safety state-machine design; still blocked from live hearing output,
 - [ ] production-grade filterbank, frequency/temporal artifact quantification, phase/delay and stream-boundary characterization before hearing output,
 - [ ] calibrated final hearing-output limiter, no-bypass safety tests and MPO verification,
 - [ ] per-ear production gain bounds and start/reconnect ramp,
