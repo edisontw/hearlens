@@ -47,3 +47,7 @@ Technical settings belong in family/admin/research mode.
 ## Headset direction (2026-10-12)
 
 Prefer comfortable everyday **Bluetooth earbuds/headphones** in the eventual user experience. Start M04 with measured Bluetooth feasibility, prioritizing LE Audio-compatible Android phone/headset pairs where available, but do not equate LE Audio capability with proven low delay. Retain a fixed wired USB-C pair as a reference baseline, not an assumed product requirement. See [M04_BLUETOOTH_EVALUATION.md](./M04_BLUETOOTH_EVALUATION.md).
+
+## Ear-local DSP feasibility update — M04-A (2026-10-12)
+
+For **daily face-to-face listening**, prioritize a Bluetooth-controlled, open-fit/open-ear device with **its own built-in near-ear microphone and low-delay DSP**, rather than assuming a normal phone mic → Bluetooth stream can be transparent. Bluetooth convenience stays fundamental; separate phone-microphone remote listening can remain optional, and **neither another wearable microphone nor a sealed ear canal is mandatory**. Do not infer availability of local earbud fitting from AirPods/Galaxy first-party settings or generic LE Audio/HAP/VCP. See [M04-A decision and evidence](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md). Captions remain independent; all [safety gates](./SAFETY.md) remain blocking.
