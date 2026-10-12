@@ -78,3 +78,7 @@ Specific checks before committing implementation:
 2. Obtain/check full Deep Research report if accessible; distinguish supplied summary, verified platform specs, measured results, and untested hypotheses.
 3. Start **M04-A only**, with a standards/API/SDK capability matrix and architecture go/no-go; do not proceed to adding output or more M03 offline DSP until architectural viability is clear.
 4. Preserve Bluetooth-first UX, no extra microphone, no forced ear occlusion, daily face-to-face usage. Keep wired strictly as comparative control.
+
+## Follow-on M04-A decision record (2026-10-12)
+
+The full research reports and public platform/standards/manufacturer references were revisited in M04-A. See [M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md) for the evidence matrix, API/SDK limitations, procurement gate, two bench POCs and explicit priority to complete M04-B before changing M03M scope. This addendum supersedes the earlier tentative phone-mic Bluetooth feasibility priority **for ordinary face-to-face assist**, not the user's Bluetooth-first everyday preference. Do not treat this desk review as physical latency, output SPL, MPO or hard-mute verification.
