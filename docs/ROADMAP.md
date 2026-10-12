@@ -87,7 +87,21 @@ Goal: build the personalization domain layer before live output.
 
 No live-ear safety claim.
 
-## M04 — Earbud-local DSP feasibility first; controlled Bluetooth hearing bench second (wired reference only)
+## M04 — SOFTWARE-FIRST phone DSP / microphone-routing ceiling (updated 2026-10-12)
+
+**LATEST USER DIRECTION:** defer **all hardware POCs**, ODM/chipset engagement, purchases and acoustic bench hardware. Evaluate how far **ordinary phone native software + everyday Bluetooth earbuds** can go first. Phone DSP on PCM is feasible; Bluetooth merely transports its processed output. Revisit earbud microphone input over HFP/LE and iOS 26 supported AirPods high-quality recording, not only phone mic. Distinguish ordinary headset recording inputs from undocumented transparency/ANC microphone buses. See [M04 software-first investigation](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md).
+
+- [x] **SW0:** official Android/iOS capability recheck, S1 phone-mic→DSP→Bluetooth, S2 earbud communication-mic→phone-DSP→earbud, S3 first-party transparency+independent captions; latency/safety constraints and findings recorded.
+- [ ] **SW1 priority:** isolated Android Native microphone and audio-route diagnostics with **NO playback, NO output PCM**, permissions and opt-in metadata export, requested vs actual input/output, UNPROCESSED, mic direction, BLE/HFP switching.
+- [ ] **SW2:** software-only model for DSP and routing delay/quality ceiling; identify if smaller minimum-phase/causal WDRC could materially change budget without new live output.
+- [ ] **SW3:** simulated route-policy fail-stop and interruption tests for S1/S2; no speech amplification.
+- [ ] **SW4:** investigate iOS Native phone-mic/A2DP vs headset-mic/HFP and iOS 26 high-quality AirPods capture in input-only mode where supported.
+- [ ] **HARDWARE POC / physical acoustic trials: PARKED** until user explicitly revises priority; remains a prerequisite for *any* future real-ear hearing output.
+- [ ] **M03M:** keep paused until route feasibility clarifies where lower-latency DSP engineering has value.
+
+The prior M04-A earbud-local SDK/ODM recommendation below is preserved as a **historical conditional future option**, **NOT the active work order**. Do not automatically continue to M04-B1 hardware acquisition.
+
+## M04 — Earbud-local DSP feasibility study (historical, hardware POC deferred)
 
 - [x] **M04-A (2026-10-12):** desk API/standards/vendor evidence matrix, model-specific first-party versus third-party boundaries, architecture GO/CONDITIONAL/NO-GO, two bench POCs, and no-live-output decision. See [M04A evidence and decision record](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md).
 - [ ] **M04-B1:** select licensed/documented programmable local-DSP hardware or research platform, confirm device/firmware/SDK, predeclare ear-coupler/safety, fail-closed hardware and latency measurement plan.
