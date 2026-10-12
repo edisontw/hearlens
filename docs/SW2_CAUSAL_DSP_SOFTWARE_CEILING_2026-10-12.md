@@ -43,7 +43,18 @@ npm run characterize:causal
 npm run benchmark:causal
 ~~~
 
-The baseline deterministic report is gated in GitHub CI. CPU/heap/timing probes are **non-gating, host-specific**; Node Linux values cannot be represented as Android callback P50/P95 or Bluetooth acoustic timing. The two candidate algorithms use **different** computational formulas and gain laws and are **not** matched-compression fittings. To evaluate actual artifact audibility, future work needs a calibrated output-safe audio test and listening methods; no present user retest is needed.
+The baseline deterministic report is gated in GitHub CI. The first successful run (2026-10-12; [PR #44 CI run 38271890743](https://github.com/edisontw/hearlens/actions/runs/38271890743)) produced the following **synthetic mathematical** observations at 48 kHz:
+
+| Probe | Recorded result | Meaning |
+|---|---:|---|
+| Flat, zero-dB gains, 250–8000 Hz | **0.0000 dB** at every 10 tested tone frequencies | Verified synthetic unity reconstruction; does **not** validate different gain shapes |
+| Shaped six-band test, 250 Hz | **+0.4501 dB** | Nonideal broad filter transition for invented shape |
+| Shaped six-band test, 1400 Hz | **+4.1408 dB** | Crossover coloration must still be assessed |
+| Shaped six-band test, 2800 Hz | **+5.0257 dB** | Synthetic tone response, not target-prescription accuracy |
+| Shaped six-band test, 8000 Hz | **+3.6057 dB** | Interactions across sequential residual bands |
+| Shaped impulse energy centroid | **0.1007 samples** | NOT group delay, acoustic latency or proof of transparent response |
+
+There is no physical Bluetooth stream, no measured headset latency and no output safety approval. CPU/heap/timing probes are **non-gating, host-specific**; Node Linux values cannot be represented as Android callback P50/P95 or Bluetooth acoustic timing. The two candidate algorithms use **different** computational formulas and gain laws and are **not** matched-compression fittings. To evaluate actual artifact audibility, future work needs a calibrated output-safe audio test and listening methods; no present user retest is needed.
 
 ## Honest latency budget
 
