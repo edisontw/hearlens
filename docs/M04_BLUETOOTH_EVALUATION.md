@@ -19,7 +19,7 @@ Existing commercial use cases establish feasibility in principle: Android Sound 
 - Android LE Audio overview: https://developer.android.com/develop/connectivity/bluetooth/ble-audio/overview
 - Comparative headphone/codec delay: https://www.rtings.com/headphones/learn/wired-vs-wireless-headphones
 
-The **microphone must remain the PHONE's microphone** near the talker, with headset serving as output only; Bluetooth bidirectional call profiles can cause system capture device/quality changes. Never assume selecting a headset output preserves a phone input route.
+**For the phone-microphone → Bluetooth measurement/optional remote-listening track only**, the **microphone must remain the PHONE's microphone**, with headset serving as output only; Bluetooth bidirectional call profiles can cause system capture device/quality changes. Never assume selecting a headset output preserves a phone input route.
 
 ## Key challenge: total time and sound mixing
 
