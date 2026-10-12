@@ -1,5 +1,8 @@
 # M04-A — Earbud-local DSP and platform API feasibility (2026-10-12)
 
+> **2026-10-12 later user priority supersession:** Hardware POCs, ODM/SDK acquisition and custom ear-side prototype implementation are **deferred**. The active software-first plan is [M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md), which evaluates phone DSP + Bluetooth audio and phone/earbud microphone capture. The technical findings below remain reference material, NOT an instruction to start hardware work.
+
+
 **Decision type:** architecture evidence gate, desk research only. **Baseline `main`:** `bd488e4f498690a2cf214119b5eaf5a87a0c080d`. **No live hearing audio, microphone-to-ear runtime, device control, firmware changes or human testing were introduced in M04-A.**
 
 This document is subordinate to [SAFETY.md](./SAFETY.md). Read with [WORK_HANDOFF_ARCHITECTURE_2026-10-12.md](./WORK_HANDOFF_ARCHITECTURE_2026-10-12.md) and [M04_BLUETOOTH_EVALUATION.md](./M04_BLUETOOTH_EVALUATION.md). The full Deep Research reports provided in the 2026-10-12 HearLens project context were inspected for framing and hypotheses; primary public specifications below are independently linked. Literature-derived latency estimates are **not measurements on a HearLens device**.
