@@ -34,7 +34,9 @@
 4. **NO claim about measured Bluetooth listening latency, hearing gain, actual headset output, stereo independence, direct/delayed mixing, calibrated SPL, or microphone quality**. SW1 produces **no sound**.
 5. **NO need for additional phones, speech-recognition benchmarks, different distances or custom hardware POCs** to proceed to the next small gate.
 
-## Smallest useful follow-up — SW1-B, only if user able
+> **2026-10-12 update:** The second field trial and explicit user priority now supersede this historic requested SW1-B checklist. MIC works during the fixed-speech playback window; the product uses **phone microphone first**, and AIR31 headset input testing is **deferred**. Do not ask the user to repeat the three tests below. See [latest 13-second speech-window analysis](./SW1_FOLLOWUP_PHONE_MIC_PRIMARY_2026-10-12.md).
+
+## Smallest useful follow-up — SW1-B, only if user able (HISTORICAL / SUPERSEDED)
 
 Use the **same fixed audio clip on a second phone** at fixed volume and fixed positions (around 1 m is adequate), starting playback before each capture; keep the diagnostic phone in foreground. In the input selector **explicitly** choose `BUILTIN_MIC#15` instead of the default, and record:
 
