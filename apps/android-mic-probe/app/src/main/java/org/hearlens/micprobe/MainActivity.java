@@ -380,7 +380,7 @@ public final class MainActivity extends Activity {
                 }
                 long now = android.os.SystemClock.elapsedRealtime();
                 if (manager.getMode() == AudioManager.MODE_IN_CALL ||
-                    manager.getMode() == AudioManager.MODE_IN_CALL_SCREENING) {
+                    (Build.VERSION.SDK_INT >= 30 && manager.getMode() == AudioManager.MODE_CALL_SCREENING)) {
                     finishReason = "call_audio_mode";
                     break;
                 }
