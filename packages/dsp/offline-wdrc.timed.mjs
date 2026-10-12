@@ -8,7 +8,8 @@
  * refuses output until explicit reset() starts a NEW sample-time epoch.
  *
  * Previously returned PCM cannot be revoked; a future hardware route MUST
- * separately mute or disconnect when the guard faults.
+ * separately mute or disconnect when the guard faults. M03L adds an isolated
+ * preallocated-buffer entrypoint, not any real callback or hardware guard.
  */
 import { createOfflineStatefulWDRC, STREAM_MAX_CHUNK_SAMPLES } from "./offline-wdrc.stateful.mjs";
 
@@ -72,6 +73,39 @@ export function createOfflineTimedWDRC(config, { deadlineSlackSamples = DEFAULT_
       throw fail("underlying-dsp-rejected");
     }
   }
+
+  /**
+   * M03L isolated callback variant: no packet-object requirement, no returned
+   * PCM buffer. Caller must own independent preallocated destination.
+   * No device output. Destination is scrubbed if any failure occurs.
+   */
+  function requiredOutputSamples(chunkLength) {
+    requireActive();
+    return processor.requiredOutputSamples(chunkLength);
+  }
+  function processInto(startSample,samples,destination) {
+    requireActive();
+    // Never expose a partially written output prefix when the guard faults.
+    const scrub=()=>{if(destination instanceof Float32Array)destination.fill(0);};
+    if(!safeSampleInteger(startSample)) {scrub();throw fail("invalid-timestamp");}
+    if(!(samples instanceof Float32Array)||samples.length<1||
+        samples.length>STREAM_MAX_CHUNK_SAMPLES) {scrub();throw fail("invalid-chunk");}
+    if(startSample!==expectedSample) {
+      scrub();throw fail(startSample>expectedSample?"missing-samples":"overlap-or-reorder");
+    }
+    if(!Number.isSafeInteger(startSample+samples.length)){
+      scrub();throw fail("timestamp-overflow");
+    }
+    try{
+      const written=processor.processInto(samples,destination);
+      expectedSample+=samples.length;
+      packets++;
+      return written;
+    }catch{
+      scrub();
+      throw fail("underlying-dsp-rejected");
+    }
+  }
   function observeCaptureClock(sampleClock) {
     requireActive();
     if (!safeSampleInteger(sampleClock)) throw fail("invalid-clock");
@@ -110,7 +144,7 @@ export function createOfflineTimedWDRC(config, { deadlineSlackSamples = DEFAULT_
     resets++;
   }
   return Object.freeze({
-    push, observeCaptureClock, signalUnderrun, finish, reset,
+    push, processInto, requiredOutputSamples, observeCaptureClock, signalUnderrun, finish, reset,
     get diagnostics() {
       const inner = processor.diagnostics;
       return Object.freeze({

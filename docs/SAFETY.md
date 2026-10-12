@@ -40,6 +40,8 @@ Any live hearing-output implementation MUST include:
 
 The offline route simulation and preallocated DSP output buffer **do not control actual headphones**. Neither a mock authorization flag nor a browser route callback guarantees that amplified audio cannot fall back to a phone speaker. No live hearing playback may be enabled until a target-device native route/mute mechanism has passed *physical* disconnect and unintended-speaker-output tests. Left/right acoustic MPO requires independent measured device calibration and a final post-processing limiter on each channel. Details: [M03K_CALLBACK_ROUTE_ARCHITECTURE.md](./M03K_CALLBACK_ROUTE_ARCHITECTURE.md).
 
+M03L adds a strictly offline mock Port with **no raw PCM output/sink API**. It enforces fail-stop *model* semantics only; it cannot detect a physical headset change or mute a real output. See [M03L_CALLBACK_PORT_MODEL.md](./M03L_CALLBACK_PORT_MODEL.md). All real hardware and per-ear MPO gates above remain blocking.
+
 ## Calibration truthfulness
 
 On uncalibrated hardware:
