@@ -6,7 +6,7 @@ import {
   OFFLINE_WDRC_FRAME_SIZE as N, OFFLINE_WDRC_HOP_SIZE as HOP,
   renderOfflineWDRC, offlineFFT, offlineFrequencyBins,
 } from "./offline-wdrc.mjs";
-import {INPUT_LEVELS_DB_SPL, normalizePrescriptionTargets, targetGainAtInput} from "../prescription-targets/prescription-targets.mjs";
+import {INPUT_LEVELS_DB_SPL, normalizePrescriptionTargets} from "../prescription-targets/prescription-targets.mjs";
 
 export const STREAM_MAX_CHUNK_SAMPLES = 4096;
 export const STREAM_LOOKAHEAD_SAMPLES = N - HOP;
@@ -26,6 +26,11 @@ export function createOfflineStatefulWDRC(config) {
   const {sampleRate, targets, ear, maxGainDb, limiterCeiling,
     syntheticRmsDbFSAt65DbSPL, attackMs, releaseMs, crossoverMode} = cfg;
   const centers = targets.ears[ear].bands.map(x=>x.centerHz);
+  // M03K: freeze three anchor gains once at construction. The public target
+  // lookup normalizes the entire profile and creates an object on EACH call;
+  // the hot path instead uses these validated, snapshotted synthetic anchors.
+  const anchorGains = targets.ears[ear].bands.map(({gainDbByInputLevel:g}) =>
+    Object.freeze([g["50"],g["65"],g["80"]]));
   const bins = offlineFrequencyBins(centers,sampleRate,crossoverMode);
   const window = Float64Array.from({length:N},(_,i)=>
     0.5-0.5*Math.cos(2*Math.PI*(i+0.5)/N));
@@ -45,6 +50,8 @@ export function createOfflineStatefulWDRC(config) {
   const frameGains=new Float64Array(centers.length);
   let accepted=0,emitted=0,nextStart=-N+HOP,frames=0,limited=0,capped=0;
   let faulted=false,closed=false,maxPending=0;
+  // Non-null only within the synchronous, research-only processInto() call.
+  let directOutput=null,directWritten=0;
   function diagnostic() {
     return Object.freeze({
       kind:"offline-stateful-synthetic-only",ear,crossoverMode,sampleRate,
@@ -58,6 +65,8 @@ export function createOfflineStatefulWDRC(config) {
       reusableFrameScratchBuffers:4,
       frameScratchFloat64Elements:2*N+2*centers.length,
       perFrameScratchBufferAllocations:0,
+      callbackStyleWriteIntoAvailable:true,
+      callbackStyleDoesNotAllocateResultArrays:true,
     });
   }
   function emitUntil(end,result) {
@@ -66,7 +75,9 @@ export function createOfflineStatefulWDRC(config) {
       const pre=weights[slot]>0?overlap[slot]/weights[slot]:0;
       if(!Number.isFinite(pre))throw new Error("nonfinite WOLA output");
       if(Math.abs(pre)>limiterCeiling)limited++;
-      result.push(Math.fround(Math.max(-ceilingSafe,Math.min(ceilingSafe,pre))));
+      const pcm=Math.fround(Math.max(-ceilingSafe,Math.min(ceilingSafe,pre)));
+      if(result===null)directOutput[directWritten++]=pcm;
+      else result.push(pcm);
       overlap[slot]=0;weights[slot]=0;emitted++;
     }
   }
@@ -94,10 +105,16 @@ export function createOfflineStatefulWDRC(config) {
       const dbfs=20*Math.log10(Math.max(rms,1e-12));
       const nominal=Math.max(INPUT_LEVELS_DB_SPL[0],Math.min(INPUT_LEVELS_DB_SPL.at(-1),
         65+dbfs-syntheticRmsDbFSAt65DbSPL));
-      const lookup=targetGainAtInput(targets,ear,centers[b],nominal);
-      if(lookup.targetGainDb===null)throw new Error("missing synthetic target");
-      if(lookup.targetGainDb>maxGainDb)capped++;
-      const requested=Math.min(lookup.targetGainDb,maxGainDb);
+      // Same boundary cases and exact interpolation operation order as
+      // targetGainAtInput(), without allocating objects or re-normalizing.
+      const anchor=anchorGains[b];
+      const target=nominal<=65
+        ? (nominal===50?anchor[0]:nominal===65?anchor[1]:
+          anchor[0]+(nominal-50)/15*(anchor[1]-anchor[0]))
+        : (nominal===80?anchor[2]:
+          anchor[1]+(nominal-65)/15*(anchor[2]-anchor[1]));
+      if(target>maxGainDb)capped++;
+      const requested=Math.min(target,maxGainDb);
       const alpha=requested<gainDb[b]?attackAlpha:releaseAlpha;
       gainDb[b]=alpha*gainDb[b]+(1-alpha)*requested;
       gains[b]=Math.pow(10,gainDb[b]/20);
@@ -119,6 +136,53 @@ export function createOfflineStatefulWDRC(config) {
     }
     frames++;nextStart+=HOP;
     emitUntil(Math.max(0,Math.min(nextStart,accepted)),result);
+  }
+  // Preflight the exact maximum Float32 outputs from a future ingest.
+  // Returned count may exceed the NEXT input length when an STFT hop closes.
+  function requiredOutputSamples(chunkLength) {
+    if(faulted||closed)throw new Error("stream faulted/finalized; reset required");
+    if(!Number.isInteger(chunkLength)||chunkLength<1||
+       chunkLength>STREAM_MAX_CHUNK_SAMPLES)
+      throw new RangeError("chunkLength must be integer 1–4096");
+    const finalAccepted=accepted+chunkLength;
+    const complete=Math.max(0,Math.floor((finalAccepted-nextStart-N)/HOP)+1);
+    const futureStart=nextStart+complete*HOP;
+    return Math.max(0,Math.min(futureStart,finalAccepted)-emitted);
+  }
+  /**
+   * M03K isolated callback-shaped OFFLINE API. Caller owns and reuses both
+   * Float32 buffers; writes the exact returned prefix of destination.
+   * No returned PCM array / result[] is created by this API. No device route,
+   * clock integrity guard, real-time, physical mute or acoustic MPO guarantee.
+   */
+  function processInto(chunk,destination) {
+    if(faulted||closed)throw new Error("stream faulted/finalized; reset required");
+    if(!(chunk instanceof Float32Array)||chunk.length<1||
+       chunk.length>STREAM_MAX_CHUNK_SAMPLES){
+      faulted=true;throw new TypeError("chunk must be Float32Array length 1–4096; reset required");
+    }
+    if(!(destination instanceof Float32Array)||chunk.buffer===destination.buffer){
+      faulted=true;throw new TypeError("destination must be independent Float32Array; reset required");
+    }
+    const required=requiredOutputSamples(chunk.length);
+    if(destination.length<required){
+      faulted=true;throw new RangeError("destination too short; reset required");
+    }
+    for(let i=0;i<chunk.length;i++)if(!Number.isFinite(chunk[i])||Math.abs(chunk[i])>16){
+      faulted=true;throw new RangeError("invalid synthetic PCM; reset required");
+    }
+    directOutput=destination;
+    directWritten=0;
+    try{
+      for(let i=0;i<chunk.length;i++){
+        input[accepted%N]=chunk[i];accepted++;
+        while(nextStart+N<=accepted)frame(false,null);
+        maxPending=Math.max(maxPending,accepted-emitted);
+      }
+      if(directWritten!==required)throw new Error("internal output prefix mismatch");
+      return directWritten;
+    }catch(error){faulted=true;throw error;}
+    finally{directOutput=null;directWritten=0;}
   }
   function push(chunk) {
     if(faulted||closed)throw new Error("stream faulted/finalized; reset required");
@@ -155,5 +219,5 @@ export function createOfflineStatefulWDRC(config) {
     accepted=0;emitted=0;nextStart=-N+HOP;frames=0;limited=0;capped=0;
     closed=false;faulted=false;maxPending=0;
   }
-  return Object.freeze({push,finish,reset,get diagnostics(){return diagnostic();}});
+  return Object.freeze({push,processInto,requiredOutputSamples,finish,reset,get diagnostics(){return diagnostic();}});
 }

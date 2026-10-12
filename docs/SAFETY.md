@@ -36,6 +36,10 @@ Any live hearing-output implementation MUST include:
 11. independent left/right profiles,
 12. regression tests proving no processing stage can bypass the final limiter.
 
+## Output route hard gate (M03K architecture, not implemented)
+
+The offline route simulation and preallocated DSP output buffer **do not control actual headphones**. Neither a mock authorization flag nor a browser route callback guarantees that amplified audio cannot fall back to a phone speaker. No live hearing playback may be enabled until a target-device native route/mute mechanism has passed *physical* disconnect and unintended-speaker-output tests. Left/right acoustic MPO requires independent measured device calibration and a final post-processing limiter on each channel. Details: [M03K_CALLBACK_ROUTE_ARCHITECTURE.md](./M03K_CALLBACK_ROUTE_ARCHITECTURE.md).
+
 ## Calibration truthfulness
 
 On uncalibrated hardware:
