@@ -37,7 +37,7 @@ jobs:
           ls "$ANDROID_HOME/platforms" | tail -5
       - name: Compile Android input-only debug APK
         run: gradle --no-daemon -p apps/android-mic-probe assembleDebug
-      - name: Publish unsigned debug artifact for manual input-only testing
+      - name: Publish debug-signed (non-production) input-only diagnostic APK
         uses: actions/upload-artifact@v4
         with:
           name: hearlens-sw1-android-input-only-debug

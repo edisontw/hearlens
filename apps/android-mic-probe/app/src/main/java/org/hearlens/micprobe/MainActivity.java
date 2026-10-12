@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioDeviceCallback;
 import android.media.AudioDeviceInfo;
+import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
@@ -58,6 +59,7 @@ public final class MainActivity extends Activity {
     private AudioRecord recorder;
     private AudioRouting.OnRoutingChangedListener routingListener;
     private boolean communicationRequested;
+    private boolean communicationModeChanged;
     private int priorAudioMode;
     private int requestedSource = MediaRecorder.AudioSource.MIC;
     private int requestedInputId = -1;
@@ -66,6 +68,7 @@ public final class MainActivity extends Activity {
     private TextView status;
     private TextView history;
     private TextView hint;
+    private TextView outputRouteStatus;
     private Button stopButton;
 
     private static final class Choice {
@@ -95,11 +98,11 @@ public final class MainActivity extends Activity {
         setContentView(scroll);
 
         TextView title = new TextView(this);
-        title.setText("HearLens SW1 — Mic/Route Probe");
+        title.setText("HearLens SW1 + SW3-Native — Input / Output Observability");
         title.setTextSize(22);
         root.addView(title);
         hint = new TextView(this);
-        hint.setText("診斷用途：只接收麥克風並計算音量統計。不播放聲音、不儲存錄音、不上傳。最多收音 30 秒，離開畫面會停止。選藍牙麥克風時，系統可能暫時改用通話音訊路由。");
+        hint.setText("診斷用途：輸出部分僅查詢 Android 預計使用的音訊裝置，絕不播放聲音。收音部分維持自願啟動、最多 30 秒，原始聲音即時丟棄。手機麥克風優先；不需要測試藍牙耳機麥克風。");
         hint.setTextSize(16);
         hint.setPadding(0, 16, 0, 12);
         root.addView(hint);
@@ -108,12 +111,20 @@ public final class MainActivity extends Activity {
         root.addView(sourcePicker);
         addButton(root, "重新偵測音訊裝置", v -> {
             if (!running.get()) refreshDevices();
+            inspectOutputRoute("manual-refresh");
         });
+        addButton(root, "檢查媒體輸出預測（完全不播放）", v -> inspectOutputRoute("user-button"));
         addButton(root, "開始 — MIC（預設）", v -> startRequest(MediaRecorder.AudioSource.MIC));
         addButton(root, "開始 — UNPROCESSED（要求未處理）", v -> startRequest(MediaRecorder.AudioSource.UNPROCESSED));
         addButton(root, "開始 — VOICE_RECOGNITION", v -> startRequest(MediaRecorder.AudioSource.VOICE_RECOGNITION));
         stopButton = addButton(root, "停止收音", v -> stopCapture("user_stop"));
         addButton(root, "分享診斷 JSON（需自行確認）", v -> shareReport());
+
+        outputRouteStatus = new TextView(this);
+        outputRouteStatus.setTextSize(15);
+        outputRouteStatus.setPadding(0, 16, 0, 6);
+        outputRouteStatus.setText("輸出路由：尚未查詢；無實際播放可供驗證。");
+        root.addView(outputRouteStatus);
 
         status = new TextView(this);
         status.setTextSize(16);
@@ -137,6 +148,8 @@ public final class MainActivity extends Activity {
 
     private void refreshDevices() {
         if (running.get()) return;
+        Choice previous = sourcePicker == null ? null : (Choice) sourcePicker.getSelectedItem();
+        int keepInput = previous == null ? -1 : previous.id;
         choices.clear();
         choices.add(new Choice(-1, "系統預設輸入（不強制）"));
         try {
@@ -159,6 +172,62 @@ public final class MainActivity extends Activity {
             this, android.R.layout.simple_spinner_item, choices);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         sourcePicker.setAdapter(adapter);
+        for (int i = 0; i < choices.size(); i++) {
+            if (choices.get(i).id == keepInput) {
+                sourcePicker.setSelection(i);
+                break;
+            }
+        }
+    }
+
+    /**
+     * SW3-Native passive route observation, with NO playback and NO AudioTrack.
+     * Android 13 getAudioDevicesForAttributes() predicts the devices that a
+     * future AudioTrack using the supplied attributes may choose.
+     * It is NOT the actual routed device of an active output stream.
+     */
+    private void inspectOutputRoute(String reason) {
+        String media = "UNAVAILABLE_API_BELOW_33";
+        String accessibility = "UNAVAILABLE_API_BELOW_33";
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                AudioAttributes mediaAttrs = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build();
+                AudioAttributes accessAttrs = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build();
+                media = deviceList(manager.getAudioDevicesForAttributes(mediaAttrs)
+                    .toArray(new AudioDeviceInfo[0]));
+                accessibility = deviceList(manager.getAudioDevicesForAttributes(accessAttrs)
+                    .toArray(new AudioDeviceInfo[0]));
+            }
+        } catch (RuntimeException error) {
+            media = "UNAVAILABLE_" + error.getClass().getSimpleName();
+            accessibility = "UNAVAILABLE_" + error.getClass().getSimpleName();
+        }
+        log("SW3_OUTPUT_PREDICTION reason=" + reason + " API33_USAGEMEDIA_SPEECH=" + media
+            + " API33_ACCESSIBILITY_SPEECH=" + accessibility);
+        if (Build.VERSION.SDK_INT >= 31) {
+            try {
+                log("SW3_COMMUNICATION_SELECTED_NOT_MEDIA_ROUTE="
+                    + safeDevice(manager.getCommunicationDevice()));
+            } catch (RuntimeException error) {
+                log("SW3_COMMUNICATION_SELECTED_UNAVAILABLE=" + error.getClass().getSimpleName());
+            }
+        }
+        log("SW3_OUTPUT_ACTUAL_ROUTE=UNOBSERVABLE_NO_PLAYBACK;"
+            + " speaker_fallback_prevention=NOT_VERIFIED;"
+            + " bluetooth_codec_latency=NOT_MEASURED;"
+            + " true_earbud_wear_state=UNKNOWN");
+        if (outputRouteStatus != null) {
+            outputRouteStatus.setText("輸出路由預測（不是實際播放）"
+                + "\n一般媒體語音：" + media
+                + "\n輔助使用語音：" + accessibility
+                + "\n實際輸出：未播放，無法驗證；不可據此啟用助聽擴音。");
+        }
     }
 
     private void startRequest(int source) {
@@ -254,6 +323,7 @@ public final class MainActivity extends Activity {
                 }
                 priorAudioMode = manager.getMode();
                 manager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                communicationModeChanged = true;
                 communicationRequested = manager.setCommunicationDevice(sink);
                 log("communication_route_request=" + communicationRequested + " target=" + safeDevice(sink));
                 if (!communicationRequested) {
@@ -446,17 +516,24 @@ public final class MainActivity extends Activity {
     }
 
     private void restoreCommunication() {
-        if (!communicationRequested) return;
-        if (Build.VERSION.SDK_INT >= 31) manager.clearCommunicationDevice();
-        manager.setMode(priorAudioMode);
-        communicationRequested = false;
-        log("communication_route_cleared; prior_mode_restored=" + priorAudioMode);
+        if (!communicationRequested && !communicationModeChanged) return;
+        try {
+            if (communicationRequested && Build.VERSION.SDK_INT >= 31) {
+                manager.clearCommunicationDevice();
+            }
+            if (communicationModeChanged) manager.setMode(priorAudioMode);
+            log("communication_route_restored; prior_mode=" + priorAudioMode);
+        } finally {
+            communicationRequested = false;
+            communicationModeChanged = false;
+        }
     }
 
     private final AudioDeviceCallback deviceCallback = new AudioDeviceCallback() {
         @Override public void onAudioDevicesAdded(AudioDeviceInfo[] added) {
             log("devices_added=" + deviceList(added) + "; AVAILABLE is not ACTIVE output");
             if (!running.get()) refreshDevices();
+            inspectOutputRoute("devices-added");
         }
         @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
             log("devices_removed=" + deviceList(removed));
@@ -469,6 +546,7 @@ public final class MainActivity extends Activity {
                 }
             }
             if (!running.get()) refreshDevices();
+            inspectOutputRoute("devices-removed");
         }
     };
 
@@ -560,6 +638,11 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             log("metadata_export_error=" + e.getClass().getSimpleName());
         }
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        inspectOutputRoute("activity-resumed");
     }
 
     @Override protected void onPause() {

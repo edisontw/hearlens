@@ -46,3 +46,34 @@ test('SW1 does not mislabel an expected stop-unblocked read as an input fault', 
   assert.match(main, /if \(!running\.getAndSet\(false\)\) return;/);
   assert.match(main, /stop_requested=/);
 });
+
+
+test('SW3-Native only predicts future media/accessibility routing on Android API33+', () => {
+  assert.match(main, /Build\.VERSION\.SDK_INT >= 33/);
+  assert.match(main, /getAudioDevicesForAttributes\(mediaAttrs\)/);
+  assert.match(main, /getAudioDevicesForAttributes\(accessAttrs\)/);
+  assert.match(main, /AudioAttributes\.USAGE_MEDIA/);
+  assert.match(main, /AudioAttributes\.USAGE_ASSISTANCE_ACCESSIBILITY/);
+  assert.match(main, /SW3_OUTPUT_PREDICTION/);
+  assert.match(main, /SW3_OUTPUT_ACTUAL_ROUTE=UNOBSERVABLE_NO_PLAYBACK/);
+  assert.match(main, /speaker_fallback_prevention=NOT_VERIFIED/);
+  assert.match(main, /SW3_COMMUNICATION_SELECTED_NOT_MEDIA_ROUTE/);
+  assert.match(main, /UNAVAILABLE_API_BELOW_33/);
+  assert.match(main, /inspectOutputRoute\("devices-added"\)/);
+  assert.match(main, /inspectOutputRoute\("devices-removed"\)/);
+  assert.match(main, /inspectOutputRoute\("activity-resumed"\)/);
+  assert.match(main, /檢查媒體輸出預測（完全不播放）/);
+  assert.doesNotMatch(main, /\bnew\s+AudioTrack\s*\(/);
+  assert.doesNotMatch(main, /\bnew\s+MediaPlayer\s*\(/);
+  assert.doesNotMatch(main, /\bAudioTrack\.Builder\s*\(/);
+  assert.doesNotMatch(main, /\bgetPlaybackHeadPosition\s*\(/);
+  assert.doesNotMatch(manifest, /android\.permission\.INTERNET/);
+});
+
+test('SW3-Native preserves input choice and restores audio mode even if headset route request was rejected', () => {
+  assert.match(main, /int keepInput = previous == null \? -1 : previous\.id/);
+  assert.match(main, /if \(choices\.get\(i\)\.id == keepInput\)/);
+  assert.match(main, /communicationModeChanged = true/);
+  assert.match(main, /if \(!communicationRequested && !communicationModeChanged\) return/);
+  assert.match(main, /if \(communicationModeChanged\) manager\.setMode\(priorAudioMode\)/);
+});
