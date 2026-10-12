@@ -26,4 +26,23 @@ These calculations distinguish the **zero additional future-input lookahead** of
 
 **Decision rule:** if shaped IIR phase/group delay, wide crossovers, transient tails or compression trajectories are too irregular, **do not ship the crude first-order split**. Follow with an offline matched-fit higher-order or alternative crossover design that balances phase, response smoothness, gain error, and CPU. An existing STFT mode remains a reference, not a safety-approved path. Finish SW3 **no-PCM/no-playback** route-disconnect/state simulation before any software output-route planning. Actual acoustic output, physically verified no-speaker-fallback and independently calibrated L/R MPO are blocking; no user phone test required in SW2-B.
 
-**Status:** SW2-B purely analytical/offline characterization, pending results recorded from CI below. No new human/real-ear listening or hardware POC.
+## First verified deterministic findings (PR #45)
+
+[CI run 38280967933](https://github.com/edisontw/hearlens/actions/runs/38280967933) **PASS**, including the existing M03/SW2-A test suite and new SW2-B transfer/impulse/WDRC tests. The following are **software-only deterministic findings**, not physical output or human-audibility measurements.
+
+| Synthetic metric | Result | Interpretation |
+|---|---|---|
+| All frozen band gains 0 dB | Transfer **0 dB** and group delay **0 ms** | Telescoping identity, independent of hardware |
+| Fixed six-band gains `[0,2,4,6,3,0]` dB | Magnitude **+0.4501 to +5.0262 dB**, 250–8000 Hz | Smooth but **broad/blurred** response, not exact per-band prescription |
+| Local gain step across ±5 Hz crossover positions | Maximum magnitude **0.03925 dB** at the 700 Hz boundary | No abrupt 10-Hz discontinuity in this synthetic configuration, but broad transition and phase effects remain |
+| Frozen-profile **static filter** phase derivative | `−3.81708 … +1.25808 samples` (48 kHz), or `−0.07952 … +0.02621 ms` | Mathematical *group delay* of LTI filter shape, **not** total streaming latency; negative values are possible due to phase interference |
+| Complex frequency response vs actual causal processor impulse DFT | Six frequency points absolute complex error **≤9×10⁻⁸** | Independent parity check of transfer equation against implementation |
+| Impulse at sample 512 | **0 pre-onset energy**; nonflat setting **2.403% energy after onset sample** | Causal output with a postcursor; metric does not establish audible echo |
+| Quiet→loud→quiet synthetic sine | Gain **+10.0 dB before**, **−3.02 dB late loud**, **−3.01 dB early return**, **+5.65 dB late return** | Large compression/gain recovery swing in this invented profile; recovery may be too slow for speech, **not yet validated** |
+| Extra future-input DSP lookahead | STFT reference **16 ms**, causal baseline **0 ms** | Only algorithmic lookahead; radio/earbud/output route remain entirely unmeasured |
+
+**Crucial distinction:** the small positive/negative *static-filter* group-delay numbers above are **not** a guarantee of tiny total algorithmic phase/group delay in the *active nonlinear WDRC*, nor of low-latency Bluetooth acoustic playback. `SW2` has not exercised `AudioTrack`, a Bluetooth output route, a speaker disconnect, calibrated per-ear MPO, real-world intelligibility or a person wearing headphones.
+
+**Decision:** SW2-B analysis is complete. The first-order residual filter is still a **research baseline rather than an accepted hearing-output filter**. The broad crossover response and slow compression recovery are the major algorithmic cautions. Avoid repeated synthetic micro-optimizations until the app's phone-mic→Bluetooth-output routing and fail-closed semantics are better understood. **Next SW3:** no-PCM output-route fault simulation (A2DP/LE endpoint change, phone speaker fallback, focus/call interruption, reconnect) with no real playback. Further SW2-C filter/attack-release redesign is conditional on that route assessment. Hardware POCs stay deferred.
+
+**Status:** SW2-B research characterization **CI PASS**, no human/real-ear listening or hardware POC.
