@@ -79,6 +79,7 @@ Goal: build the personalization domain layer before live output.
 - [x] M03 Part J: reusable per-instance Float64 FFT, energy and gain scratch arrays (preserved exact offline parity), plus a PURE synthetic route authorization/start ramp/disconnect fail-stop model; does not actually enforce device routing or calibrated SPL,
 - [x] M03 Part K (offline prototype): caller-reused output buffer API, per-instance prevalidated target anchor cache, numerical no-overwrite regression, non-gating callback CPU/heap probe and native physical-route/per-ear MPO architecture requirements; **no actual audio route**,
 - [ ] M03 Part K exit gates: verified allocation/GC and realtime behavior on target phone, physical wired route/no speaker fallback and hard mute on disconnect, independent measured L/R MPO and acoustic calibration before any live amplification,
+- [x] M03 Part L: isolated timestamp-guarded reusable-buffer processInto and no-PCM mock route-port negative fixtures for disconnect, route switch, missing observations, sample-clock faults, reset and rearm; **only model semantics, no physical mute or output**,
 - [ ] production-grade filterbank, frequency/temporal artifact quantification, phase/delay and stream-boundary characterization before hearing output,
 - [ ] calibrated final hearing-output limiter, no-bypass safety tests and MPO verification,
 - [ ] per-ear production gain bounds and start/reconnect ramp,
