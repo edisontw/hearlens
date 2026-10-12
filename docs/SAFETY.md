@@ -69,3 +69,7 @@ When route state, calibration state or audio constraints are uncertain, captions
 ## SW1 microphone-route diagnostics (2026-10-12)
 
 [Android SW1 input-only probe](../apps/android-mic-probe/README.md) is intentionally a **separate foreground-only diagnostics APK** and has **no AudioTrack/output PCM path, network permission or saved microphone audio**. It does not exercise or release any of the hearing amplification gates above. In particular, observing `AudioRecord.getRoutedDevice()` verifies a requested **input** route, not the physical output route, speaker fallback or ear-level MPO. Do not interpret the SW1 APK as permission to connect the existing M03L synthetic DSP mock to real playback.
+
+## SW2 causal research-only DSP (2026-10-12)
+
+[SW2 causal IIR/WDRC](./SW2_CAUSAL_DSP_SOFTWARE_CEILING_2026-10-12.md) is an isolated **synthetic/offline** processor with no device connection or audio sink. Its zero **future-input lookahead** does **not** mean zero phase/group delay or any measured microphone-to-ear Bluetooth delay. Its post-sum PCM limiter is not calibrated ear-level SPL/MPO. All mandatory physical output route, hard-mute, left/right acoustic calibration and clinical checks remain **blocked**. Do not wire SW2 output to the experimental Android input-only probe or any Bluetooth headphone route.
