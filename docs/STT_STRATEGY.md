@@ -2,6 +2,10 @@
 
 Updated: 2026-10-04
 
+## 2026-10-13 — Gemini Live mid-session disconnect handling
+
+The caption client now treats an **unexpected established WebSocket close/error** as terminal: immediately release microphone resources, invalidate stale partial/final callbacks, show an interrupted status and allow a **manual restart** after cleanup. No invisible provider fallback or automatic retry, and user-initiated Stop still retains its separate graceful final-drain path. This is deterministic software regression only; cross-browser behavior needs field confirmation if a real failure occurs. [M01 fail-stop decision](./M01_GEMINI_FATAL_SESSION_RECOVERY_2026-10-13.md).
+
 ## Decision
 
 HearLens will not bind the caption UI to one speech-recognition vendor.
