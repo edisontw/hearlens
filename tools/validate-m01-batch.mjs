@@ -46,6 +46,11 @@ export function validateM01Batch(manifest, definition, loadReport, sourceBytes) 
   }
   const devices = Array.isArray(manifest?.devices) && manifest.devices.length === 2
     ? manifest.devices : [];
+  if (devices.length === 2 &&
+    (!devices.some(x => /iphone/i.test(x)) ||
+     !devices.some(x => /HTC\\s*U23/i.test(x)))) {
+    errors.push("locked_iphone_and_htc_u23_receiver_pair_required");
+  }
   const frozen = manifest?.frozen || {};
   if (!/^[0-9a-f]{40}$/.test(frozen.mainSha || "")) errors.push("main_sha_not_pinned");
   if (!nonempty(frozen.buildId) || /<|>/.test(frozen.buildId || "")) errors.push("build_id_not_pinned");
