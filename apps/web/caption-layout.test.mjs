@@ -23,8 +23,12 @@ test("long-caption area wraps and scrolls internally without losing keyboard acc
 test("phone portrait retains two main controls and three size controls in compact rows", () => {
   const phone = css.split("/* Phone portrait:")[1]?.split("/* Short-height landscape")[0] ?? "";
   assert.match(phone, /@media \(max-width: 540px\)/);
-  assert.match(phone, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(phone, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.6fr\)/);
+  // The compact two-column control grid is defined in the first phone
+  // breakpoint; the final phone block refines touch/spacing properties.
+  const initialPhone = css.split("@media (max-width: 540px) {")[1]
+    ?.split("@media (prefers-color-scheme: dark)")[0] ?? "";
+  assert.match(initialPhone, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(initialPhone, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.6fr\)/);
   assert.match(phone, /min-height: 48px/);
   assert.match(phone, /height: clamp\(10rem, 34dvh, 19rem\)/);
   assert.match(phone, /safe-area-inset-left/);
