@@ -48,7 +48,7 @@ export function validateM01Batch(manifest, definition, loadReport, sourceBytes) 
     ? manifest.devices : [];
   if (devices.length === 2 &&
     (!devices.some(x => /iphone/i.test(x)) ||
-     !devices.some(x => /HTC\\s*U23/i.test(x)))) {
+     !devices.some(x => /HTC\s*U23/i.test(x)))) {
     errors.push("locked_iphone_and_htc_u23_receiver_pair_required");
   }
   const frozen = manifest?.frozen || {};
