@@ -109,6 +109,10 @@ Research I/O curves are data and cannot override calibrated-device, final-limite
 - [M03_DSP_CHARACTERIZATION.md](./M03_DSP_CHARACTERIZATION.md) characterizes **synthetic-only** response and speed. The current hard spectral band boundaries show an abrupt transition in selective-gain fixtures.
 - Good arithmetic throughput on CI cannot establish low-latency microphone-to-earphone operation; no calibrated SPL, streaming buffer-delay measurement, distortion acceptance or real-ear validation exists.
 
+## M03 nonlinear CAMFIT arithmetic validation (research-only; 2026-10-14)
+
+M03 Part P now executes the **unchanged, integrity-pinned upstream Clarity/PyClarity Python CAMFIT compressive function** for 8 distinct bilateral audiograms: 324 ear×frequency×level results matched HearLens's isolated JavaScript CAMFIT research model to a maximum difference of `3.55×10⁻¹⁴ dB` (CI PASS, tolerance `10⁻⁶ dB`). See [direct upstream reference protocol](./M03_CAMFIT_PYTHON_CROSSCHECK_2026-10-14.md). This is **numerical algorithm parity for the tested conditions**, NOT an acoustic calibration, verified NAL-NL2/DSL clinical fitting prescription, or approval to feed the numbers directly into the PCM WDRC or normal Bluetooth headphones. Existing physical fail-closed route and independent left/right MPO safety gates remain blocking.
+
 ## M03 Part F quality decision
 
 - [M03_DENSE_CROSSOVER_AB.md](./M03_DENSE_CROSSOVER_AB.md): dense matched synthetic A/B across every six-/eight-band crossover, limited harmonic and two-tone projection, impulsive ringing proxy and post-synthesis limiter.

@@ -15,6 +15,7 @@
     "benchmark:causal": "node tools/characterize-sw2-causal.mjs --benchmark",
     "characterize:phase": "node tools/characterize-sw2b-phase.mjs",
     "report:sw3": "node tools/report-sw3-route-policy.mjs",
-    "benchmark:batch": "node tools/validate-m01-batch.mjs"
+    "benchmark:batch": "node tools/validate-m01-batch.mjs",
+    "verify:camfit:python": "node tools/verify-camfit-upstream.mjs"
   }
 }
