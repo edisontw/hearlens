@@ -3,7 +3,7 @@ import {
   browserSpeechSupported,
 } from "./providers/browser-speech.js?v=20261005-adaptive1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261013-gemini-failstop1";
+  "./providers/gemini-live-transcribe.js?v=20261013-mobile-lifecycle1";
 import { GoogleCloudStreamingProvider } from
   "./providers/google-cloud-streaming.js?v=20261005-adaptive1";
 
