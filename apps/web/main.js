@@ -2,16 +2,17 @@ import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261013-mobile-lifecycle1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261013-rolling-caption1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
 } from "./zh-display.js?v=20261008-stop-flush1";
 import {
+  currentCaptionText,
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261008-stop-flush1";
+} from "./transcript-window.mjs?v=20261013-rolling-caption1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -37,9 +38,10 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261013-mobile-lifecycle1";
+const BUILD_ID = "20261013-rolling-caption1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
+const CAPTION_REFRESH_MS = 1_000;
 const CAPTION_SIZE_STORAGE_KEY = "hearlens-caption-size-v1";
 const MAX_DEBUG_LINES = 120;
 const MAX_REPORT_DEBUG_LINES = 5000;
@@ -148,6 +150,8 @@ let activeInputProfile = null;
 let activeCaptureSettings = null;
 let activeCaptionLatency = null;
 let captionStopRequested = false;
+let captionRefreshTimer = null;
+let lastInterimAt = null;
 const transcript = [];
 const sessionFinals = [];
 const debugLines = [];
@@ -415,9 +419,39 @@ function trimTranscript(now = Date.now()) {
   }
 }
 
-function visibleTranscript() {
+function visibleTranscript(now = Date.now()) {
+  trimTranscript(now);
+  return currentCaptionText(transcript, "", null, now, ROLLING_WINDOW_MS);
+}
+
+function liveInterim(now = Date.now()) {
+  return currentCaptionText([], interimText, lastInterimAt, now, ROLLING_WINDOW_MS);
+}
+
+function syncCaptionRefreshTimer() {
+  const now = Date.now();
+  const needRefresh = Boolean(activeSessionId) ||
+    recentTranscriptItems(transcript, now, ROLLING_WINDOW_MS).length > 0 ||
+    Boolean(recentRecognizedText(now)) ||
+    Boolean(liveInterim(now));
+  if (needRefresh && captionRefreshTimer === null) {
+    captionRefreshTimer = window.setInterval(refreshCaptionWindow, CAPTION_REFRESH_MS);
+  } else if (!needRefresh && captionRefreshTimer !== null) {
+    window.clearInterval(captionRefreshTimer);
+    captionRefreshTimer = null;
+  }
+}
+
+function refreshCaptionWindow() {
   trimTranscript();
-  return transcript.map((item) => item.text).join(" ").trim();
+  if (activeSessionId && !captionStopRequested) {
+    renderCaption();
+  } else if (!activeSessionId) {
+    const text = visibleTranscript() || "字幕會顯示在這裡。";
+    if (els.caption.textContent !== text) els.caption.textContent = text;
+  }
+  if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
+  syncCaptionRefreshTimer();
 }
 
 function rememberRecognizedText(text, timestamp = Date.now()) {
@@ -434,9 +468,13 @@ function recentRecognizedText(now = Date.now()) {
 }
 
 function renderCaption() {
-  const finalText = visibleTranscript();
-  const combined = [finalText, interimText].filter(Boolean).join(" ").trim();
-  els.caption.textContent = combined || "正在聆聽…";
+  const now = Date.now();
+  const combined = currentCaptionText(
+    transcript, interimText, lastInterimAt, now, ROLLING_WINDOW_MS);
+  const nextText = combined || "正在聆聽…";
+  // Do not re-announce the same caption via aria-live every second.
+  if (els.caption.textContent !== nextText) els.caption.textContent = nextText;
+  syncCaptionRefreshTimer();
 }
 
 function addFinalTranscript(text, rawText = text) {
@@ -456,6 +494,7 @@ function addFinalTranscript(text, rawText = text) {
   if (els.recallPanel && !els.recallPanel.hidden) {
     renderRecall();
   }
+  syncCaptionRefreshTimer();
 }
 
 function renderRecall() {
@@ -466,7 +505,7 @@ function renderRecall() {
   els.recallList.replaceChildren();
 
   if (!items.length) {
-    const fallback = interimText.trim() || recentRecognizedText(now);
+    const fallback = liveInterim(now) || recentRecognizedText(now);
     const empty = document.createElement("div");
     empty.className = "recall-empty";
     empty.textContent = fallback || "目前沒有最近 30 秒的字幕。";
@@ -496,8 +535,9 @@ function renderRecall() {
 }
 
 function showRecall() {
-  renderRecall();
   els.recallPanel.hidden = false;
+  renderRecall();
+  syncCaptionRefreshTimer();
   els.recallPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -509,7 +549,7 @@ async function copyRecentTranscript() {
   );
   const text =
     recentTranscriptText(items) ||
-    interimText.trim() ||
+    liveInterim() ||
     recentRecognizedText();
 
   if (!text) {
@@ -736,6 +776,7 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
   } finally {
     interimText = "";
     rawInterimText = "";
+    lastInterimAt = null;
     trimTranscript();
     els.caption.textContent =
       visibleTranscript() || recentRecognizedText() || "字幕已中斷，請重新開始。";
@@ -746,6 +787,7 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
     if (els.resetPreset) els.resetPreset.disabled = false;
     setAdvancedTuningDisabled(false);
     appendSttLog("S" + expectedSessionId + " fatal-cleanup-complete");
+    syncCaptionRefreshTimer();
   }
 }
 
@@ -774,6 +816,13 @@ async function startSession() {
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
   renderCaptionLatencyTelemetry();
   sessionFinals.length = 0;
+  transcript.length = 0;
+  lastRecognizedText = "";
+  lastRecognizedAt = 0;
+  interimText = "";
+  rawInterimText = "";
+  lastInterimAt = null;
+  syncCaptionRefreshTimer();
   appendSttLog("S" + sessionId + " session-start");
 
   setStatus("啟動中…");
@@ -841,6 +890,7 @@ async function startSession() {
       }
       rawInterimText = text;
       interimText = toTaiwanTraditional(text);
+      lastInterimAt = interimText.trim() ? Date.now() : null;
       if (interimText.trim()) {
         rememberRecognizedText(interimText, timestamp);
       }
@@ -855,6 +905,7 @@ async function startSession() {
       const displayText = toTaiwanTraditional(text);
       rawInterimText = "";
       interimText = "";
+      lastInterimAt = null;
       rememberRecognizedText(displayText, timestamp);
       addFinalTranscript(displayText, text);
     },
@@ -946,6 +997,7 @@ async function stopSession() {
 
   interimText = "";
   rawInterimText = "";
+  lastInterimAt = null;
   trimTranscript();
   const recent = visibleTranscript() || recentRecognizedText();
   els.caption.textContent = recent || "字幕會顯示在這裡。";
@@ -959,6 +1011,7 @@ async function stopSession() {
   setStatus("已停止");
   appendSttLog("S" + sessionId + " session-stopped");
   captionStopRequested = false;
+  syncCaptionRefreshTimer();
 }
 
 async function cleanupFailedStart(error) {
@@ -978,6 +1031,8 @@ async function cleanupFailedStart(error) {
 
   await releaseDiagnosticCapture("未啟動");
   activeSessionId = 0;
+  lastInterimAt = null;
+  syncCaptionRefreshTimer();
 }
 
 els.start.addEventListener("click", async () => {
@@ -1022,6 +1077,7 @@ window.addEventListener("pagehide", () => interruptForPageEvent("pagehide"));
 els.recall.addEventListener("click", showRecall);
 els.closeRecall.addEventListener("click", () => {
   els.recallPanel.hidden = true;
+  syncCaptionRefreshTimer();
   if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
 });
 els.copyRecentTranscript?.addEventListener("click", () => {
