@@ -66,6 +66,10 @@ Do not label uncalibrated processing as clinical fitting.
 
 When route state, calibration state or audio constraints are uncertain, captions may continue but hearing amplification must fail closed.
 
+## M01 caption capture foreground lifecycle (2026-10-13)
+
+[Mobile lifecycle fail-stop](./M01_MOBILE_LIFECYCLE_FAILSTOP_2026-10-13.md) terminates foreground captions on page hidden/pagehide or microphone-track ended/persistently muted, with no automatic resume, and discards asynchronous permission results after cancellation. This is a *caption microphone resource/privacy guard*, **not** proof that a mobile OS always delivers timely background notifications or physical output/mute protection. The existing no-hearing-output hard gate remains unchanged.
+
 ## SW1 microphone-route diagnostics (2026-10-12)
 
 [Android SW1 input-only probe](../apps/android-mic-probe/README.md) is intentionally a **separate foreground-only diagnostics APK** and has **no AudioTrack/output PCM path, network permission or saved microphone audio**. It does not exercise or release any of the hearing amplification gates above. In particular, observing `AudioRecord.getRoutedDevice()` verifies a requested **input** route, not the physical output route, speaker fallback or ear-level MPO. Do not interpret the SW1 APK as permission to connect the existing M03L synthetic DSP mock to real playback.

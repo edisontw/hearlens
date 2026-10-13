@@ -16,7 +16,10 @@ test("fatal transport callback transitions current caption session to an error a
   assert.match(main, /activeSessionId = 0; \/\/ immediately reject delayed partial/);
   assert.match(main, /await failedProvider\?\.dispose\?\.\(\)/);
   assert.match(main, /await releaseDiagnosticCapture\("未使用"\)/);
-  assert.match(main, /setStatus\("字幕連線中斷，請重新開始", "error"\)/);
+  assert.match(main, /"字幕已暫停，請重新開始"/);
+  assert.match(main, /"麥克風已中斷，請重新開始"/);
+  assert.match(main, /"字幕連線中斷，請重新開始"/);
+  assert.match(main, /setStatus\(reasonLabel, "error"\)/);
   assert.match(main, /els\.start\.disabled = false/);
   assert.match(main, /setAdvancedTuningDisabled\(false\)/);
   assert.match(main, /sessionId !== activeSessionId/);
@@ -32,7 +35,7 @@ test("abnormal socket close stops capture; explicit stop still supports final dr
 });
 
 test("fatal fix refreshes the browser's main, provider, and provider-implementation URLs", () => {
-  const version = "20261013-gemini-failstop1";
+  const version = "20261013-mobile-lifecycle1";
   assert.equal(build.buildId, version);
   assert.match(main, new RegExp('const BUILD_ID = "' + version + '"'));
   assert(main.includes("./stt/provider.js?v=" + version));

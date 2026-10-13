@@ -12,6 +12,7 @@ const OPEN_TIMEOUT_MS = 8_000;
 const SETUP_TIMEOUT_MS = 8_000;
 const STOP_TIMEOUT_MS = 5_000;
 const STOP_DRAIN_GRACE_MS = 1_000;
+const MIC_MUTE_GRACE_MS = 2_000;
 const GEMINI_WS_BASE =
   "wss://generativelanguage.googleapis.com/ws/" +
   "google.ai.generativelanguage.v1beta.GenerativeService." +
@@ -111,25 +112,66 @@ export class GeminiLiveTranscribeProvider {
     this.lastLevelDebugAt = 0;
     this.fatalTransportHandled = false;
     this.listeningReady = false;
+    this.startEpoch = 0;
+    this.captureTrack = null;
+    this.captureTrackHandlers = null;
+    this.captureMuteTimer = null;
+  }
+
+  assertStartCurrent(epoch) {
+    if (this.startEpoch !== epoch || !this.active || this.stopping ||
+        this.fatalTransportHandled) {
+      throw new Error("Caption capture start was cancelled.");
+    }
   }
 
   // A WebSocket error/close is not a normal silence interval. Immediately
   // disable audio capture, discard stale frames, and report failure once.
   // A pre-listening failure is instead propagated by start()'s rejection.
-  handleUnexpectedTransportFailure(socket, code, message) {
-    if (this.socket !== socket || this.stopping ||
-        !this.active || this.fatalTransportHandled) return;
+  handleFatalCaptureState(code, message, detail = "capture-failed") {
+    if (this.stopping || !this.active || this.fatalTransportHandled) return;
     this.fatalTransportHandled = true;
+    this.startEpoch += 1;
     const wasListening = this.listeningReady;
     this.active = false;
     this.listeningReady = false;
-    this.debug("transport-failed", code);
+    this.debug(detail, code);
     void this.shutdownCapture().catch((error) => {
       this.debug("capture-cleanup-failed",
         error instanceof Error ? error.message : "unknown");
     });
     if (wasListening) {
       this.onError({ providerId: this.id, code, message, fatal: true });
+    }
+  }
+
+  handleUnexpectedTransportFailure(socket, code, message) {
+    if (this.socket !== socket) return;
+    this.handleFatalCaptureState(code, message, "transport-failed");
+  }
+
+  handleUnexpectedCaptureFailure(track, code, message) {
+    if (this.captureTrack !== track) return;
+    this.handleFatalCaptureState(code, message, "microphone-failed");
+  }
+
+  scheduleMutedMicFailure(track) {
+    if (track !== this.captureTrack || !this.active || this.stopping ||
+        this.captureMuteTimer !== null) return;
+    this.debug("microphone-muted", "awaiting-recovery");
+    this.captureMuteTimer = window.setTimeout(() => {
+      this.captureMuteTimer = null;
+      if (track === this.captureTrack && track.muted === true) {
+        this.handleUnexpectedCaptureFailure(track,
+          "mic-muted", "手機麥克風已中斷，請重新開始字幕。");
+      }
+    }, MIC_MUTE_GRACE_MS);
+  }
+
+  clearMutedMicFailure() {
+    if (this.captureMuteTimer !== null) {
+      window.clearTimeout(this.captureMuteTimer);
+      this.captureMuteTimer = null;
     }
   }
 
@@ -204,6 +246,11 @@ export class GeminiLiveTranscribeProvider {
         },
         { once: true },
       );
+      // A background-page dispose may close a CONNECTING socket.
+      socket.addEventListener("close", () => {
+        window.clearTimeout(timeout);
+        reject(new Error("Gemini Live closed during connection."));
+      }, { once: true });
     });
 
     socket.addEventListener("message", (event) => {
@@ -392,13 +439,38 @@ export class GeminiLiveTranscribeProvider {
     }
   }
 
-  async startCapture() {
-    this.stream = await navigator.mediaDevices.getUserMedia({
+  async startCapture(epoch) {
+    const acquiredStream = await navigator.mediaDevices.getUserMedia({
       audio: requestedAudioConstraints(this.captureMode),
       video: false,
     });
+    try {
+      this.assertStartCurrent(epoch);
+    } catch (error) {
+      // getUserMedia may resolve after a page-hide cancellation or disposal.
+      for (const track of acquiredStream.getTracks()) track.stop();
+      throw error;
+    }
+    this.stream = acquiredStream;
 
     const [captureTrack] = this.stream.getAudioTracks();
+    if (!captureTrack || captureTrack.readyState === "ended") {
+      throw new Error("Microphone track is unavailable.");
+    }
+    this.captureTrack = captureTrack;
+    const handlers = {
+      ended: () => this.handleUnexpectedCaptureFailure(
+        captureTrack, "mic-ended", "手機麥克風已停止，請重新開始字幕。"),
+      mute: () => this.scheduleMutedMicFailure(captureTrack),
+      unmute: () => this.clearMutedMicFailure(),
+    };
+    this.captureTrackHandlers = handlers;
+    for (const [name, handler] of Object.entries(handlers)) {
+      captureTrack.addEventListener?.(name, handler);
+    }
+    if (captureTrack.muted === true) {
+      this.scheduleMutedMicFailure(captureTrack);
+    }
     this.debug(
       "capture-settings",
       JSON.stringify({
@@ -415,6 +487,7 @@ export class GeminiLiveTranscribeProvider {
     this.audioContext = new AudioContextClass({ latencyHint: "interactive" });
     if (this.audioContext.state === "suspended") {
       await this.audioContext.resume();
+      this.assertStartCurrent(epoch);
     }
 
     if (!this.audioContext.createScriptProcessor) {
@@ -506,6 +579,7 @@ export class GeminiLiveTranscribeProvider {
     this.lastLevelDebugAt = 0;
     this.fatalTransportHandled = false;
     this.listeningReady = false;
+    const epoch = ++this.startEpoch;
 
     this.onStatus({
       state: "connecting",
@@ -516,15 +590,18 @@ export class GeminiLiveTranscribeProvider {
 
     try {
       const token = await this.fetchToken();
+      this.assertStartCurrent(epoch);
       await this.openSocket(token);
+      this.assertStartCurrent(epoch);
 
       const setupPromise = this.waitForSetup();
       this.sendSetup();
       await setupPromise;
+      this.assertStartCurrent(epoch);
 
-      await this.startCapture();
-      if (!this.active || this.fatalTransportHandled ||
-          this.socket?.readyState !== WebSocket.OPEN) {
+      await this.startCapture(epoch);
+      this.assertStartCurrent(epoch);
+      if (this.socket?.readyState !== WebSocket.OPEN) {
         throw new Error("Gemini Live closed before listening was ready.");
       }
       this.listeningReady = true;
@@ -549,6 +626,16 @@ export class GeminiLiveTranscribeProvider {
   }
 
   async shutdownCapture() {
+    this.clearMutedMicFailure();
+    const priorTrack = this.captureTrack;
+    const handlers = this.captureTrackHandlers;
+    this.captureTrack = null;
+    this.captureTrackHandlers = null;
+    if (priorTrack && handlers) {
+      for (const [name, handler] of Object.entries(handlers)) {
+        priorTrack.removeEventListener?.(name, handler);
+      }
+    }
     if (this.processorNode) {
       this.processorNode.onaudioprocess = null;
     }
@@ -567,10 +654,11 @@ export class GeminiLiveTranscribeProvider {
     this.inputNormalizer = null;
     this.pendingSamples = [];
 
-    for (const track of this.stream?.getTracks?.() ?? []) {
+    const acquiredStream = this.stream;
+    this.stream = null;
+    for (const track of acquiredStream?.getTracks?.() ?? []) {
       track.stop();
     }
-    this.stream = null;
 
     // Detach synchronously so simultaneous fatal-close/dispose cleanup
     // cannot close the same AudioContext twice.
@@ -583,6 +671,7 @@ export class GeminiLiveTranscribeProvider {
 
   async stop() {
     this.debug("provider-stop");
+    this.startEpoch += 1;
     this.active = false;
     this.listeningReady = false;
     this.stopping = true;
@@ -642,7 +731,12 @@ export class GeminiLiveTranscribeProvider {
 
   async dispose() {
     this.debug("provider-dispose");
+    this.startEpoch += 1;
     this.active = false;
+    if (this.setupRejecter) {
+      this.setupRejecter(new Error("Caption startup cancelled."));
+      this.clearSetupWaiters();
+    }
     this.listeningReady = false;
     this.stopping = true;
     await this.shutdownCapture();
