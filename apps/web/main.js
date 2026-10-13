@@ -1,4 +1,8 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261013-gemini-failstop1";
+import {
+  assertCaptionSessionCurrent,
+  shouldInterruptForPageEvent,
+} from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261013-mobile-lifecycle1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -33,7 +37,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261013-gemini-failstop1";
+const BUILD_ID = "20261013-mobile-lifecycle1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_SIZE_STORAGE_KEY = "hearlens-caption-size-v1";
@@ -143,6 +147,7 @@ let activeSessionId = 0;
 let activeInputProfile = null;
 let activeCaptureSettings = null;
 let activeCaptionLatency = null;
+let captionStopRequested = false;
 const transcript = [];
 const sessionFinals = [];
 const debugLines = [];
@@ -704,7 +709,8 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
   if (els.quickPreset) els.quickPreset.disabled = true;
   if (els.resetPreset) els.resetPreset.disabled = true;
   setAdvancedTuningDisabled(true);
-  setStatus("字幕連線中斷，請重新開始", "error");
+  setStatus(code === "page-hidden" || code === "pagehide"
+    ? "字幕已暫停，請重新開始" : "字幕連線中斷，請重新開始", "error");
   appendSttLog("S" + expectedSessionId + " fatal-session " + code);
   const failedProvider = sttProvider;
   sttProvider = null;
@@ -735,6 +741,10 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
   }
 }
 
+function requireActiveCaptionSession(sessionId) {
+  assertCaptionSessionCurrent(sessionId, activeSessionId, document.hidden);
+}
+
 async function startSession() {
   if (!window.isSecureContext) {
     throw new Error("需要 HTTPS 安全連線才能使用麥克風。");
@@ -744,8 +754,13 @@ async function startSession() {
     throw new Error("這個瀏覽器不支援麥克風存取。");
   }
 
+  if (document.hidden) {
+    throw new Error("請切回此頁面，再開始字幕。");
+  }
+
   const sessionId = ++sessionCounter;
   activeSessionId = sessionId;
+  captionStopRequested = false;
   activeInputProfile = null;
   activeCaptureSettings = null;
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
@@ -762,10 +777,18 @@ async function startSession() {
 
   // getUserMedia here is used only for permission/device diagnostics.
   // The selected STT provider owns its actual recognition capture.
-  stream = await navigator.mediaDevices.getUserMedia({
+  const diagnosticStream = await navigator.mediaDevices.getUserMedia({
     audio: requestedAudioConstraints(runtimeSttConfig.captureMode),
     video: false,
   });
+  try {
+    requireActiveCaptionSession(sessionId);
+  } catch (error) {
+    // Permission may resolve AFTER pagehide or a newer session starts.
+    for (const track of diagnosticStream.getTracks()) track.stop();
+    throw error;
+  }
+  stream = diagnosticStream;
 
   const [track] = stream.getAudioTracks();
   if (!track) {
@@ -788,8 +811,10 @@ async function startSession() {
   // Do not keep the diagnostics capture open while the STT provider
   // starts its own microphone/recognition path.
   await releaseDiagnosticCapture("權限正常；已釋放給字幕引擎");
+  requireActiveCaptionSession(sessionId);
   appendSttLog("S" + sessionId + " diagnostic-mic-released");
   await new Promise((resolve) => window.setTimeout(resolve, 250));
+  requireActiveCaptionSession(sessionId);
 
   sttProvider = createSttProvider({
     provider: runtimeSttConfig.provider,
@@ -835,7 +860,8 @@ async function startSession() {
       els.diagStt.textContent = message;
       appendSttLog("S" + sessionId + " provider-error " + (code || message));
       if (fatal === true && (code === "gemini-closed" ||
-          code === "gemini-socket-error")) {
+          code === "gemini-socket-error" || code === "mic-ended" ||
+          code === "mic-muted")) {
         void failClosedCaptionSession(sessionId, message, code);
       }
     },
@@ -869,6 +895,7 @@ async function startSession() {
   if (sttProvider) {
     try {
       await sttProvider.start();
+      requireActiveCaptionSession(sessionId);
     } catch (error) {
       appendSttLog(
         "S" +
@@ -887,6 +914,7 @@ async function startSession() {
     appendSttLog("S" + sessionId + " no-browser-stt");
   }
 
+  requireActiveCaptionSession(sessionId);
   setStatus("正在聆聽", "listening");
   els.stop.disabled = false;
   renderCaption();
@@ -894,6 +922,8 @@ async function startSession() {
 
 async function stopSession() {
   const sessionId = activeSessionId;
+  if (!sessionId || !sttProvider || captionStopRequested) return;
+  captionStopRequested = true;
   els.stop.disabled = true;
   setStatus("停止中…");
   appendSttLog("S" + sessionId + " stop-request");
@@ -904,6 +934,7 @@ async function stopSession() {
   sttProvider = null;
 
   await releaseDiagnosticCapture(null);
+  if (sessionId !== activeSessionId) return;
 
   interimText = "";
   rawInterimText = "";
@@ -919,6 +950,7 @@ async function stopSession() {
   setAdvancedTuningDisabled(false);
   setStatus("已停止");
   appendSttLog("S" + sessionId + " session-stopped");
+  captionStopRequested = false;
 }
 
 async function cleanupFailedStart(error) {
@@ -941,9 +973,14 @@ async function cleanupFailedStart(error) {
 }
 
 els.start.addEventListener("click", async () => {
+  const expectedSessionId = sessionCounter + 1;
   try {
     await startSession();
   } catch (error) {
+    // Old in-flight permission/token/socket completions cannot clobber
+    // the interruption state or a newly started foreground session.
+    if (expectedSessionId <= sessionCounter &&
+        expectedSessionId !== activeSessionId) return;
     await cleanupFailedStart(error);
     setStatus("無法啟動", "error");
     els.caption.textContent =
@@ -959,6 +996,20 @@ els.start.addEventListener("click", async () => {
 els.stop.addEventListener("click", () => {
   void stopSession();
 });
+
+function interruptForPageEvent(eventType) {
+  if (!shouldInterruptForPageEvent(eventType, document.visibilityState)) return;
+  if (!activeSessionId || captionStopRequested) return;
+  const code = eventType === "pagehide" ? "pagehide" : "page-hidden";
+  const reason = "字幕已暫停；返回頁面後請手動重新開始。";
+  void failClosedCaptionSession(activeSessionId, reason, code);
+}
+
+document.addEventListener("visibilitychange",
+  () => interruptForPageEvent("visibilitychange"));
+window.addEventListener("pagehide", () => interruptForPageEvent("pagehide"));
+// Deliberately NO pageshow/visibility-visible auto-restart: microphone
+// permission and cloud transcription restart require another user action.
 
 els.recall.addEventListener("click", showRecall);
 els.closeRecall.addEventListener("click", () => {
