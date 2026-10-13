@@ -1,4 +1,4 @@
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261008-stop-flush1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261013-gemini-failstop1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -33,7 +33,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261008-stop-flush1";
+const BUILD_ID = "20261013-gemini-failstop1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_SIZE_STORAGE_KEY = "hearlens-caption-size-v1";
@@ -693,6 +693,48 @@ async function releaseDiagnosticCapture(label = "已釋放") {
   }
 }
 
+// Unexpected Gemini transport failure is terminal for this session.
+// Preserve already finalized text, but do not silently continue displaying
+// "listening" or retain the microphone after the WebSocket has died.
+async function failClosedCaptionSession(expectedSessionId, message, code) {
+  if (expectedSessionId !== activeSessionId) return;
+  activeSessionId = 0; // immediately reject delayed partial/final/status callbacks
+  els.start.disabled = true;
+  els.stop.disabled = true;
+  if (els.quickPreset) els.quickPreset.disabled = true;
+  if (els.resetPreset) els.resetPreset.disabled = true;
+  setAdvancedTuningDisabled(true);
+  setStatus("字幕連線中斷，請重新開始", "error");
+  appendSttLog("S" + expectedSessionId + " fatal-session " + code);
+  const failedProvider = sttProvider;
+  sttProvider = null;
+  try {
+    await failedProvider?.dispose?.();
+  } catch (error) {
+    appendSttLog("S" + expectedSessionId + " dispose-error " +
+      (error instanceof Error ? error.message : "unknown"));
+  }
+  try {
+    await releaseDiagnosticCapture("未使用");
+  } catch (error) {
+    appendSttLog("S" + expectedSessionId + " capture-cleanup-error " +
+      (error instanceof Error ? error.message : "unknown"));
+  } finally {
+    interimText = "";
+    rawInterimText = "";
+    trimTranscript();
+    els.caption.textContent =
+      visibleTranscript() || recentRecognizedText() || "字幕已中斷，請重新開始。";
+    els.diagStt.textContent = message;
+    els.start.disabled = false;
+    els.stop.disabled = true;
+    if (els.quickPreset) els.quickPreset.disabled = false;
+    if (els.resetPreset) els.resetPreset.disabled = false;
+    setAdvancedTuningDisabled(false);
+    appendSttLog("S" + expectedSessionId + " fatal-cleanup-complete");
+  }
+}
+
 async function startSession() {
   if (!window.isSecureContext) {
     throw new Error("需要 HTTPS 安全連線才能使用麥克風。");
@@ -788,12 +830,17 @@ async function startSession() {
       els.diagStt.textContent = label;
       appendSttLog("S" + sessionId + " status " + state);
     },
-    onError: ({ message, code }) => {
+    onError: ({ message, code, fatal }) => {
       if (sessionId !== activeSessionId) return;
       els.diagStt.textContent = message;
       appendSttLog("S" + sessionId + " provider-error " + (code || message));
+      if (fatal === true && (code === "gemini-closed" ||
+          code === "gemini-socket-error")) {
+        void failClosedCaptionSession(sessionId, message, code);
+      }
     },
     onDebug: ({ event, detail, segmentId, timestamp }) => {
+      if (sessionId !== activeSessionId) return;
       if (event === "audio-first-chunk") {
         markFirstAudioChunk(activeCaptionLatency, timestamp);
         renderCaptionLatencyTelemetry();
