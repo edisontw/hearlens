@@ -32,3 +32,21 @@ jobs:
         run: npm run benchmark:stream
       - name: Offline callback buffer CPU and heap probe (non-gating timing interpretation)
         run: npm run benchmark:callback && node tools/benchmark-offline-callback.mjs 1 24000
+
+  m03-camfit-direct-python-reference:
+    name: M03 direct pinned Python CAMFIT cross-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/requirements-camfit-oracle.txt
+      - name: Install reproducible Python numerical dependencies
+        run: python -m pip install -r tools/requirements-camfit-oracle.txt
+      - name: Run SHA-verified original PyClarity against JS across eight audiograms
+        run: npm run verify:camfit:python
