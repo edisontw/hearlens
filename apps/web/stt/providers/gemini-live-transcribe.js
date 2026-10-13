@@ -109,6 +109,28 @@ export class GeminiLiveTranscribeProvider {
     this.stopDrainTimer = null;
     this.firstAudioSent = false;
     this.lastLevelDebugAt = 0;
+    this.fatalTransportHandled = false;
+    this.listeningReady = false;
+  }
+
+  // A WebSocket error/close is not a normal silence interval. Immediately
+  // disable audio capture, discard stale frames, and report failure once.
+  // A pre-listening failure is instead propagated by start()'s rejection.
+  handleUnexpectedTransportFailure(socket, code, message) {
+    if (this.socket !== socket || this.stopping ||
+        !this.active || this.fatalTransportHandled) return;
+    this.fatalTransportHandled = true;
+    const wasListening = this.listeningReady;
+    this.active = false;
+    this.listeningReady = false;
+    this.debug("transport-failed", code);
+    void this.shutdownCapture().catch((error) => {
+      this.debug("capture-cleanup-failed",
+        error instanceof Error ? error.message : "unknown");
+    });
+    if (wasListening) {
+      this.onError({ providerId: this.id, code, message, fatal: true });
+    }
   }
 
   debug(event, detail = "") {
@@ -177,6 +199,8 @@ export class GeminiLiveTranscribeProvider {
         () => {
           window.clearTimeout(timeout);
           reject(new Error("Could not connect to Gemini Live."));
+          this.handleUnexpectedTransportFailure(
+            socket, "gemini-socket-error", "Gemini Live connection error.");
         },
         { once: true },
       );
@@ -186,6 +210,7 @@ export class GeminiLiveTranscribeProvider {
       void this.handleMessage(event);
     });
     socket.addEventListener("close", (event) => {
+      if (this.socket !== socket) return;
       this.debug("ws-close", "code=" + event.code);
 
       if (this.setupRejecter) {
@@ -197,13 +222,9 @@ export class GeminiLiveTranscribeProvider {
         this.stopResolver("socket-close");
       }
 
-      if (this.active && !this.stopping) {
-        this.onError({
-          providerId: this.id,
-          code: "gemini-closed",
-          message: "Gemini Live connection closed.",
-        });
-      }
+      this.handleUnexpectedTransportFailure(
+        socket, "gemini-closed", "Gemini Live connection closed.");
+      // This never grants permission to resume recording or switch providers.
     });
   }
 
@@ -232,6 +253,8 @@ export class GeminiLiveTranscribeProvider {
 
   async handleMessage(event) {
     const text = await decodeWebSocketData(event.data);
+    // Decoding may finish after the connection has already faulted.
+    if (this.fatalTransportHandled && !this.stopping) return;
     if (!text) {
       this.debug(
         "ws-unsupported-frame",
@@ -481,6 +504,8 @@ export class GeminiLiveTranscribeProvider {
     this.segmentId += 1;
     this.firstAudioSent = false;
     this.lastLevelDebugAt = 0;
+    this.fatalTransportHandled = false;
+    this.listeningReady = false;
 
     this.onStatus({
       state: "connecting",
@@ -498,6 +523,11 @@ export class GeminiLiveTranscribeProvider {
       await setupPromise;
 
       await this.startCapture();
+      if (!this.active || this.fatalTransportHandled ||
+          this.socket?.readyState !== WebSocket.OPEN) {
+        throw new Error("Gemini Live closed before listening was ready.");
+      }
+      this.listeningReady = true;
 
       this.onStatus({
         state: "listening",
@@ -506,6 +536,7 @@ export class GeminiLiveTranscribeProvider {
       });
     } catch (error) {
       this.active = false;
+      this.listeningReady = false;
       await this.shutdownCapture();
       try {
         this.socket?.close();
@@ -541,15 +572,19 @@ export class GeminiLiveTranscribeProvider {
     }
     this.stream = null;
 
-    if (this.audioContext && this.audioContext.state !== "closed") {
-      await this.audioContext.close();
-    }
+    // Detach synchronously so simultaneous fatal-close/dispose cleanup
+    // cannot close the same AudioContext twice.
+    const context = this.audioContext;
     this.audioContext = null;
+    if (context && context.state !== "closed") {
+      await context.close();
+    }
   }
 
   async stop() {
     this.debug("provider-stop");
     this.active = false;
+    this.listeningReady = false;
     this.stopping = true;
 
     await this.shutdownCapture();
@@ -608,6 +643,7 @@ export class GeminiLiveTranscribeProvider {
   async dispose() {
     this.debug("provider-dispose");
     this.active = false;
+    this.listeningReady = false;
     this.stopping = true;
     await this.shutdownCapture();
 
