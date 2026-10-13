@@ -12,6 +12,10 @@ The Web Hearing Lab exports one `hearlens-test-report-v1` JSON object containing
 
 The one-click copy button is the canonical manual export path. When engineering tuning is used, `runtime.tuningProfile` records the resolved profile version, bounded controls, and full normalization configuration. The Web lab can also copy a versioned tuning URL for reproducible A/B work; limiter and other non-exposed protection parameters remain fixed by the build.
 
+## M01 formal offline batch gate — 2026-10-13
+
+The version-pinned 24-run [M01 intake validator](./M01_FORMAL_BATCH_INTAKE_2026-10-13.md) runs locally on separately retained original JSON reports; it does **not** upload transcripts. Incomplete or uncontrolled historical experiments are not backfilled. The full M01 recording matrix remains deferred until the version/source and setup are genuinely frozen.
+
 ## Phase 2 — MN4 collector
 
 When test volume becomes large, add a small HTTPS collector on MN4:
