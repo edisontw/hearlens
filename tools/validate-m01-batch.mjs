@@ -41,7 +41,7 @@ export function validateM01Batch(manifest, definition, loadReport, sourceBytes) 
   if (manifest?.schema !== "hearlens-m01-batch-manifest-v1") errors.push("manifest_schema_mismatch");
   if (definition?.sourceId !== "zh-tw-regression-v2-short-through-section3") errors.push("definition_source_mismatch");
   if (!Array.isArray(manifest?.devices) || manifest.devices.length !== 2 ||
-    new Set(manifest.devices).size !== 2 || manifest.devices.some(x => !nonempty(x))) {
+    new Set(manifest.devices).size !== 2 || manifest.devices.some(x => !nonempty(x) || /REPLACE|TBD|[<>]/i.test(x))) {
     errors.push("two_distinct_receiver_labels_required");
   }
   const devices = Array.isArray(manifest?.devices) && manifest.devices.length === 2
@@ -89,7 +89,7 @@ export function validateM01Batch(manifest, definition, loadReport, sourceBytes) 
         issue.push("provider_mismatch");
       }
       if (rt.inputMode !== "adaptive" || rt.inputGain != null ||
-        rt.tuningProfile?.enabled === true) issue.push("nondefault_gain_or_tuning");
+        rt.tuningProfile?.enabled !== false) issue.push("nondefault_gain_or_tuning");
       if (test.sourceId !== SOURCE_ID) issue.push("incorrect_report_source_id");
       if (String(test.sourceVolume ?? "").trim() !== frozen.sourceVolume) issue.push("volume_missing_or_changed");
       if (!nonempty(test.notes)) issue.push("environment_or_orientation_note_missing");
