@@ -31,3 +31,27 @@ export function relativeTranscriptTime(itemTime, now = Date.now()) {
 
   return Math.max(1, Math.round(seconds / 60)) + " 分鐘前";
 }
+
+/**
+ * Display-only rolling caption projection. Never mutates the original
+ * transcript/session reports. A partial that has gone stale is not fresh
+ * speech, even if the recognizer omitted a final event.
+ */
+export function currentCaptionText(
+  items = [],
+  interim = "",
+  interimAt = null,
+  now = Date.now(),
+  windowMs = DEFAULT_ROLLING_TRANSCRIPT_WINDOW_MS,
+) {
+  const safeWindow = Math.max(0, Number(windowMs) || 0);
+  const finals = recentTranscriptItems(items, now, safeWindow)
+    .map((item) => String(item.text).trim())
+    .join(" ");
+  const age = now - interimAt;
+  const liveInterim = Number.isFinite(interimAt) &&
+    Number.isFinite(now) && age >= 0 && age <= safeWindow
+      ? String(interim || "").trim()
+      : "";
+  return [finals, liveInterim].filter(Boolean).join(" ").trim();
+}
