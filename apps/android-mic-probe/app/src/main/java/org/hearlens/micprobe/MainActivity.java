@@ -84,6 +84,7 @@ public final class MainActivity extends Activity {
         priorAudioMode = manager.getMode();
         buildScreen();
         log("app_open android=" + Build.VERSION.SDK_INT + " device=" + Build.MANUFACTURER + "/" + Build.MODEL);
+        log("probe_build=20261013-sw3-native-v0.2.0; predicted_output_only=true");
         log("recording_scope=input_only; raw_PCM=discarded; output=DISABLED");
         refreshDevices();
         manager.registerAudioDeviceCallback(deviceCallback, ui);
@@ -98,33 +99,39 @@ public final class MainActivity extends Activity {
         setContentView(scroll);
 
         TextView title = new TextView(this);
-        title.setText("HearLens SW1 + SW3-Native — Input / Output Observability");
+        title.setText("HearLens SW3-Native · v0.2.0");
         title.setTextSize(22);
         root.addView(title);
-        hint = new TextView(this);
-        hint.setText("診斷用途：輸出部分僅查詢 Android 預計使用的音訊裝置，絕不播放聲音。收音部分維持自願啟動、最多 30 秒，原始聲音即時丟棄。手機麥克風優先；不需要測試藍牙耳機麥克風。");
-        hint.setTextSize(16);
-        hint.setPadding(0, 16, 0, 12);
-        root.addView(hint);
+        TextView buildLabel = new TextView(this);
+        buildLabel.setText("2026-10-13 · Route Probe · NO PLAYBACK");
+        buildLabel.setTextSize(13);
+        root.addView(buildLabel);
 
+        // Visible without scrolling: the primary SW3 action is above the
+        // optional legacy SW1 microphone selector/recording controls.
+        addButton(root, "檢查媒體輸出預測（完全不播放）", v -> inspectOutputRoute("user-button"));
+        outputRouteStatus = new TextView(this);
+        outputRouteStatus.setTextSize(15);
+        outputRouteStatus.setPadding(0, 10, 0, 8);
+        outputRouteStatus.setText("輸出路由：尚未查詢；無實際播放可供驗證。");
+        root.addView(outputRouteStatus);
+
+        hint = new TextView(this);
+        hint.setText("僅查詢 Android 預計的聲音輸出裝置；不播放、不錄音、不上傳。以下麥克風收音功能僅供其他研究，這次不需要使用。");
+        hint.setTextSize(14);
+        hint.setPadding(0, 8, 0, 8);
+        root.addView(hint);
         sourcePicker = new Spinner(this);
         root.addView(sourcePicker);
         addButton(root, "重新偵測音訊裝置", v -> {
             if (!running.get()) refreshDevices();
             inspectOutputRoute("manual-refresh");
         });
-        addButton(root, "檢查媒體輸出預測（完全不播放）", v -> inspectOutputRoute("user-button"));
         addButton(root, "開始 — MIC（預設）", v -> startRequest(MediaRecorder.AudioSource.MIC));
         addButton(root, "開始 — UNPROCESSED（要求未處理）", v -> startRequest(MediaRecorder.AudioSource.UNPROCESSED));
         addButton(root, "開始 — VOICE_RECOGNITION", v -> startRequest(MediaRecorder.AudioSource.VOICE_RECOGNITION));
         stopButton = addButton(root, "停止收音", v -> stopCapture("user_stop"));
         addButton(root, "分享診斷 JSON（需自行確認）", v -> shareReport());
-
-        outputRouteStatus = new TextView(this);
-        outputRouteStatus.setTextSize(15);
-        outputRouteStatus.setPadding(0, 16, 0, 6);
-        outputRouteStatus.setText("輸出路由：尚未查詢；無實際播放可供驗證。");
-        root.addView(outputRouteStatus);
 
         status = new TextView(this);
         status.setTextSize(16);

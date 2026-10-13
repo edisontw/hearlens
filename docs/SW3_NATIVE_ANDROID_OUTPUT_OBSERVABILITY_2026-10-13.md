@@ -39,3 +39,9 @@ When convenient, the user can install the **new** input-only debug build, connec
 The build and static tests verify that the APK remains **silent**. They cannot verify what Android would route to a *currently playing* AudioTrack or physically prevent any audio burst when A2DP disconnects; even media-route predictions and device-added/removed callbacks have a race with physical playback.
 
 **Decision:** keep uncalibrated hearing amplification **NO-GO**. After software-only API/probe review, determine whether a trustworthy native output routing/hard-mute mechanism is possible; until a dedicated nonhuman acoustic and physical speaker-fallback proof plus independent measured per-ear MPO is approved, *do not start sound output*. The user has deferred such hardware POCs. Captions remain the tested usable feature.
+
+## 2026-10-13 debug APK versioning and discoverability correction
+
+A field report stated that after Android offered **Update**, the `檢查媒體輸出預測（完全不播放）` button was absent. Code review confirmed the original SW3 diagnostic feature existed in GitHub `main`, but the APK metadata still used SW1 `versionCode 1` / `0.1.0-sw1` and the older artifact name; on smaller screens the new button was below an input selector and refresh button. The exact APK installed on the user's phone was not directly inspected, so the cause is **not proven**.
+
+The follow-up release changes to `versionCode 2` / `0.2.0-sw3-native`, visually obvious `HearLens SW3-Native · v0.2.0` with fixed build marker, a uniquely versioned Actions APK artifact, and **first-screen route-prediction button** above all microphone controls. Ephemeral GitHub Actions debug signing may also prevent reliable in-place installs across builds; clean reinstall is the safest fallback when Android rejects an update. No output playback, recording protocol or safety gate is relaxed.
