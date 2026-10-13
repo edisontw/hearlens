@@ -78,6 +78,10 @@ When route state, calibration state or audio constraints are uncertain, captions
 
 [SW3 route model](./SW3_BLUETOOTH_OUTPUT_FAIL_CLOSED_MODEL_2026-10-13.md) is a **count-only synthetic fixture**, not Bluetooth output authorization. A2DP/LE endpoints, headset identities, two-ear state and calibration/profile IDs are **mock metadata**. The tested failure cases (speaker fallback, disconnect, HFP change, phone call, focus/background, stale route, one-ear removal, reconnect) revoke model permission, **but Android may route previously queued sound to a phone speaker before an app receives any notification**. No current Android route, sample timestamp, software flag or CI test proves physical hard mute or calibrated ear SPL. The user has deferred hardware POCs; real hearing playback stays prohibited.
 
+## SW3-C Android passive route audit (2026-10-13)
+
+[SW3-C native no-output route audit](./SW3C_ANDROID_ROUTE_CONTROL_DECISION_2026-10-13.md) watches MEDIA/accessibility **predicted** routes during a user-started 30-second foreground window. It latches prediction faults and never grants playback: `outputAuthorized()` is always false. A stable watch or an AudioTrack preferred/routed-device query cannot demonstrate physical speaker isolation or a hardware mute. Live hearing output remains strictly prohibited; the earlier AIR31 field PASS does not need repetition.
+
 ## SW3-Native Android media-output observability (2026-10-13)
 
 [SW3-Native passive output prediction](./SW3_NATIVE_ANDROID_OUTPUT_OBSERVABILITY_2026-10-13.md) uses the public API 33+ `AudioManager.getAudioDevicesForAttributes` **without generating or playing sound**. It returns the **anticipated** devices for given AudioAttributes, not the actual output of a playing AudioTrack. The available-device list and communication-selected route are separate concepts. Callback time cannot establish no-speaker-fallback physical mute, Bluetooth latency or calibrated ear SPL. This source change **must not** enable headphone/amplification output or modify the mandatory hardware gates above. SW1 source PCM continues to be immediately discarded.
