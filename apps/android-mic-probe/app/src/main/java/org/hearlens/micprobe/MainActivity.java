@@ -70,6 +70,27 @@ public final class MainActivity extends Activity {
     private TextView hint;
     private TextView outputRouteStatus;
     private Button stopButton;
+    private final PassiveRouteAudit outputAudit = new PassiveRouteAudit();
+    private long auditSequence;
+    private long auditDeadlineMs;
+    private boolean beginAuditOnInspect;
+    private TextView auditStatus;
+    private final Runnable auditPoll = new Runnable() {
+        @Override public void run() {
+            if (outputAudit.state() != PassiveRouteAudit.State.MONITORING) return;
+            if (android.os.SystemClock.elapsedRealtime() >= auditDeadlineMs) {
+                outputAudit.finish();
+                log("SW3_ROUTE_AUDIT state=COMPLETE samples=" + outputAudit.samples()
+                    + "; prediction_window_only=true; physical_output_unverified=true");
+                showAuditStatus();
+                return;
+            }
+            inspectOutputRoute("audit-periodic-poll");
+            if (outputAudit.state() == PassiveRouteAudit.State.MONITORING) {
+                ui.postDelayed(this, 1000L);
+            }
+        }
+    };
 
     private static final class Choice {
         final int id;
@@ -84,7 +105,7 @@ public final class MainActivity extends Activity {
         priorAudioMode = manager.getMode();
         buildScreen();
         log("app_open android=" + Build.VERSION.SDK_INT + " device=" + Build.MANUFACTURER + "/" + Build.MODEL);
-        log("probe_build=20261013-sw3-native-v0.2.0; predicted_output_only=true");
+        log("probe_build=20261013-sw3-native-v0.3.0; predicted_output_only=true; passive_audit=true");
         log("recording_scope=input_only; raw_PCM=discarded; output=DISABLED");
         refreshDevices();
         manager.registerAudioDeviceCallback(deviceCallback, ui);
@@ -99,11 +120,11 @@ public final class MainActivity extends Activity {
         setContentView(scroll);
 
         TextView title = new TextView(this);
-        title.setText("HearLens SW3-Native · v0.2.0");
+        title.setText("HearLens SW3-Native · v0.3.0");
         title.setTextSize(22);
         root.addView(title);
         TextView buildLabel = new TextView(this);
-        buildLabel.setText("2026-10-13 · Route Probe · NO PLAYBACK");
+        buildLabel.setText("2026-10-13 · Route Audit · NO PLAYBACK");
         buildLabel.setTextSize(13);
         root.addView(buildLabel);
 
@@ -115,6 +136,12 @@ public final class MainActivity extends Activity {
         outputRouteStatus.setPadding(0, 10, 0, 8);
         outputRouteStatus.setText("輸出路由：尚未查詢；無實際播放可供驗證。");
         root.addView(outputRouteStatus);
+        addButton(root, "開始 30 秒無聲路由監測（僅預測）", v -> startPassiveAudit());
+        auditStatus = new TextView(this);
+        auditStatus.setTextSize(15);
+        auditStatus.setPadding(0, 8, 0, 8);
+        root.addView(auditStatus);
+        showAuditStatus();
 
         hint = new TextView(this);
         hint.setText("僅查詢 Android 預計的聲音輸出裝置；不播放、不錄音、不上傳。以下麥克風收音功能僅供其他研究，這次不需要使用。");
@@ -196,6 +223,8 @@ public final class MainActivity extends Activity {
     private void inspectOutputRoute(String reason) {
         String media = "UNAVAILABLE_API_BELOW_33";
         String accessibility = "UNAVAILABLE_API_BELOW_33";
+        AudioDeviceInfo[] mediaDevices = null;
+        AudioDeviceInfo[] accessDevices = null;
         try {
             if (Build.VERSION.SDK_INT >= 33) {
                 AudioAttributes mediaAttrs = new AudioAttributes.Builder()
@@ -206,10 +235,12 @@ public final class MainActivity extends Activity {
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build();
-                media = deviceList(manager.getAudioDevicesForAttributes(mediaAttrs)
-                    .toArray(new AudioDeviceInfo[0]));
-                accessibility = deviceList(manager.getAudioDevicesForAttributes(accessAttrs)
-                    .toArray(new AudioDeviceInfo[0]));
+                mediaDevices = manager.getAudioDevicesForAttributes(mediaAttrs)
+                    .toArray(new AudioDeviceInfo[0]);
+                accessDevices = manager.getAudioDevicesForAttributes(accessAttrs)
+                    .toArray(new AudioDeviceInfo[0]);
+                media = deviceList(mediaDevices);
+                accessibility = deviceList(accessDevices);
             }
         } catch (RuntimeException error) {
             media = "UNAVAILABLE_" + error.getClass().getSimpleName();
@@ -225,6 +256,25 @@ public final class MainActivity extends Activity {
                 log("SW3_COMMUNICATION_SELECTED_UNAVAILABLE=" + error.getClass().getSimpleName());
             }
         }
+        if (beginAuditOnInspect || outputAudit.state() == PassiveRouteAudit.State.MONITORING) {
+            PassiveRouteAudit.Endpoint[] mediaEndpoints = toAuditEndpoints(mediaDevices);
+            PassiveRouteAudit.Endpoint[] accessEndpoints = toAuditEndpoints(accessDevices);
+            // Audio mode is a limited passive hint, NOT a reliable call/focus state.
+            boolean normalMode = manager.getMode() == AudioManager.MODE_NORMAL;
+            if (beginAuditOnInspect) {
+                outputAudit.begin(++auditSequence, mediaEndpoints, accessEndpoints, normalMode);
+            } else {
+                outputAudit.observe(++auditSequence, mediaEndpoints, accessEndpoints, normalMode);
+            }
+            log("SW3_ROUTE_AUDIT reason=" + reason + " state=" + outputAudit.state()
+                + " detail=" + outputAudit.detail() + " samples=" + outputAudit.samples()
+                + "; current_playback_route=UNKNOWN; playback_authorized="
+                + outputAudit.outputAuthorized() + "; focus_state=UNOBSERVED");
+            showAuditStatus();
+            if (outputAudit.state() != PassiveRouteAudit.State.MONITORING) {
+                ui.removeCallbacks(auditPoll);
+            }
+        }
         log("SW3_OUTPUT_ACTUAL_ROUTE=UNOBSERVABLE_NO_PLAYBACK;"
             + " speaker_fallback_prevention=NOT_VERIFIED;"
             + " bluetooth_codec_latency=NOT_MEASURED;"
@@ -237,7 +287,49 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private static PassiveRouteAudit.Endpoint[] toAuditEndpoints(AudioDeviceInfo[] info) {
+        if (info == null) return null;
+        PassiveRouteAudit.Endpoint[] result = new PassiveRouteAudit.Endpoint[info.length];
+        for (int i = 0; i < info.length; i++) {
+            result[i] = new PassiveRouteAudit.Endpoint(typeName(info[i].getType()),
+                info[i].getId());
+        }
+        return result;
+    }
+
+    private void showAuditStatus() {
+        if (auditStatus == null) return;
+        auditStatus.setText("無聲預測監測：" + outputAudit.state()
+            + "（" + outputAudit.samples() + " 次）；" + outputAudit.detail()
+            + "\\n注意：監測通過也不能授權播放或驗證硬體靜音。");
+    }
+
+    private void startPassiveAudit() {
+        if (running.get()) {
+            log("SW3_ROUTE_AUDIT_START_DENIED microphone_capture_running");
+            return;
+        }
+        ui.removeCallbacks(auditPoll);
+        // This is an explicit user-only reset of an OBSERVATION, not an audio safety gate.
+        outputAudit.resetByUser();
+        beginAuditOnInspect = true;
+        try {
+            inspectOutputRoute("audit-user-start");
+        } finally {
+            beginAuditOnInspect = false;
+        }
+        if (outputAudit.state() == PassiveRouteAudit.State.MONITORING) {
+            auditDeadlineMs = android.os.SystemClock.elapsedRealtime() + 30_000L;
+            ui.postDelayed(auditPoll, 1000L);
+        }
+    }
+
     private void startRequest(int source) {
+        if (outputAudit.state() == PassiveRouteAudit.State.MONITORING) {
+            outputAudit.interrupt("microphone_probing_started");
+            ui.removeCallbacks(auditPoll);
+            showAuditStatus();
+        }
         if (running.get() || recorder != null) {
             log("start_ignored_capture_active");
             return;
@@ -653,11 +745,16 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onPause() {
+        outputAudit.interrupt("app_background");
+        ui.removeCallbacks(auditPoll);
+        showAuditStatus();
         stopCapture("app_left_foreground");
         super.onPause();
     }
 
     @Override protected void onDestroy() {
+        ui.removeCallbacks(auditPoll);
+        outputAudit.interrupt("activity_destroyed");
         stopCapture("activity_destroyed");
         manager.unregisterAudioDeviceCallback(deviceCallback);
         super.onDestroy();
