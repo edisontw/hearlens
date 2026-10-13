@@ -114,6 +114,7 @@ export class GeminiLiveTranscribeProvider {
     this.listeningReady = false;
     this.startEpoch = 0;
     this.captureTrack = null;
+    this.captureTrackHandlers = null;
     this.captureMuteTimer = null;
   }
 
@@ -457,16 +458,16 @@ export class GeminiLiveTranscribeProvider {
       throw new Error("Microphone track is unavailable.");
     }
     this.captureTrack = captureTrack;
-    captureTrack.addEventListener?.("ended", () => {
-      this.handleUnexpectedCaptureFailure(
-        captureTrack, "mic-ended", "手機麥克風已停止，請重新開始字幕。");
-    });
-    captureTrack.addEventListener?.("mute", () => {
-      this.scheduleMutedMicFailure(captureTrack);
-    });
-    captureTrack.addEventListener?.("unmute", () => {
-      this.clearMutedMicFailure();
-    });
+    const handlers = {
+      ended: () => this.handleUnexpectedCaptureFailure(
+        captureTrack, "mic-ended", "手機麥克風已停止，請重新開始字幕。"),
+      mute: () => this.scheduleMutedMicFailure(captureTrack),
+      unmute: () => this.clearMutedMicFailure(),
+    };
+    this.captureTrackHandlers = handlers;
+    for (const [name, handler] of Object.entries(handlers)) {
+      captureTrack.addEventListener?.(name, handler);
+    }
     if (captureTrack.muted === true) {
       this.scheduleMutedMicFailure(captureTrack);
     }
@@ -627,10 +628,13 @@ export class GeminiLiveTranscribeProvider {
   async shutdownCapture() {
     this.clearMutedMicFailure();
     const priorTrack = this.captureTrack;
+    const handlers = this.captureTrackHandlers;
     this.captureTrack = null;
-    if (priorTrack) {
-      // Do not rely on track.stop() firing an ended event.
-      priorTrack.onended = null;
+    this.captureTrackHandlers = null;
+    if (priorTrack && handlers) {
+      for (const [name, handler] of Object.entries(handlers)) {
+        priorTrack.removeEventListener?.(name, handler);
+      }
     }
     if (this.processorNode) {
       this.processorNode.onaudioprocess = null;
