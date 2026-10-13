@@ -1,0 +1,23 @@
+{
+  "schema": "hearlens-m01-batch-manifest-v1",
+  "devices": [
+    "REPLACE_WITH_EXACT_IPHONE_MODEL",
+    "HTC U23"
+  ],
+  "frozen": {
+    "mainSha": "REPLACE_WITH_TESTED_40_CHARACTER_MAIN_SHA",
+    "buildId": "REPLACE_WITH_TESTED_WEB_BUILD_ID",
+    "provider": "gemini-live-transcribe",
+    "sourceVolume": "REPLACE_WITH_UNCHANGED_PLAYBACK_VOLUME_FIELD",
+    "sourceSha256": "cdd7b9d8d1c94d1f254d7c9fe20b598e1e99982fb1bd96e3555c823ca32b77da"
+  },
+  "runs": [
+    {
+      "file": "example-run01.json",
+      "repeat": 1,
+      "cutoffConfirmed": false,
+      "setupConfirmed": false,
+      "telemetryReviewed": false
+    }
+  ]
+}
