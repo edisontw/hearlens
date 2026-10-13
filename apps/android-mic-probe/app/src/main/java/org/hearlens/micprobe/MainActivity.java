@@ -301,7 +301,7 @@ public final class MainActivity extends Activity {
         if (auditStatus == null) return;
         auditStatus.setText("無聲預測監測：" + outputAudit.state()
             + "（" + outputAudit.samples() + " 次）；" + outputAudit.detail()
-            + "\\n注意：監測通過也不能授權播放或驗證硬體靜音。");
+            + "\n注意：監測通過也不能授權播放或驗證硬體靜音。");
     }
 
     private void startPassiveAudit() {
