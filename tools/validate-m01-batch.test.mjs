@@ -99,7 +99,11 @@ test("duplicate file, duplicate matrix slot, dropped repeat and unknown phone ca
   const b = a.evaluate();
   assert.equal(b.status, "INCOMPLETE");
   assert(b.errors.some(x => x.includes("duplicate_report_file")));
-  assert(b.errors.some(x => x.includes("duplicate_matrix_slot")));
+  // Reusing the same report filename is different from claiming a duplicate
+  // matrix slot. Test that distinct invalid case explicitly.
+  const dup = validSet();
+  dup.manifest.runs[1].repeat = 1;
+  assert(dup.evaluate().errors.some(x => x.includes("duplicate_matrix_slot")));
   const c = validSet();
   c.reports["synthetic-0.json"].test.receiverDevice = "unregistered";
   assert(c.evaluate().errors.some(x => x.includes("receiver_label_missing_or_wrong")));
