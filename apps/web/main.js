@@ -713,8 +713,12 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
   if (els.quickPreset) els.quickPreset.disabled = true;
   if (els.resetPreset) els.resetPreset.disabled = true;
   setAdvancedTuningDisabled(true);
-  setStatus(code === "page-hidden" || code === "pagehide"
-    ? "字幕已暫停，請重新開始" : "字幕連線中斷，請重新開始", "error");
+  const reasonLabel = code === "page-hidden" || code === "pagehide"
+    ? "字幕已暫停，請重新開始"
+    : code === "mic-ended" || code === "mic-muted"
+      ? "麥克風已中斷，請重新開始"
+      : "字幕連線中斷，請重新開始";
+  setStatus(reasonLabel, "error");
   appendSttLog("S" + expectedSessionId + " fatal-session " + code);
   const failedProvider = sttProvider;
   sttProvider = null;
