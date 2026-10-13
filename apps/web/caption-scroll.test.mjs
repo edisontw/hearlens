@@ -4,8 +4,8 @@ import { shouldFollowCaptionScroll } from "./caption-scroll.mjs";
 
 test("long captions follow new speech when at or near their end", () => {
   assert.equal(shouldFollowCaptionScroll(0, 120, 180), true);
-  assert.equal(shouldFollowCaptionScroll(252, 500, 200), false);
-  assert.equal(shouldFollowCaptionScroll(252, 500, 200, 48), false);
+  assert.equal(shouldFollowCaptionScroll(250, 500, 200), false);
+  assert.equal(shouldFollowCaptionScroll(252, 500, 200, 48), true);
   assert.equal(shouldFollowCaptionScroll(255, 500, 200, 48), true);
   assert.equal(shouldFollowCaptionScroll(300, 500, 200), true);
 });
