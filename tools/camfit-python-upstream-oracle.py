@@ -29,7 +29,7 @@ EXPECTED_EDGES = [177, 354, 707, 1414, 2828, 5657, 11314]
 
 
 def git_blob_sha(data: bytes) -> str:
-    return hashlib.sha1(f"blob {len(data)}\\0".encode() + data).hexdigest()
+    return hashlib.sha1(f"blob {len(data)}".encode() + bytes([0]) + data).hexdigest()
 
 
 def get_originals(directory: Path) -> None:
@@ -104,7 +104,7 @@ def main() -> None:
         "verifiedBlobShas": PINNED_BLOBS,
         "cases": reports,
     }, sys.stdout, allow_nan=False)
-    sys.stdout.write("\\n")
+    sys.stdout.write(chr(10))
 
 
 if __name__ == "__main__":
