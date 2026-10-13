@@ -85,15 +85,15 @@ test("each ear, three input anchors and log-interpolated audiogram support exact
 
 test("large mismatch is reported rather than clamped, concealed or called clinical parity", () => {
   const candidate = targets();
-  // Left 500 Hz: target 25/15/5; candidate 25/15/-3 remains monotonic I/O.
-  candidate.ears.left.bands[0].gainDbByInputLevel["80"] = -3;
+  // Left 500 Hz: target 25/15/5; candidate 25/15/13 remains monotonic I/O.
+  candidate.ears.left.bands[0].gainDbByInputLevel["80"] = 13;
   const out = comparePrescriptionParity(parityCase(), candidate, 5);
   assert.equal(out.withinExplorationTolerance, false);
   assert.equal(out.maxAbsErrorDb, 8);
   assert.equal(out.meanAbsErrorDb, 8 / 9);
   assert.equal(out.rmseDb, 8 / 3);
   assert.equal(out.rows.find(x => x.ear === "left" && x.centerHz === 500 &&
-    x.inputLevelDbSPL === 80).errorDb, -8);
+    x.inputLevelDbSPL === 80).errorDb, 8);
   assert.equal(out.ears.left.withinTolerance, false);
   assert.equal(out.ears.right.withinTolerance, true);
   assert.equal(out.hearingOutputAuthorized, false);
