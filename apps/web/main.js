@@ -13,7 +13,7 @@ import {
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261013-rolling-caption1";
+} from "./transcript-window.mjs?v=20261014-caption-layout1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
