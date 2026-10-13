@@ -33,6 +33,7 @@ Goal: validate the simplest useful product.
 - [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
 - [x] validate Far/Noisy voice capture on at least one additional receiving phone before considering it for Auto (HTC U23 2 m A/B PASS; post-run distance correction recorded),
 - [x] run one HTC U23 1 m Auto vs Far/Noisy safety A/B (PASS: voice materially improved transcript continuity with zero retained clipping; global Auto remains raw for cross-device conservatism),
+- [x] **M01 formal batch intake tooling (2026-10-13; software only):** validate locked WAV SHA-256, frozen build/source/device/preset metadata, 24 individual slots and manual section-3 cutoff/setup attestations; automatically score strict CER/key fields/anchors and summarize only complete paired cells. Historical exploratory reports are not promoted. Tests/CI added; **this does NOT complete the 24 physical runs**. [Intake instructions](./M01_FORMAL_BATCH_INTAKE_2026-10-13.md).
 - [ ] run the locked reduced-disturbance M01 Taiwan Mandarin benchmark (`docs/M01_FORMAL_BENCHMARK.md`): 24 short-prefix controlled runs through section 3, automated strict CER / key-field / utterance-coverage scoring; current client timing remains engineering telemetry until a speech-onset reference is added,
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - [x] 30 s rolling transcript with segmented recent-history view,

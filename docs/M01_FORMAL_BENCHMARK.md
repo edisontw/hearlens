@@ -1,6 +1,6 @@
 # M01 Formal Taiwan-Mandarin Benchmark
 
-Status: **locked protocol v1 preparation**
+Status: **locked protocol v1 preparation**. Batch intake validator available; [M01 2026-10-13 tooling record](./M01_FORMAL_BATCH_INTAKE_2026-10-13.md). Existing exploratory reports remain excluded, and all 24 formal runs are still outstanding.
 
 This protocol is the formal validation step for the M01 Caption Hearing Lab. It is intentionally separate from the earlier engineering A/B tests.
 
