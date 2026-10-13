@@ -1,0 +1,4 @@
+# M03 upstream Python oracle only; not needed by the Web App or normal npm test.
+# Pinned wheels for Python 3.11 and reproducible numerical evaluation.
+numpy==1.26.4
+scipy==1.12.0
