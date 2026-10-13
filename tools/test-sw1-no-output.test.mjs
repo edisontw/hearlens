@@ -79,19 +79,35 @@ test('SW3-Native preserves input choice and restores audio mode even if headset 
 });
 
 
-test('SW3 v0.2.0 version/build identity and route action visible before legacy input controls',()=>{
+test('SW3 v0.3.0 version/build identity and route action visible before legacy input controls',()=>{
   const gradle = readFileSync(base + '/app/build.gradle', 'utf8');
   const workflow = readFileSync('.github/workflows/android-sw1-probe.yml', 'utf8');
-  assert.match(gradle, /versionCode 2/);
-  assert.match(gradle, /versionName '0\.2\.0-sw3-native'/);
+  assert.match(gradle, /versionCode 3/);
+  assert.match(gradle, /versionName '0\.3\.0-sw3-audit'/);
   assert.match(manifest, /android:label="HearLens SW3 Route Probe"/);
-  assert.match(main, /HearLens SW3-Native · v0\.2\.0/);
-  assert.match(main, /probe_build=20261013-sw3-native-v0\.2\.0/);
+  assert.match(main, /HearLens SW3-Native · v0\.3\.0/);
+  assert.match(main, /probe_build=20261013-sw3-native-v0\.3\.0/);
   const primaryAction=main.indexOf('addButton(root, "檢查媒體輸出預測（完全不播放）"');
   const inputSelector=main.indexOf('sourcePicker = new Spinner(this)');
   assert(primaryAction>0 && inputSelector>primaryAction,
       'passive output prediction action must precede legacy mic controls');
-  assert.match(workflow, /hearlens-sw3-native-v0\.2\.0-route-probe/);
-  assert.match(workflow, /hearlens-sw3-native-v0\.2\.0-debug\.apk/);
+  assert.match(workflow, /hearlens-sw3-native-v0\.3\.0-passive-audit/);
+  assert.match(workflow, /hearlens-sw3-native-v0\.3\.0-debug\.apk/);
   assert.doesNotMatch(workflow, /name: hearlens-sw1-android-input-only-debug/);
+});
+
+test('SW3 30-second route audit is passive and never grants output', () => {
+  const base = 'apps/android-mic-probe/app/src/main/java/org/hearlens/micprobe/';
+  const audit = readFileSync(base + 'PassiveRouteAudit.java', 'utf8');
+  const testcase = readFileSync('apps/android-mic-probe/tests/org/hearlens/micprobe/PassiveRouteAuditTest.java', 'utf8');
+  assert.match(audit, /outputAuthorized\(\) \{ return false; \}/);
+  assert.match(audit, /stale_or_repeated_observation/);
+  assert.match(audit, /manual_reset_required/);
+  assert.match(audit, /anticipated_route_changed_or_unavailable/);
+  assert.match(main, /startPassiveAudit\(\)/);
+  assert.match(main, /SW3_ROUTE_AUDIT/);
+  assert.match(main, /audit-periodic-poll/);
+  assert.match(main, /outputAudit\.interrupt\("app_background"\)/);
+  assert.match(testcase, /speaker fallback latches fault/);
+  assert.doesNotMatch(audit + main, /\bnew\s+AudioTrack\s*\(|\bnew\s+MediaPlayer\s*\(/);
 });
