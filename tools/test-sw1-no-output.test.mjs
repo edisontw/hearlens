@@ -77,3 +77,21 @@ test('SW3-Native preserves input choice and restores audio mode even if headset 
   assert.match(main, /if \(!communicationRequested && !communicationModeChanged\) return/);
   assert.match(main, /if \(communicationModeChanged\) manager\.setMode\(priorAudioMode\)/);
 });
+
+
+test('SW3 v0.2.0 version/build identity and route action visible before legacy input controls',()=>{
+  const gradle = readFileSync(base + '/app/build.gradle', 'utf8');
+  const workflow = readFileSync('.github/workflows/android-sw1-probe.yml', 'utf8');
+  assert.match(gradle, /versionCode 2/);
+  assert.match(gradle, /versionName '0\.2\.0-sw3-native'/);
+  assert.match(manifest, /android:label="HearLens SW3 Route Probe"/);
+  assert.match(main, /HearLens SW3-Native · v0\.2\.0/);
+  assert.match(main, /probe_build=20261013-sw3-native-v0\.2\.0/);
+  const primaryAction=main.indexOf('addButton(root, "檢查媒體輸出預測（完全不播放）"');
+  const inputSelector=main.indexOf('sourcePicker = new Spinner(this)');
+  assert(primaryAction>0 && inputSelector>primaryAction,
+      'passive output prediction action must precede legacy mic controls');
+  assert.match(workflow, /hearlens-sw3-native-v0\.2\.0-route-probe/);
+  assert.match(workflow, /hearlens-sw3-native-v0\.2\.0-debug\.apk/);
+  assert.doesNotMatch(workflow, /name: hearlens-sw1-android-input-only-debug/);
+});
