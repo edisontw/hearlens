@@ -636,6 +636,22 @@ public final class MainActivity extends Activity {
         }
         @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
             log("devices_removed=" + deviceList(removed));
+            PassiveRouteAudit.Endpoint expectedOutput = outputAudit.target();
+            if (outputAudit.state() == PassiveRouteAudit.State.MONITORING &&
+                expectedOutput != null) {
+                for (AudioDeviceInfo device : removed) {
+                    if (expectedOutput.id == device.getId() &&
+                        expectedOutput.kind.equals(typeName(device.getType()))) {
+                        // A removed anticipated sink is a stronger negative signal
+                        // than a potentially stale media-route prediction.
+                        outputAudit.interrupt("anticipated_bluetooth_sink_removed");
+                        ui.removeCallbacks(auditPoll);
+                        showAuditStatus();
+                        log("SW3_ROUTE_AUDIT fault=headset_removed; output_authorized=false");
+                        break;
+                    }
+                }
+            }
             if (running.get() && selectedInput != null) {
                 for (AudioDeviceInfo device : removed) {
                     if (device.getId() == selectedInput.getId()) {
