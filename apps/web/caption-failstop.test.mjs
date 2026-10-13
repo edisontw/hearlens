@@ -17,7 +17,9 @@ test("fatal transport callback transitions current caption session to an error a
   assert.match(main, /await failedProvider\?\.dispose\?\.\(\)/);
   assert.match(main, /await releaseDiagnosticCapture\("未使用"\)/);
   assert.match(main, /"字幕已暫停，請重新開始"/);
-  assert.match(main, /"字幕連線中斷，請重新開始", "error"\)/);
+  assert.match(main, /"麥克風已中斷，請重新開始"/);
+  assert.match(main, /"字幕連線中斷，請重新開始"/);
+  assert.match(main, /setStatus\(reasonLabel, "error"\)/);
   assert.match(main, /els\.start\.disabled = false/);
   assert.match(main, /setAdvancedTuningDisabled\(false\)/);
   assert.match(main, /sessionId !== activeSessionId/);
