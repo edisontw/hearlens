@@ -54,6 +54,12 @@ The original SW3-Native APK accidentally reused the SW1 package version (`versio
 
 This remains a **passive prediction-only** utility; it does NOT observe a playing track, measure Bluetooth mic-to-ear delay or enforce physical speaker mute.
 
+## SW3-C passive route observation audit (v0.3.0, 2026-10-13)
+
+The next versioned debug build adds a manually started **30-second SILENT route-prediction watch**, checking API33 MEDIA + ACCESSIBILITY predictions at 1-second intervals and on device added/removed notifications. All observations are **anticipated** routes, *not* the playing AudioTrack route. A speaker, SCO, changing/ambiguous/missing predicted device, non-normal audio mode or background transition latches an **observation fault** until manual restart. Stable samples do not prove hard mute; Android focus state, physical speaker playback, codec delay, acoustic output and ear SPL are **unmeasured**. This audit **never authorizes hearing playback**.
+
+Version code 3, version name `0.3.0-sw3-audit`; main screen build marker `20261013-sw3-native-v0.3.0`; Android Actions artifact `hearlens-sw3-native-v0.3.0-passive-audit` contains `hearlens-sw3-native-v0.3.0-debug.apk`. Signing warning above continues to apply. The previous SW3-Native v0.2.0 Motorola + AIR31 passive single-button field verification already PASSED. **No mandatory new phone trial, speech playback or microphone test is requested**. For full API capability decision and safety limits, see [SW3-C](../../docs/SW3C_ANDROID_ROUTE_CONTROL_DECISION_2026-10-13.md).
+
 ## SW3-Native one-button AIR31 field result (2026-10-13)
 
 Motorola moto g62 5G Android 13 / API33 with AIR31 paired: versioned `SW3-Native v0.2.0` ran successfully and on activity resume, device-added and the explicit user button, both media/speech and accessibility/speech anticipated device lists pointed at `BLUETOOTH_A2DP#135 (AIR31)`. **No output PCM or microphone recording occurred in this session.** Field scope is complete; **do not repeat the voice experiment or mandatory SCO input tests**. Actual playing device, acoustic delay and physical speaker-fallback suppression remain unknown. [Field evidence](../../docs/SW3_NATIVE_AIR31_FIELD_RESULT_2026-10-13.md).
