@@ -17,7 +17,8 @@ test("rolling window refresh is bounded and has an explicit shutdown path", () =
 });
 
 test("live captions update text only on changes without re-announcing every second", () => {
-  assert.match(main, /if \(els\.caption\.textContent !== nextText\) els\.caption\.textContent = nextText/);
+  assert.match(main, /if \(els\.caption\.textContent === text\) return/);
+  assert.match(main, /updateCaptionDisplay\(nextText\)/);
   assert.match(main, /currentCaptionText\(\s*transcript, interimText, lastInterimAt, now, ROLLING_WINDOW_MS\)/);
   assert.match(main, /lastInterimAt = interimText\.trim\(\) \? Date\.now\(\) : null/);
   assert.match(main, /const fallback = liveInterim\(now\) \|\| recentRecognizedText\(now\)/);
