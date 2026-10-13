@@ -1,8 +1,9 @@
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261014-caption-layout1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261013-rolling-caption1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261014-caption-layout1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -12,7 +13,7 @@ import {
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261013-rolling-caption1";
+} from "./transcript-window.mjs?v=20261014-caption-layout1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -38,7 +39,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261013-rolling-caption1";
+const BUILD_ID = "20261014-caption-layout1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -448,7 +449,7 @@ function refreshCaptionWindow() {
     renderCaption();
   } else if (!activeSessionId) {
     const text = visibleTranscript() || "字幕會顯示在這裡。";
-    if (els.caption.textContent !== text) els.caption.textContent = text;
+    updateCaptionDisplay(text);
   }
   if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
   syncCaptionRefreshTimer();
@@ -467,13 +468,22 @@ function recentRecognizedText(now = Date.now()) {
   return lastRecognizedText;
 }
 
+function updateCaptionDisplay(text) {
+  if (els.caption.textContent === text) return;
+  const follow = shouldFollowCaptionScroll(
+    els.caption.scrollTop, els.caption.scrollHeight, els.caption.clientHeight);
+  els.caption.textContent = text;
+  if (follow) els.caption.scrollTop = els.caption.scrollHeight;
+}
+
 function renderCaption() {
   const now = Date.now();
   const combined = currentCaptionText(
     transcript, interimText, lastInterimAt, now, ROLLING_WINDOW_MS);
   const nextText = combined || "正在聆聽…";
-  // Do not re-announce the same caption via aria-live every second.
-  if (els.caption.textContent !== nextText) els.caption.textContent = nextText;
+  // No repeat announcement for an unchanged caption, and no forced jump
+  // when a user has scrolled up to reread an earlier long sentence.
+  updateCaptionDisplay(nextText);
   syncCaptionRefreshTimer();
 }
 
@@ -778,8 +788,8 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
     rawInterimText = "";
     lastInterimAt = null;
     trimTranscript();
-    els.caption.textContent =
-      visibleTranscript() || recentRecognizedText() || "字幕已中斷，請重新開始。";
+    updateCaptionDisplay(
+      visibleTranscript() || recentRecognizedText() || "字幕已中斷，請重新開始。");
     els.diagStt.textContent = message;
     els.start.disabled = false;
     els.stop.disabled = true;
@@ -1000,7 +1010,7 @@ async function stopSession() {
   lastInterimAt = null;
   trimTranscript();
   const recent = visibleTranscript() || recentRecognizedText();
-  els.caption.textContent = recent || "字幕會顯示在這裡。";
+  updateCaptionDisplay(recent || "字幕會顯示在這裡。");
   els.diagMic.textContent = "未使用";
   activeSessionId = 0;
   els.start.disabled = false;

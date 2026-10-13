@@ -127,17 +127,27 @@ h2 {
 
 .caption {
   min-height: 8.5rem;
+  max-height: min(24rem, 42dvh);
   margin: 1rem 0;
   padding: 1rem;
-  display: flex;
-  align-items: center;
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   border-radius: 16px;
   background: #101418;
   color: #ffffff;
   font-size: var(--caption-size);
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.42;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.caption:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .actions {
@@ -233,14 +243,16 @@ details > summary {
 }
 
 @media (max-width: 540px) {
-  .actions,
-  .secondary-actions,
   .diagnostics {
     grid-template-columns: 1fr;
   }
 
-  .caption {
-    min-height: 10rem;
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .secondary-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
   }
 }
 
@@ -381,11 +393,11 @@ details > summary {
 
 @media (max-width: 540px) {
   .quick-profile {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .quick-profile span {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
 }
 
@@ -553,10 +565,208 @@ details > summary {
 
 @media (max-width: 540px) {
   .caption-size-control {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Role group's aria-label already exposes this label to assistive tech. */
+  .caption-size-control > span {
+    display: none;
+  }
+}
+
+
+/* Phone portrait: preserve touch targets without stacking every control. */
+@media (max-width: 540px) {
+  .shell {
+    padding: max(0.45rem, env(safe-area-inset-top))
+      max(0.65rem, env(safe-area-inset-right))
+      max(0.85rem, env(safe-area-inset-bottom))
+      max(0.65rem, env(safe-area-inset-left));
+  }
+
+  .hero {
+    padding: 0.45rem 0 0.1rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.7rem, 6vw, 2.25rem);
+    margin-bottom: 0.3rem;
+  }
+
+  .hero .lead {
+    font-size: 0.95rem;
+    line-height: 1.35;
+    margin-bottom: 0.25rem;
+  }
+
+  .panel {
+    margin-top: 0.6rem;
+    padding: 0.7rem;
+  }
+
+  .primary-panel {
+    padding: 0.7rem;
+  }
+
+  .status-row > * {
+    min-width: 0;
+  }
+
+  .status {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .caption {
+    height: clamp(10rem, 34dvh, 19rem);
+    min-height: 10rem;
+    max-height: none;
+    margin: 0.6rem 0 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .actions,
+  .secondary-actions {
+    gap: 0.45rem;
+  }
+
+  .actions button {
+    min-width: 0;
+    min-height: 48px;
+    padding: 0.55rem 0.3rem;
+  }
+
+  .secondary-actions {
+    margin-top: 0.5rem;
+  }
+
+  .caption-size-control {
+    min-width: 0;
+    min-height: 48px;
+    gap: 0.25rem;
+  }
+
+  .caption-size-control .size-option {
+    min-height: 48px;
+    padding: 0.5rem 0.1rem;
+  }
+
+  .quick-profile {
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    padding: 0.55rem;
+  }
+
+  .quick-profile label {
+    font-size: 0.85rem;
+  }
+
+  .quick-profile select {
+    min-width: 0;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .quick-profile .text-button {
+    min-height: 44px;
+    padding: 0.4rem 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .quick-profile span {
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .primary-panel .hint {
+    margin-top: 0.55rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+}
+
+/* Short-height landscape (including wide phones): captions remain dominant. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .shell {
+    width: min(900px, 100%);
+    padding: max(0.3rem, env(safe-area-inset-top))
+      max(0.65rem, env(safe-area-inset-right))
+      max(0.7rem, env(safe-area-inset-bottom))
+      max(0.65rem, env(safe-area-inset-left));
+  }
+
+  .hero {
+    padding: 0;
+  }
+
+  .hero .eyebrow,
+  .hero .lead {
+    display: none;
+  }
+
+  .hero h1 {
+    margin: 0;
+    font-size: 1.45rem;
+  }
+
+  .panel {
+    margin-top: 0.4rem;
+    padding: 0.6rem;
+  }
+
+  .primary-panel {
+    padding: 0.6rem;
+  }
+
+  .caption {
+    height: clamp(6.5rem, 34dvh, 12rem);
+    min-height: 6.5rem;
+    max-height: none;
+    margin: 0.4rem 0 0.5rem;
+    padding: 0.65rem;
+    line-height: 1.3;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .secondary-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr);
+    margin-top: 0.35rem;
+  }
+
+  .actions button,
+  .caption-size-control .size-option {
+    min-height: 44px;
+    padding: 0.4rem 0.35rem;
+  }
+
+  .caption-size-control {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: 44px;
+    gap: 0.3rem;
   }
 
   .caption-size-control > span {
-    grid-column: 1 / -1;
+    display: none;
+  }
+
+  .quick-profile {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    margin-top: 0.4rem;
+    padding: 0.4rem;
+  }
+
+  .quick-profile span {
+    display: none;
+  }
+
+  .primary-panel .hint {
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
   }
 }

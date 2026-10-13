@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261008-stop-flush1" />
+    <link rel="stylesheet" href="./styles.css?v=20261014-caption-layout1" />
   </head>
   <body>
     <main class="shell">
@@ -25,9 +25,9 @@
           <span id="status" class="status" data-state="idle">尚未開始</span>
         </div>
 
-        <div id="caption" class="caption" aria-live="polite" aria-atomic="true">
-          字幕會顯示在這裡。
-        </div>
+        <div id="caption" class="caption" tabindex="0"
+          role="log" aria-label="即時字幕，內容過長時可在框內捲動"
+          aria-live="polite" aria-atomic="true" aria-relevant="text">字幕會顯示在這裡。</div>
 
         <div class="actions">
           <button id="start" class="primary" type="button">開始聆聽</button>
@@ -253,6 +253,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261013-rolling-caption1"></script>
+    <script type="module" src="./main.js?v=20261014-caption-layout1"></script>
   </body>
 </html>

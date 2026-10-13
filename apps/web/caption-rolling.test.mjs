@@ -17,7 +17,8 @@ test("rolling window refresh is bounded and has an explicit shutdown path", () =
 });
 
 test("live captions update text only on changes without re-announcing every second", () => {
-  assert.match(main, /if \(els\.caption\.textContent !== nextText\) els\.caption\.textContent = nextText/);
+  assert.match(main, /if \(els\.caption\.textContent === text\) return/);
+  assert.match(main, /updateCaptionDisplay\(nextText\)/);
   assert.match(main, /currentCaptionText\(\s*transcript, interimText, lastInterimAt, now, ROLLING_WINDOW_MS\)/);
   assert.match(main, /lastInterimAt = interimText\.trim\(\) \? Date\.now\(\) : null/);
   assert.match(main, /const fallback = liveInterim\(now\) \|\| recentRecognizedText\(now\)/);
@@ -33,7 +34,7 @@ test("session reports keep full finals despite rolling display expiration", () =
 });
 
 test("rolling caption version is consistent across browser assets", () => {
-  const version = "20261013-rolling-caption1";
+  const version = "20261014-caption-layout1";
   assert.equal(build.buildId, version);
   assert(main.includes('./transcript-window.mjs?v=' + version));
   assert(html.includes('./main.js?v=' + version));
