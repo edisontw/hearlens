@@ -17,6 +17,7 @@ test("long-caption area wraps and scrolls internally without losing keyboard acc
   assert.match(html, /id="caption" class="caption" tabindex="0"/);
   assert.match(html, /role="log"/);
   assert.match(html, /aria-live="polite"/);
+  assert.match(html, /aria-relevant="text">字幕會顯示在這裡。<\/div>/);
   assert.match(css, /\.caption:focus-visible/);
 });
 
