@@ -683,15 +683,19 @@ function renderDiagnostics(track) {
 }
 
 async function releaseDiagnosticCapture(label = "已釋放") {
-  for (const track of stream?.getTracks?.() ?? []) {
+  // Detach ownership BEFORE awaiting browser cleanup, so concurrent
+  // pagehide and startup-finalization cannot close/stop the same resource twice.
+  const priorStream = stream;
+  stream = null;
+  for (const track of priorStream?.getTracks?.() ?? []) {
     track.stop();
   }
-  stream = null;
 
-  if (audioContext && audioContext.state !== "closed") {
-    await audioContext.close();
-  }
+  const priorContext = audioContext;
   audioContext = null;
+  if (priorContext && priorContext.state !== "closed") {
+    await priorContext.close();
+  }
 
   if (label) {
     els.diagMic.textContent = label;
