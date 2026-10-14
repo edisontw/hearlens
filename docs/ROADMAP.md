@@ -97,6 +97,12 @@ Goal: build the personalization domain layer before live output.
 
 No live-ear safety claim.
 
+## SW4 — Native input timing evidence and actual acoustic measurement plan (2026-10-14)
+
+- [x] **SW4-A (software instrumentation, unmeasured on phone):** Android input-only diagnostic APK v0.4.0 observes matching MONOTONIC `AudioRecord` sample timestamps + sample-frame progression during a **user-started capture**, logs timestamp age and signed frame-clock skew with missing/stale/regressing/error states, and discards each PCM sample; JVM regression and Android debug APK CI. **Not** mic acoustic input latency or Bluetooth E2E delay. [Evidence-bound measurement decision](./SW4_ANDROID_INPUT_CLOCK_AND_ACOUSTIC_BENCH_DECISION_2026-10-14.md).
+- [x] **SW4-B (method/protocol):** distinguish existing software input clock and passive output-route observations from **physical** phone mic SPL→dBFS transfer, nonhuman A2DP/LE acoustic latency, left/right ear-coupler MPO and proven speaker fallback hard mute. Minimum instrumentation requirements and GO/NO-GO documented.
+- [ ] **Hardware gated / explicitly deferred:** synchronized nonhuman acoustic Bluetooth playback latency and output-route fault bench; separately calibrated ear-simulator L/R output; verification that an OS route change **never emits amplified sound from the phone speaker**. No on-ear amplification authorized, and no mandatory repeated SW1 mic or SW3 AIR31 field tests.
+
 ## M04 — SOFTWARE-FIRST phone DSP / microphone-routing ceiling (updated 2026-10-12)
 
 **LATEST USER DIRECTION (2026-10-12, field follow-up):** use the **PHONE built-in microphone as the primary input**, phone Native DSP to process PCM and **ordinary Bluetooth earbuds primarily for output**. Earbud microphones, HFP/SCO uplink, iOS high-quality AirPods capture and custom hardware POCs are **deferred optional fallbacks**, not next-step prerequisites. No mandatory placement near talker, occluded ear canal or separate microphone. Evaluate software-only capacity first. Do not assume a measured safe low-latency acoustic output path. Distinguish ordinary headset recording inputs from undocumented transparency/ANC microphone buses. See [M04 software-first investigation](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md).

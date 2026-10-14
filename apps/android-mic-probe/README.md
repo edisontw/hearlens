@@ -1,4 +1,4 @@
-# HearLens SW1 — Android input-only microphone / route probe
+# HearLens SW1 / SW3 / SW4 — Android input-only microphone and route diagnostics
 
 **Purpose:** inspect what an ordinary Android app can actually capture from a phone microphone or paired Bluetooth headset microphone, before designing mobile DSP. This is a **separate debug-only app**. It does **not** run through the HearLens website and has **no output audio path, speech recognizer, audio file output, network or background audio service**.
 
@@ -63,3 +63,15 @@ Version code 3, version name `0.3.0-sw3-audit`; main screen build marker `202610
 ## SW3-Native one-button AIR31 field result (2026-10-13)
 
 Motorola moto g62 5G Android 13 / API33 with AIR31 paired: versioned `SW3-Native v0.2.0` ran successfully and on activity resume, device-added and the explicit user button, both media/speech and accessibility/speech anticipated device lists pointed at `BLUETOOTH_A2DP#135 (AIR31)`. **No output PCM or microphone recording occurred in this session.** Field scope is complete; **do not repeat the voice experiment or mandatory SCO input tests**. Actual playing device, acoustic delay and physical speaker-fallback suppression remain unknown. [Field evidence](../../docs/SW3_NATIVE_AIR31_FIELD_RESULT_2026-10-13.md).
+
+## SW4 Input Clock diagnostic update (v0.4.0, 2026-10-14)
+
+The app retains all existing SW1 and SW3 functions and adds **metadata-only Android input sample-clock diagnostics** to the existing user-initiated, foreground MIC capture. When the ~1-second level log is emitted, the app observes `AudioRecord.getTimestamp(AudioTimestamp.TIMEBASE_MONOTONIC)` and matching Java `System.nanoTime()`. The `SW4_input_clock` record reports `timestampAgeMs`, `frameClockDeltaMs` and classification (`FIRST_SAMPLE`, `STABLE`, `DISCONTINUITY`, `STALE`, `UNAVAILABLE`, or `INVALID`).
+
+**Important:** `timestampAgeMs` is the age of Android's input timestamp when polled. It is **not microphone analog/acoustic/ADC latency**, not the Bluetooth microphone-to-ear end-to-end time and not a physical sound output measure. `frameClockDeltaMs` reflects the consistency of successive frame-clock/time pairs, not real-ear latency. Existing one-second RMS/peak dBFS measurements are still **not calibrated SPL**.
+
+The new build identity is `HearLens SW4 Input Clock · v0.4.0`, `versionCode=4`, exported `probe_build=20261014-sw4-input-clock-v0.4.0`. Download the versioned GitHub Actions artifact `hearlens-sw4-input-clock-v0.4.0-diagnostics` containing `hearlens-sw4-input-clock-v0.4.0-debug.apk`. Some GitHub debug builds use different signing certificates: if updating fails, export desired previous diagnostics and uninstall only the prior probe app before installing SW4. Verify the displayed app version.
+
+**Optional test only.** Existing SW1 Motorola phone microphone and SW3 AIR31 media-route prediction tests are accepted; no further fixed speech clip, distance matrix, headset microphone test or Bluetooth audio playback is needed for SW4 code acceptance. A short ambient input-only MIC capture is sufficient *if* SW4 timestamp evidence is ever required. The default route-prediction button remains completely silent.
+
+See [SW4 test scope and proposed acoustically instrumented nonhuman Bluetooth/SPL GO-NO-GO bench](../../docs/SW4_ANDROID_INPUT_CLOCK_AND_ACOUSTIC_BENCH_DECISION_2026-10-14.md). Actual A2DP/LE playback latency, acoustic left/right MPO and physical no-speaker-fallback mute are **not** validated by SW4; hearing amplification remains disabled.

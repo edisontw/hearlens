@@ -5,9 +5,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-feature android:name="android.hardware.microphone" android:required="true"/>
-    <application android:allowBackup="false" android:label="HearLens SW3 Route Probe"
+    <application android:allowBackup="false" android:label="HearLens SW4 Clock Probe"
         android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".MainActivity" android:exported="true" android:label="HearLens SW3 Route Probe">
+        <activity android:name=".MainActivity" android:exported="true" android:label="HearLens SW4 Clock Probe">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
