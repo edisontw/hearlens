@@ -14,6 +14,8 @@ jobs:
           node-version: 22
       - name: Unit tests and JavaScript syntax
         run: npm test
+      - name: M03 browser profile entry and import/export contract
+        run: node --test apps/web/audiogram-editor.test.mjs && node --check apps/web/audiogram-editor.mjs && node --check apps/web/audiogram-page.mjs
       - name: SW3 deterministic Bluetooth output no-PCM route policy report
         run: npm run report:sw3
       - name: SW2 deterministic causal DSP software-ceiling report

@@ -1,0 +1,39 @@
+.audiogram-page .shell { max-width: 900px; }
+.profile-back { display: inline-block; margin-bottom: 1rem; color: var(--accent); font-weight: 700; }
+.profile-form { display: grid; gap: 1rem; }
+.profile-ear { min-width: 0; margin: 0; padding: 1rem; border: 1px solid var(--border); border-radius: 14px; }
+.profile-ear legend { font-size: 1.2rem; font-weight: 750; padding: 0 .3rem; }
+.profile-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.profile-fields label, .profile-meta label { display: grid; gap: .25rem; font-weight: 650; }
+.profile-fields input, .profile-meta input, .profile-meta select {
+  box-sizing: border-box; width: 100%; min-height: 48px; padding: .55rem;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--panel);
+  color: var(--text); font: inherit;
+}
+.profile-fields small { color: var(--muted); font-size: .8rem; }
+.profile-meta { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: .8rem; }
+.profile-actions { display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 1rem; }
+.profile-actions button, .profile-file-label {
+  min-height: 48px; display: inline-flex; align-items: center; justify-content: center;
+  padding: .6rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+  font: inherit; font-weight: 700; cursor: pointer;
+}
+.profile-file-label { background: transparent; color: inherit; }
+.profile-file-label:focus-within { outline: 3px solid var(--accent); }
+.profile-file-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.profile-alert { min-height: 1.7em; margin-top: .75rem; font-weight: 700; }
+.profile-alert[data-kind="error"] { color: var(--danger); }
+.profile-alert[data-kind="ok"] { color: var(--ok); }
+.profile-warning { border-left: 4px solid var(--border); padding: .65rem .85rem; line-height: 1.6; }
+.profile-chart { width: 100%; height: auto; max-height: 400px; display: block; }
+.profile-chart text { font-size: 14px; fill: var(--text); }
+.profile-chart .gridline { stroke: var(--border); stroke-width: 1; }
+.profile-chart .left-ear { stroke: #1474ba; fill: none; stroke-width: 3; }
+.profile-chart .right-ear { stroke: #d14d40; fill: none; stroke-width: 3; }
+.profile-chart .point { stroke-width: 3; }
+.profile-help { color: var(--muted); line-height: 1.55; }
+@media (max-width: 560px) {
+  .profile-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .profile-meta { grid-template-columns: minmax(0, 1fr); }
+  .profile-actions > * { flex: 1 1 40%; }
+}

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <title>聽力圖資料 · HearLens</title>
+  <link rel="stylesheet" href="./styles.css?v=20261014-caption-wake1">
+  <link rel="stylesheet" href="./audiogram-page.css?v=20261014-audiogram1">
+</head>
+<body class="audiogram-page">
+  <main class="shell">
+    <header class="hero">
+      <a class="profile-back" href="./index.html">← 返回即時字幕</a>
+      <p class="eyebrow">HearLens · 本機資料管理（研究功能）</p>
+      <h1>我的聽力圖</h1>
+      <p class="lead">將聽力檢查報告中的 dB HL 數值填入。左右耳分開記錄；未測量請留空。</p>
+    </header>
+    <section class="panel" aria-labelledby="entry-title">
+      <h2 id="entry-title">聽力閾值</h2>
+      <p class="profile-help">若報告沒有某個頻率，請保留空白，不要填 0。資料只用於研究與日後設定，<strong>不會啟動麥克風、耳機或聲音放大</strong>。</p>
+      <form id="audiogram-form" class="profile-form" autocomplete="off" onsubmit="return false;">
+      <fieldset class="profile-ear">
+        <legend>右耳（紅色 ○）</legend>
+        <div class="profile-fields">
+          <label for="right-250">250 Hz
+            <input id="right-250" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="右耳（紅色 ○） 250 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="right-500">500 Hz
+            <input id="right-500" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="右耳（紅色 ○） 500 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="right-1000">1 kHz
+            <input id="right-1000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="右耳（紅色 ○） 1000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="right-2000">2 kHz
+            <input id="right-2000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="右耳（紅色 ○） 2000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="right-4000">4 kHz
+            <input id="right-4000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="右耳（紅色 ○） 4000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="right-8000">8 kHz
+            <input id="right-8000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="右耳（紅色 ○） 8000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+        </div>
+        <div class="profile-meta">
+          <label for="right-source">數值來源
+            <select id="right-source"><option value="clinical-report">聽力檢查報告</option><option value="manual">自行輸入</option></select>
+          </label>
+          <label for="right-date">檢查日期（選填）
+            <input type="date" id="right-date">
+          </label>
+        </div>
+      </fieldset>
+      <fieldset class="profile-ear">
+        <legend>左耳（藍色 ×）</legend>
+        <div class="profile-fields">
+          <label for="left-250">250 Hz
+            <input id="left-250" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="左耳（藍色 ×） 250 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="left-500">500 Hz
+            <input id="left-500" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="左耳（藍色 ×） 500 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="left-1000">1 kHz
+            <input id="left-1000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="左耳（藍色 ×） 1000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="left-2000">2 kHz
+            <input id="left-2000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="左耳（藍色 ×） 2000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="left-4000">4 kHz
+            <input id="left-4000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="左耳（藍色 ×） 4000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+          <label for="left-8000">8 kHz
+            <input id="left-8000" type="number" inputmode="decimal" min="-20" max="130" step="5" placeholder="未測量" autocomplete="off" aria-label="左耳（藍色 ×） 8000 Hz dB HL">
+            <small>dB HL</small>
+          </label>
+        </div>
+        <div class="profile-meta">
+          <label for="left-source">數值來源
+            <select id="left-source"><option value="clinical-report">聽力檢查報告</option><option value="manual">自行輸入</option></select>
+          </label>
+          <label for="left-date">檢查日期（選填）
+            <input type="date" id="left-date">
+          </label>
+        </div>
+      </fieldset>
+      </form>
+      <div class="profile-actions">
+        <button id="profile-preview" type="button" class="secondary">更新預覽</button>
+        <button id="profile-save" type="button" class="primary">儲存到這台裝置</button>
+        <button id="profile-export" type="button" class="secondary">匯出 JSON</button>
+        <label class="profile-file-label">匯入 JSON
+          <input id="profile-import" type="file" accept=".json,application/json" aria-label="匯入聽力圖 JSON">
+        </label>
+        <button id="profile-clear" type="button" class="secondary">清除本機資料</button>
+      </div>
+      <p id="profile-status" class="profile-alert" role="status" aria-live="polite"></p>
+      <p class="profile-warning"><strong>隱私：</strong>僅在按下儲存後才會寫入這台裝置的瀏覽器 localStorage，<strong>沒有加密</strong>；不會送到 Gemini 或 HearLens 伺服器。共用裝置請不要儲存。下載的 JSON 也含聽力資料。</p>
+    </section>
+    <section class="panel" aria-labelledby="chart-title">
+      <h2 id="chart-title">聽力圖預覽（dB HL）</h2>
+      <p id="profile-summary" class="profile-help">尚未輸入資料。</p>
+      <svg id="profile-chart" class="profile-chart" viewBox="0 0 640 395"
+        role="img" aria-label="聽力閾值圖：右耳紅色圓圈、左耳藍色叉號；頻率由左至右，dB HL 向下增加"></svg>
+      <p class="profile-help">只連接相鄰且確實輸入的測量點。此圖不表示 dB SPL、聲音增益、臨床配適、MPO 或實際耳機輸出。</p>
+    </section>
+  </main>
+  <script type="module" src="./audiogram-page.mjs?v=20261014-audiogram1"></script>
+</body>
+</html>
