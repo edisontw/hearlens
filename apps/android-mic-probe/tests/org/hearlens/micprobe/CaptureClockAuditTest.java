@@ -55,9 +55,9 @@ public final class CaptureClockAuditTest {
               CaptureClockAudit.State.FIRST_SAMPLE, "new capture resets baseline");
         check(audit.observe(true, 2_900, 6_000_000_000L, 6_025_000_000L, 48_000),
               CaptureClockAudit.State.DISCONTINUITY, "regressing frames");
-        check(audit.observe(true, 3_100, 6_500_000_000L, 6_525_000_000L, 48_000),
+        check(audit.observe(true, 26_900, 6_500_000_000L, 6_525_000_000L, 48_000),
               CaptureClockAudit.State.STABLE, "new monotonic pair after reset");
-        check(audit.observe(true, 3_200, 7_000_000_000L, 7_025_000_000L, 16_000),
+        check(audit.observe(true, 50_900, 7_000_000_000L, 7_025_000_000L, 16_000),
               CaptureClockAudit.State.DISCONTINUITY, "changed sample-rate reference");
         check(audit.observe(true, -1, 7_500_000_000L, 7_550_000_000L, 48_000),
               CaptureClockAudit.State.INVALID, "negative frame");
