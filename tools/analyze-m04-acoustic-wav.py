@@ -13,6 +13,7 @@ Events are reference-channel stimulus windows, at least 0.05 s apart from unrela
 stimuli; each output window extends by max-delay. Record BOTH channels on ONE ADC.
 """
 import argparse
+import hashlib
 import json
 import math
 import pathlib
@@ -38,6 +39,8 @@ def read_wav(path):
     else:
         signed = np.frombuffer(data, dtype="<i2" if width == 2 else "<i4").astype(np.int32)
     pcm = signed.reshape(-1, 2).astype(np.float64) / float(1 << (width * 8 - 1))
+    if rate < 8000 or rate > 192000:
+        raise ValueError("Unsupported recording sample rate")
     return rate, pcm
 
 
@@ -52,6 +55,10 @@ def one_event(pcm, rate, start, stop, min_lag, max_lag):
     a, b = round(start * rate), round(stop * rate)
     if a < 0 or b <= a or b + max_lag > len(pcm):
         raise ValueError("Event window or maximum lag extends beyond WAV")
+    if b - a < round(0.01 * rate):
+        raise ValueError("Reference event shorter than 10 ms")
+    if np.max(np.abs(pcm[a:b, 0])) >= 0.995 or np.max(np.abs(pcm[a + min_lag:b + max_lag, 1])) >= 0.995:
+        raise ValueError("Clipped/near-full-scale recording: no trustworthy acoustic lag")
     ref = pcm[a:b, 0].copy()
     # DC removal avoids a false peak from offset and steady microphone bias.
     ref -= np.mean(ref)
@@ -74,8 +81,14 @@ def one_event(pcm, rate, start, stop, min_lag, max_lag):
     lag = min_lag + index
     if not math.isfinite(coefficient) or coefficient < 0.35:
         raise ValueError("Weak correlation: check channel identity, noise and stimulus")
+    # Correlation near the search boundaries cannot exclude a peak just outside.
+    if index <= max(1, round(0.002 * rate)) or index >= len(score) - 1 - max(1, round(0.002 * rate)):
+        raise ValueError("Correlation peak at lag-window edge; widen delay range")
     return {"reference_start_s": start, "reference_end_s": stop,
-            "delay_ms": 1000 * lag / rate, "absolute_correlation": coefficient}
+            "delay_ms": 1000 * lag / rate, "absolute_correlation": coefficient,
+            "warning": ("Near-zero arrival may be direct-room sound/crosstalk, NOT Bluetooth output"
+                        if 1000 * lag / rate < 10 else
+                        "Output-source identity is NOT verifiable from two WAV channels alone")}
 
 
 def main():
@@ -107,15 +120,22 @@ def main():
         ap.error(str(exc))
     if not events:
         ap.error("At least one event required")
+    for previous, following in zip(events, events[1:]):
+        if following["reference_start_s"] < previous["reference_end_s"] + max_lag / rate:
+            ap.error("Overlapping event/output search windows: choose isolated stimuli")
     delays = [v["delay_ms"] for v in events]
     result = {
         "type": "M04_UNCALIBRATED_NONHUMAN_ACOUSTIC_ARRIVAL_DIFFERENCE",
-        "source": str(args.wav), "sample_rate_hz": rate,
+        "status": "PROVISIONAL_LAG_CANDIDATES_ONLY_NOT_SAFETY_OR_BLUETOOTH_VALIDATION",
+        "source": str(args.wav), "source_sha256": hashlib.sha256(args.wav.read_bytes()).hexdigest(),
+        "sample_rate_hz": rate,
         "measurement": "reference mic acoustic arrival -> receiver mic acoustic arrival",
         "not_proven": ["phone microphone ADC latency", "ear canal SPL/MPO",
                        "speaker fallback protection", "direct sound cancellation",
                        "route identity", "safe human amplification"],
-        "requires_review": ["independent physical hard mute", "fixture propagation correction",
+        "requires_review": ["independent direct-leakage/no-output control",
+                            "physical confirmation receiver channel originates from earbud",
+                            "independent physical hard mute", "fixture propagation correction",
                             "reference/receiver mic crosstalk", "speaker-leakage monitoring",
                             "separate left/right calibrated coupler measurements"],
         "events": events,
