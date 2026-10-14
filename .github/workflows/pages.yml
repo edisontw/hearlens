@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/web/**"
+      - "packages/audiogram/audiogram.mjs"
       - "testdata/audio/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -33,6 +34,8 @@ jobs:
         run: |
           mkdir -p apps/web/testdata
           cp testdata/audio/hearlens-zh-tw-regression-v2.wav apps/web/testdata/
+      - name: Stage canonical M03 audiogram validator
+        run: cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
