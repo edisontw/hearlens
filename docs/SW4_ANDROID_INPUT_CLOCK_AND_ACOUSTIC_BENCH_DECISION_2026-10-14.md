@@ -1,6 +1,8 @@
 # SW4 — Android input clock observability + physical-acoustic measurement decision (2026-10-14)
 
-**Status: instrumented input-only debug APK, awaiting optional physical-phone check; no new microphone field result, Bluetooth acoustic output, calibrated SPL or hearing-path authorization.**
+**Status: instrumented input-only APK and moto g62 5G Android 13 SW4 input-clock field check PASS (2026-10-14). Bluetooth acoustic output, calibrated SPL/MPO, real mic acoustic latency and hearing-path authorization remain unverified.**
+
+SW4 actual field evidence: [26/26 timestamps valid, 25 consecutive STABLE, 0 clock faults; separately 20/26 all-zero digital level windows with no controlled stimulus](./SW4_MOTO_G62_INPUT_CLOCK_FIELD_RESULT_2026-10-14.md). This closes **input timestamp instrumentation field acceptance only**, not microphone acoustic performance or hearing-output safety. No repeat speech or headset-mic trial is required.
 
 ## Objective and choice of next stage
 
