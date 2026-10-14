@@ -15,7 +15,13 @@ jobs:
       - name: Unit tests and JavaScript syntax
         run: npm test
       - name: M03 browser profile entry and import/export contract
-        run: node --test apps/web/audiogram-editor.test.mjs && node --check apps/web/audiogram-editor.mjs && node --check apps/web/audiogram-page.mjs
+        run: |
+          node --test apps/web/audiogram-editor.test.mjs
+          node --check apps/web/audiogram-editor.mjs
+          node --check apps/web/audiogram-page.mjs
+          cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
+          node --input-type=module -e "import('./apps/web/audiogram-domain.mjs').then(m => { if (typeof m.normalizeAudiogramProfile !== 'function' || typeof m.deserializeAudiogramProfile !== 'function') process.exit(1) })"
+          cmp -s packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
       - name: SW3 deterministic Bluetooth output no-PCM route policy report
         run: npm run report:sw3
       - name: SW2 deterministic causal DSP software-ceiling report
