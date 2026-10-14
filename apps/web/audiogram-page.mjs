@@ -17,6 +17,17 @@ const form = document.querySelector("#audiogram-form");
 const status = document.querySelector("#profile-status");
 const summary = document.querySelector("#profile-summary");
 const chart = document.querySelector("#profile-chart");
+// Capture the last explicitly saved (or loaded) form state. No automatic persistence.
+let savedFormSnapshot = null;
+
+function currentFormSnapshot() {
+  return JSON.stringify(readEntries());
+}
+
+function hasUnsavedChanges() {
+  return savedFormSnapshot !== null && currentFormSnapshot() !== savedFormSnapshot;
+}
+
 
 function setStatus(message, kind = "") {
   status.textContent = message;
@@ -110,13 +121,15 @@ function updatePreview() {
   try {
     const profile = validProfile();
     drawProfile(profile);
-    setStatus("");
+    setStatus(hasUnsavedChanges() ? "尚未儲存變更；請按「儲存到這台裝置」。" : "",
+      hasUnsavedChanges() ? "dirty" : "");
   } catch (error) {
     drawProfile();
     const anyValue = AUDIOGRAM_INPUT_EARS.some(ear =>
       readEntries()[ear].thresholds.some(value => value !== ""));
     if (anyValue) setStatus(error.message, "error");
-    else setStatus("");
+    else setStatus(hasUnsavedChanges() ? "尚未儲存變更；目前無有效測量值。" : "",
+      hasUnsavedChanges() ? "dirty" : "");
   }
 }
 
@@ -125,6 +138,7 @@ document.querySelector("#profile-save").addEventListener("click", () => {
   try {
     const profile = validProfile();
     localStorage.setItem(STORAGE_KEY, serializeAudiogramProfile(profile));
+    savedFormSnapshot = currentFormSnapshot();
     drawProfile(profile);
     setStatus("已儲存到此瀏覽器。此儲存空間未加密；請勿在共用裝置保存。", "ok");
   } catch (error) {
@@ -142,7 +156,8 @@ document.querySelector("#profile-export").addEventListener("click", () => {
     document.body.append(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    // A zero-delay revoke can race mobile browsers beginning the download.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
     drawProfile(profile);
     setStatus("已準備匯出 JSON。檔案含有聽力資料，請妥善保管。", "ok");
   } catch (error) {
@@ -154,8 +169,15 @@ document.querySelector("#profile-import").addEventListener("change", async (even
   const file = input.files?.[0];
   if (!file) return;
   try {
+    if (hasUnsavedChanges() && !window.confirm("表單目前有尚未儲存的變更。匯入將取代目前表單，確定繼續？")) {
+      return;
+    }
+    const beforeRead = currentFormSnapshot();
     if (file.size > 16384) throw new Error("檔案超過 16 KB 限制。");
     const profile = deserializeAudiogramProfile(await file.text());
+    if (beforeRead !== currentFormSnapshot()) {
+      throw new Error("讀取期間表單已有變更，為避免覆寫請重新匯入。");
+    }
     loadIntoForm(profile);
     setStatus("已匯入表單，但尚未儲存到此裝置。確認無誤後再按儲存。", "ok");
   } catch (error) {
@@ -175,6 +197,7 @@ document.querySelector("#profile-clear").addEventListener("click", () => {
       });
     }
     drawProfile();
+    savedFormSnapshot = currentFormSnapshot();
     setStatus("本機資料與表單已清除。", "ok");
   } catch (error) {
     setStatus("無法清除本機資料：" + error.message, "error");
@@ -189,6 +212,7 @@ try {
     loadIntoForm(deserializeAudiogramProfile(stored));
     setStatus("已載入此瀏覽器先前儲存的聽力圖。", "ok");
   } else drawProfile();
+  savedFormSnapshot = currentFormSnapshot();
 } catch {
   drawProfile();
   setStatus("無法讀取本機儲存資料；請檢查瀏覽器儲存權限或舊資料格式。", "error");
