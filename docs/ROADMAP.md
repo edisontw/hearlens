@@ -71,6 +71,7 @@ Exit: evidence that proximity improves useful speech capture under target scenes
 
 - [x] Add an independent family/research web page to enter left/right audiogram dB HL values at six frequencies, inspect measured-only points, explicitly store locally, import/export versioned JSON and delete saved data without invoking microphone or audio output. Reuse the original M03 schema validator in the Pages artifact, not a fork. [Scope and validation](./M03_AUDIOGRAM_LOCAL_UI_2026-10-14.md).
 - [x] M03 profile page follow-up: show unsaved-edit status, confirm destructive import over unsaved edits, reject asynchronous import when the form changes mid-read, retain exported JSON Blob URL long enough for mobile downloads, accept valid non-5-dB numeric entries, and assert the copied canonical validator exists in CI/Pages staging. No hearing-output code.
+- [ ] **M03 browser E2E gate (2026-10-15):** separate conditional GitHub Actions job uses actual headless Chromium to open the staged static page and verify independent bilateral values, zero vs absent measurements, explicit local save, reload, JSON download, cancel/accept overwrite of unsaved changes, import without autosave, invalid JSON rejection, and clear/reload. Checks no unapproved external network requests or browser module errors. **Pending PR CI; not Moto g62 field acceptance or a clinical test.**
 - [ ] Moto g62 field acceptance for editing, browser reload, import/export and delete. **No amplification or clinical fitting claim.**
 
 ## M03 — Audiogram Profile + Offline DSP Tests
