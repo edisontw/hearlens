@@ -67,6 +67,11 @@ Goal: quantify the product's most important physical advantage.
 
 Exit: evidence that proximity improves useful speech capture under target scenes.
 
+## M03 local audiogram profile UX (2026-10-14)
+
+- [x] Add an independent family/research web page to enter left/right audiogram dB HL values at six frequencies, inspect measured-only points, explicitly store locally, import/export versioned JSON and delete saved data without invoking microphone or audio output. Reuse the original M03 schema validator in the Pages artifact, not a fork. [Scope and validation](./M03_AUDIOGRAM_LOCAL_UI_2026-10-14.md).
+- [ ] Moto g62 field acceptance for editing, browser reload, import/export and delete. **No amplification or clinical fitting claim.**
+
 ## M03 — Audiogram Profile + Offline DSP Tests
 
 Goal: build the personalization domain layer before live output.
