@@ -562,7 +562,7 @@ public final class MainActivity extends Activity {
                     double peakDbfs = 20 * Math.log10(Math.max(peak / 32768.0, 1e-9));
                     AudioTimestamp timestamp = new AudioTimestamp();
                     int timestampStatus = rec.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC);
-                    long observationNanos = android.os.SystemClock.elapsedRealtimeNanos();
+                    long observationNanos = System.nanoTime();
                     CaptureClockAudit.Snapshot clock = clockAudit.observe(
                         timestampStatus == AudioRecord.SUCCESS, timestamp.framePosition,
                         timestamp.nanoTime, observationNanos, rec.getSampleRate());
