@@ -1,9 +1,10 @@
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261014-caption-layout1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261014-caption-wake1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261014-caption-wake1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261014-caption-layout1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261014-caption-wake1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -13,7 +14,7 @@ import {
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261014-caption-layout1";
+} from "./transcript-window.mjs?v=20261014-caption-wake1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -39,7 +40,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261014-caption-layout1";
+const BUILD_ID = "20261014-caption-wake1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -116,6 +117,7 @@ const els = {
   caption: document.querySelector("#caption"),
   recallPanel: document.querySelector("#recall-panel"),
   status: document.querySelector("#status"),
+  screenAwake: document.querySelector("#screen-awake-status"),
   diagMic: document.querySelector("#diag-mic"),
   diagStt: document.querySelector("#diag-stt"),
   diagBuild: document.querySelector("#diag-build"),
@@ -157,6 +159,25 @@ const transcript = [];
 const sessionFinals = [];
 const debugLines = [];
 const reportDebugLines = [];
+
+const captionScreenWakeLock = createCaptionScreenWakeLock({
+  requestWakeLock: typeof navigator.wakeLock?.request === "function"
+    ? (type) => navigator.wakeLock.request(type)
+    : null,
+  onState: (state) => {
+    if (els.screenAwake) {
+      els.screenAwake.textContent = {
+        requesting: "正在嘗試保持螢幕開啟…",
+        held: "聆聽期間已保持螢幕開啟；停止後恢復原本休眠設定。",
+        unsupported: "此瀏覽器不支援螢幕常亮；字幕仍可使用。",
+        unavailable: "系統未允許螢幕常亮；字幕仍可使用。",
+        released: "系統已取消螢幕常亮；請留意鎖屏會暫停字幕。",
+        idle: "開始聆聽時會嘗試保持螢幕開啟（可能增加耗電）。",
+      }[state] || "";
+    }
+    appendSttLog("caption-screen-awake " + state);
+  },
+});
 
 appendSttLog("build " + BUILD_ID);
 if (els.diagBuild) {
@@ -757,6 +778,7 @@ async function releaseDiagnosticCapture(label = "已釋放") {
 // "listening" or retain the microphone after the WebSocket has died.
 async function failClosedCaptionSession(expectedSessionId, message, code) {
   if (expectedSessionId !== activeSessionId) return;
+  captionScreenWakeLock.stop();
   activeSessionId = 0; // immediately reject delayed partial/final/status callbacks
   els.start.disabled = true;
   els.stop.disabled = true;
@@ -985,13 +1007,15 @@ async function startSession() {
 
   requireActiveCaptionSession(sessionId);
   setStatus("正在聆聽", "listening");
+  void captionScreenWakeLock.start();
   els.stop.disabled = false;
   renderCaption();
 }
 
 async function stopSession() {
   const sessionId = activeSessionId;
-  if (!sessionId || !sttProvider || captionStopRequested) return;
+  if (!sessionId || captionStopRequested) return;
+  captionScreenWakeLock.stop();
   captionStopRequested = true;
   els.stop.disabled = true;
   setStatus("停止中…");
@@ -1025,6 +1049,7 @@ async function stopSession() {
 }
 
 async function cleanupFailedStart(error) {
+  captionScreenWakeLock.stop();
   appendSttLog(
     "S" +
       activeSessionId +
@@ -1116,6 +1141,7 @@ els.copyTestReport?.addEventListener("click", () => {
 });
 
 window.addEventListener("pagehide", () => {
+  captionScreenWakeLock.stop();
   void sttProvider?.dispose?.();
 
   for (const track of stream?.getTracks?.() ?? []) {
