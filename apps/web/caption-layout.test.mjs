@@ -56,10 +56,13 @@ test("caption update follows near-bottom while keeping manual reread position", 
 });
 
 test("responsive asset version has browser cache bust and no hearing playback", () => {
-  const version = "20261014-caption-layout1";
+  const version = "20261014-caption-wake1";
   assert.equal(build.buildId, version);
   assert(main.includes('./caption-scroll.mjs?v=' + version));
   assert(html.includes('./styles.css?v=' + version));
   assert(html.includes('./main.js?v=' + version));
+  assert.match(html, /id="screen-awake-status"[^>]*aria-live="polite"/);
+  assert.match(main, /captionScreenWakeLock[.]stop[(][)]/);
+  assert.match(main, /captionScreenWakeLock[.]start[(][)]/);
   assert.doesNotMatch(main, /\bnew\s+AudioTrack\s*\(/);
 });
