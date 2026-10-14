@@ -99,6 +99,12 @@ test("new profile route is reachable and never attaches to amplified PCM playbac
   assert.match(source, /localStorage\.setItem/);
   assert.match(source, /localStorage\.removeItem/);
   assert.match(deploy, /cp packages\/audiogram\/audiogram\.mjs apps\/web\/audiogram-domain\.mjs/);
+  assert.match(source, /savedFormSnapshot = currentFormSnapshot\(\)/);
+  assert.match(source, /hasUnsavedChanges\(\)/);
+  assert.match(source, /beforeRead !== currentFormSnapshot\(\)/);
+  assert.match(source, /URL\.revokeObjectURL\(url\), 10_000/);
+  assert.match(html, /step="any"/);
+  assert.match(html, /audiogram-page\.mjs\?v=20261014-audiogram2/);
   assert.doesNotMatch(source, /AudioContext|AudioWorklet|AudioTrack|AudioRecord|mediaDevices|getUserMedia|\.play\(/);
   assert.doesNotMatch(html, /<audio|<video/);
 });
