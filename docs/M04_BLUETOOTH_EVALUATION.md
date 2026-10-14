@@ -1,5 +1,8 @@
 # M04 Bluetooth-first hearing feasibility — decision record (2026-10-12)
 
+> **2026-10-14 evidence checkpoint:** [M04-B0 software-first exit and local-DSP platform downselect](./M04B0_SOFTWARE_FIRST_EXIT_AND_LOCAL_DSP_DOWSELECT_2026-10-14.md) records what is **not measurable by Android passive route/timestamp APIs**. Ordinary phone-mic→Bluetooth stays the preferred research path but is not cleared for everyday open-ear live hearing. Hardware POCs/development and output/acoustic user tests remain parked until separately authorized; do not repeat SW1/SW3/SW4 acceptance tests.
+
+
 > **LATEST PRIORITY UPDATE:** [M04 software-first capture feasibility](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md) supersedes both the original phone-mic-only investigation priority and the later custom earbud-local hardware POC priority. Explore **normal phone/earbud capture → phone native DSP → Bluetooth output** first, with output disabled during diagnostics. User has deferred all hardware POCs. Do not consider old POC sequence permission to do hardware work or live amplification.
 
 
