@@ -105,7 +105,7 @@ public final class MainActivity extends Activity {
         priorAudioMode = manager.getMode();
         buildScreen();
         log("app_open android=" + Build.VERSION.SDK_INT + " device=" + Build.MANUFACTURER + "/" + Build.MODEL);
-        log("probe_build=20261013-sw3-native-v0.3.0; predicted_output_only=true; passive_audit=true");
+        log("probe_build=20261014-sw4-input-clock-v0.4.0; predicted_output_only=true; passive_audit=true; input_clock_metadata_only=true");
         log("recording_scope=input_only; raw_PCM=discarded; output=DISABLED");
         refreshDevices();
         manager.registerAudioDeviceCallback(deviceCallback, ui);
@@ -120,11 +120,11 @@ public final class MainActivity extends Activity {
         setContentView(scroll);
 
         TextView title = new TextView(this);
-        title.setText("HearLens SW3-Native · v0.3.0");
+        title.setText("HearLens SW4 Input Clock · v0.4.0");
         title.setTextSize(22);
         root.addView(title);
         TextView buildLabel = new TextView(this);
-        buildLabel.setText("2026-10-13 · Route Audit · NO PLAYBACK");
+        buildLabel.setText("2026-10-14 · Input Clock + Route Audit · NO PLAYBACK");
         buildLabel.setTextSize(13);
         root.addView(buildLabel);
 
@@ -144,7 +144,7 @@ public final class MainActivity extends Activity {
         showAuditStatus();
 
         hint = new TextView(this);
-        hint.setText("僅查詢 Android 預計的聲音輸出裝置；不播放、不錄音、不上傳。以下麥克風收音功能僅供其他研究，這次不需要使用。");
+        hint.setText("路由檢查不播放、不錄音；下方收音功能必須手動啟動，僅記錄音量與輸入時間戳、立即丟棄 PCM。時間戳不是聲學延遲，無法測量藍牙播放時間或耳機聲壓。");
         hint.setTextSize(14);
         hint.setPadding(0, 8, 0, 8);
         root.addView(hint);
@@ -527,6 +527,7 @@ public final class MainActivity extends Activity {
         short[] buffer = new short[960];
         long started = android.os.SystemClock.elapsedRealtime();
         long windowStart = started;
+        final CaptureClockAudit clockAudit = new CaptureClockAudit();
         long samples = 0, clipped = 0, totalFrames = 0;
         double sumSquares = 0;
         int peak = 0;
@@ -561,11 +562,16 @@ public final class MainActivity extends Activity {
                     double peakDbfs = 20 * Math.log10(Math.max(peak / 32768.0, 1e-9));
                     AudioTimestamp timestamp = new AudioTimestamp();
                     int timestampStatus = rec.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC);
+                    long observationNanos = android.os.SystemClock.elapsedRealtimeNanos();
+                    CaptureClockAudit.Snapshot clock = clockAudit.observe(
+                        timestampStatus == AudioRecord.SUCCESS, timestamp.framePosition,
+                        timestamp.nanoTime, observationNanos, rec.getSampleRate());
                     String route = safeDevice(rec.getRoutedDevice());
                     log(String.format(Locale.US,
                         "level: rms_dBFS=%.1f peak_dBFS=%.1f clipped=%d samples=%d input=%s tsStatus=%d frames=%d",
                         dbfs, peakDbfs, clipped, samples, route, timestampStatus,
                         timestampStatus == AudioRecord.SUCCESS ? timestamp.framePosition : -1));
+                    log("SW4_" + clock.toLog());
                     samples = 0;
                     clipped = 0;
                     sumSquares = 0;
