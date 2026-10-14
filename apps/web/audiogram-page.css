@@ -24,6 +24,7 @@
 .profile-alert { min-height: 1.7em; margin-top: .75rem; font-weight: 700; }
 .profile-alert[data-kind="error"] { color: var(--danger); }
 .profile-alert[data-kind="ok"] { color: var(--ok); }
+.profile-alert[data-kind="dirty"] { color: var(--text); border-left: 4px solid var(--accent); padding-left: .6rem; }
 .profile-warning { border-left: 4px solid var(--border); padding: .65rem .85rem; line-height: 1.6; }
 .profile-chart { width: 100%; height: auto; max-height: 400px; display: block; }
 .profile-chart text { font-size: 14px; fill: var(--text); }
