@@ -35,7 +35,11 @@ jobs:
           mkdir -p apps/web/testdata
           cp testdata/audio/hearlens-zh-tw-regression-v2.wav apps/web/testdata/
       - name: Stage canonical M03 audiogram validator
-        run: cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
+        run: |
+          cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
+          cmp -s packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
+          test -s apps/web/audiogram.html
+          test -s apps/web/audiogram-page.mjs
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
