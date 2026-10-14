@@ -1,0 +1,40 @@
+name: M03 Audiogram Chromium E2E
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/audiogram*"
+      - "packages/audiogram/audiogram.mjs"
+      - "tools/test-audiogram-browser.mjs"
+      - ".github/workflows/audiogram-browser.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/audiogram*"
+      - "packages/audiogram/audiogram.mjs"
+      - "tools/test-audiogram-browser.mjs"
+      - ".github/workflows/audiogram-browser.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-audiogram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned Chromium test runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Stage exactly the canonical audiogram domain module for Pages
+        run: |
+          cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
+          cmp -s packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
+      - name: Run browser interaction regression (no audio or network backend)
+        run: node tools/test-audiogram-browser.mjs
