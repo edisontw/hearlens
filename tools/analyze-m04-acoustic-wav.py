@@ -109,20 +109,22 @@ def main():
     max_lag = math.floor(rate * args.max_delay_ms / 1000)
     if max_lag <= min_lag:
         ap.error("Lag range shorter than one sample")
-    events = []
+    specs = []
     try:
         for part in args.events.split(","):
             start, stop = (float(v) for v in part.split(":"))
-            if not (math.isfinite(start) and math.isfinite(stop)):
-                raise ValueError("Event times must be finite")
-            events.append(one_event(pcm, rate, start, stop, min_lag, max_lag))
+            if not (math.isfinite(start) and math.isfinite(stop) and 0 <= start < stop):
+                raise ValueError("Event times must be finite, nonnegative, and increasing")
+            specs.append((start, stop))
+        for previous, following in zip(specs, specs[1:]):
+            if following[0] < previous[1] + max_lag / rate:
+                raise ValueError("Overlapping event/output search windows: choose isolated stimuli")
+        events = [one_event(pcm, rate, start, stop, min_lag, max_lag)
+                  for start, stop in specs]
     except (ValueError, ZeroDivisionError) as exc:
         ap.error(str(exc))
     if not events:
         ap.error("At least one event required")
-    for previous, following in zip(events, events[1:]):
-        if following["reference_start_s"] < previous["reference_end_s"] + max_lag / rate:
-            ap.error("Overlapping event/output search windows: choose isolated stimuli")
     delays = [v["delay_ms"] for v in events]
     result = {
         "type": "M04_UNCALIBRATED_NONHUMAN_ACOUSTIC_ARRIVAL_DIFFERENCE",
