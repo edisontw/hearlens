@@ -84,7 +84,7 @@ test('SW4 v0.4.0 version/build identity and route action visible before legacy i
   const workflow = readFileSync('.github/workflows/android-sw1-probe.yml', 'utf8');
   assert.match(gradle, /versionCode 4/);
   assert.match(gradle, /versionName '0\.4\.0-sw4-input-clock'/);
-  assert.match(manifest, /android:label="HearLens SW3 Route Probe"/);
+  assert.match(manifest, /android:label="HearLens SW4 Clock Probe"/);
   assert.match(main, /HearLens SW4 Input Clock · v0\.4\.0/);
   assert.match(main, /probe_build=20261014-sw4-input-clock-v0\.4\.0/);
   const primaryAction=main.indexOf('addButton(root, "檢查媒體輸出預測（完全不播放）"');
