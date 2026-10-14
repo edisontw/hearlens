@@ -52,7 +52,7 @@ test("JSON import/export roundtrip uses the original M03 serializer unchanged", 
   const form = formDataFromProfile(decoded);
   assert.deepEqual(form, inputs());
   assert.equal(serializeAudiogramProfile(normalizeAudiogramProfile(profileFromFormData(form))), encoded);
-  assert.equal(Object.keys(JSON.parse(encoded)), 2);
+  assert.deepEqual(Object.keys(JSON.parse(encoded)), ["schema", "ears"]);
 });
 
 test("invalid, missing and coercible measurements fail closed", () => {
