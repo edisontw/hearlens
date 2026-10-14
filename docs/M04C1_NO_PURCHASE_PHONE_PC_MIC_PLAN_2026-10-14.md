@@ -26,6 +26,17 @@
 
 **No-purchase branch selection:** Prioritize existing-caption usefulness while holding acoustic output. If the PC has a verified *single common-clock* multichannel input built in, it can be considered for later independent safety-reviewed measurement without a new interface; otherwise stop this branch rather than repeatedly optimizing synthetic DSP or improvising unsynchronized clocks.
 
+## M04-C2 — Existing Android first-party baseline availability (passive only)
+
+**New software-only decision, 2026-10-14:** before programming a new live PCM output route, check whether **Google Sound Amplifier (聲音擴大器)** is available on the existing Moto g62 5G. The official app documents phone-microphone → wired/Bluetooth headphone environmental sound amplification, while explicitly warning that Bluetooth output can be delayed or degraded. It is a useful **external comparator** for software-topology feasibility, NOT a validated measurement, medical fit, route hard mute or HearLens implementation. Phone/model-specific compatibility must be confirmed, not assumed.
+
+- **Allowed now:** look for the app in Android Settings → Accessibility or its Google Play listing, and note *installed/compatible/not compatible/unavailable*. Do **not** press Start/turn on amplification solely for this check.
+- **Not approved:** activation, on-ear listening, phone-speaker fallback experiments, sound-volume increases, loopback test-tone playback, or subjective latency claims. A real nonhuman sound test would require a *new explicit user approval* and the independently protected output setup described in SAFETY/M04-B0.
+- **Important prescription limitation:** Google's help says that separate L/R adjustments for Bluetooth headphones apply to *phone media*, **not phone-microphone audio**; this cannot replace HearLens audiogram-aware processing.
+- **Priority:** if this app is unavailable, no third-party amplification app is a mandatory substitute. Avoid installing dozens of comparators or building a custom output player until safety and recording apparatus gates are resolved. Keep M01 captions usable and M03 DSP offline.
+
+Primary sources: [Google Sound Amplifier help (Traditional Chinese)](https://support.google.com/accessibility/android/answer/9157755?hl=zh-Hant), [Google Play app](https://play.google.com/store/apps/details?id=com.google.android.accessibility.soundamplifier).
+
 ## Safe next interaction / minimum evidence to request
 
 The Windows Realtek microphone detection and moving input level bar already close the basic available-PC-microphone check; no further screenshot or numeric percentage is needed. AIR31 should remain paired with the phone for its intended receiver role, and EWM1 may remain phone-only/unused. With the available unsynchronized devices and no approved protected playback, **stop additional acoustic latency trials here** instead of requesting a contrived dual-device measurement. Existing phone-mic and AIR31 field tests should not be repeated.
