@@ -1,5 +1,8 @@
 # M04-A — Earbud-local DSP and platform API feasibility (2026-10-12)
 
+> **2026-10-14 current evidence update:** [M04-B0 desk downselect and software-first exit gate](./M04B0_SOFTWARE_FIRST_EXIT_AND_LOCAL_DSP_DOWSELECT_2026-10-14.md) verifies Nordic firmware/mono-platform constraints, public Qualcomm access uncertainty and Tympan Rev F official store **sold out** status. **No hardware procurement, live audio or firmware POC authorized.** The user-approved phone builtin mic→ordinary Bluetooth output remains the active software-first direction, contingent on physical acoustic and route tests.
+
+
 > **2026-10-12 later user priority supersession:** Hardware POCs, ODM/SDK acquisition and custom ear-side prototype implementation are **deferred**. The active software-first plan is [M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md), which evaluates phone DSP + Bluetooth audio and phone/earbud microphone capture. The technical findings below remain reference material, NOT an instruction to start hardware work.
 
 
