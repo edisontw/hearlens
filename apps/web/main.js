@@ -4,7 +4,7 @@ import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261014-caption-layout1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261014-caption-wake1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -14,7 +14,7 @@ import {
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261014-caption-layout1";
+} from "./transcript-window.mjs?v=20261014-caption-wake1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
