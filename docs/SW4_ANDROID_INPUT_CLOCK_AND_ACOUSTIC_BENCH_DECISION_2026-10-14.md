@@ -14,7 +14,7 @@ The existing separate debug-only Android app, now `HearLens SW4 Input Clock · v
 
 During an explicitly user-started **input-only** MIC / VOICE_RECOGNITION capture, the Android `AudioRecord.getTimestamp(AudioTimestamp.TIMEBASE_MONOTONIC)` is sampled once per ~1-second level-statistics interval. A separate pure-Java `CaptureClockAudit` observes:
 
-- `timestampAgeMs = observationElapsedRealtimeNanos − audioTimestamp.nanoTime`: how old the Android-provided input timestamp appears **when sampled**, not when sound reached the microphone.
+- `timestampAgeMs = observationSystemNanoTime − audioTimestamp.nanoTime`: how old the Android-provided input timestamp appears **when sampled**, not when sound reached the microphone.
 - `frameClockDeltaMs = 1000×ΔframePosition/sampleRate − ΔtimestampNanos/10⁶`: signed clock continuity difference across successive **valid** input timestamps; **not** microphone ADC latency, audio capture-to-user-visible processing delay or Bluetooth transport latency.
 - `state` in `UNAVAILABLE` / `FIRST_SAMPLE` / `STABLE` / `STALE` / `INVALID` / `DISCONTINUITY`: purely **diagnostic** classifications, not routing/production safety authorization. Missing status resets the timing baseline; invalid, duplicate, regressing, future, too-old or impossible timestamps never silently become measurements.
 - Android source, actual routed **input** device, client/device format, per-second RMS/peak **dBFS** and clipping counts still appear in the report. These remain *digital amplitudes*, not absolute environmental SPL, SNR or speech intelligibility.
