@@ -118,7 +118,7 @@ test('SW4 input-clock readouts are metadata-only and never claim acoustic or Blu
   const workflow = readFileSync('.github/workflows/android-sw1-probe.yml', 'utf8');
   assert.match(main, /new CaptureClockAudit\(\)/);
   assert.match(main, /AudioTimestamp\.TIMEBASE_MONOTONIC/);
-  assert.match(main, /elapsedRealtimeNanos\(\)/);
+  assert.match(main, /System\.nanoTime\(\)/);
   assert.match(main, /SW4_.*clock\.toLog\(\)/);
   assert.match(main, /buffer\[i\] = 0/);
   for (const v of ['acoustic_input_latency=UNMEASURED',
