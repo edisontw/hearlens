@@ -86,7 +86,7 @@ try {
   assert.equal(await page.locator("#caption").innerText(), "這是一段測試字幕。");
   assert.equal(await page.locator('[data-caption-size="xlarge"]').getAttribute("aria-pressed"), "true");
 
-  await context.setViewportSize({ width: 844, height: 390 });
+  await page.setViewportSize({ width: 844, height: 390 });
   const landscapeRegular = await page.locator("#caption").evaluate(el => el.getBoundingClientRect().height);
   await page.locator("#caption-focus-toggle").click();
   const landscapeFocus = await page.locator("#caption").evaluate(el => el.getBoundingClientRect().height);
