@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import {
   currentCaptionText,
+  completeSessionTranscriptText,
   recentTranscriptItems,
   recentTranscriptText,
   relativeTranscriptTime,
@@ -67,4 +69,32 @@ test("interim speech remains fresh only for its own 30-second window", () => {
     "");
   assert.equal(currentCaptionText([], "未標時間", null, 100_000), "");
   assert.equal(currentCaptionText([], "未來資料", 101_000, 100_000), "");
+});
+
+
+test("complete session opt-in text includes expired finals but never modifies the source array", () => {
+  // The caller supplies finalized segments only; interim text is not part of it.
+  const finals = [
+    { text: "醫師說明檢查結果。", time: 1_000 },
+    { text: "請兩週後再回診。", time: 95_000 },
+    { text: " ", time: 95_001 },
+  ];
+  const before = JSON.stringify(finals);
+  assert.equal(completeSessionTranscriptText(finals),
+    "醫師說明檢查結果。\\n請兩週後再回診。");
+  assert.equal(JSON.stringify(finals), before);
+  assert.equal(completeSessionTranscriptText([]), "");
+});
+
+test("full-session copy is explicit, disabled without finals, and reset at each new session", () => {
+  const html = readFileSync("apps/web/index.html", "utf8");
+  const main = readFileSync("apps/web/main.js", "utf8");
+  assert.match(html, /id="copy-complete-transcript"[^>]*disabled/);
+  assert.match(html, /文字僅暫存在這個分頁/);
+  assert.match(main, /completeSessionTranscriptText\\(sessionFinals\\)/);
+  assert.match(main, /sessionFinals\\.push\\(item\\);\\s*syncCompleteTranscriptCopyButton\\(\\)/);
+  assert.match(main, /sessionFinals\\.length = 0;\\s*syncCompleteTranscriptCopyButton\\(\\)/);
+  assert.match(main, /copyCompleteTranscript\\.disabled = sessionFinals\\.length === 0/);
+  assert.match(main, /navigator\\.clipboard\\.writeText\\(text\\)/);
+  assert.match(main, /els\\.copyCompleteTranscript\\?\\.addEventListener\\("click"/);
 });
