@@ -1,18 +1,32 @@
-name: M03 Audiogram Chromium E2E
+name: Web UI Chromium E2E
 
 on:
   pull_request:
     paths:
       - "apps/web/audiogram*"
+      - "apps/web/index.html"
+      - "apps/web/main.js"
+      - "apps/web/styles.css"
+      - "apps/web/caption-focus.mjs"
+      - "apps/web/caption-size.mjs"
+      - "apps/web/build.json"
       - "packages/audiogram/audiogram.mjs"
       - "tools/test-audiogram-browser.mjs"
+      - "tools/test-caption-focus-browser.mjs"
       - ".github/workflows/audiogram-browser.yml"
   push:
     branches: [main]
     paths:
       - "apps/web/audiogram*"
+      - "apps/web/index.html"
+      - "apps/web/main.js"
+      - "apps/web/styles.css"
+      - "apps/web/caption-focus.mjs"
+      - "apps/web/caption-size.mjs"
+      - "apps/web/build.json"
       - "packages/audiogram/audiogram.mjs"
       - "tools/test-audiogram-browser.mjs"
+      - "tools/test-caption-focus-browser.mjs"
       - ".github/workflows/audiogram-browser.yml"
   workflow_dispatch:
 
@@ -20,7 +34,7 @@ permissions:
   contents: read
 
 jobs:
-  chromium-audiogram:
+  chromium-static-ui:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -36,5 +50,7 @@ jobs:
         run: |
           cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
           cmp -s packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
-      - name: Run browser interaction regression (no audio or network backend)
-        run: node tools/test-audiogram-browser.mjs
+      - name: Run real-browser static UI regressions (no microphone or output)
+        run: |
+          node tools/test-audiogram-browser.mjs
+          node tools/test-caption-focus-browser.mjs
