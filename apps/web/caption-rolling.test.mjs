@@ -34,7 +34,7 @@ test("session reports keep full finals despite rolling display expiration", () =
 });
 
 test("rolling caption version is consistent across browser assets", () => {
-  const version = "20261015-caption-retain1";
+  const version = "20261015-caption-clear1";
   assert.equal(build.buildId, version);
   assert(main.includes('./transcript-window.mjs?v=' + version));
   assert(html.includes('./main.js?v=' + version));
@@ -52,4 +52,13 @@ test("main live caption retains last confirmed final and manual clear never dele
   assert.match(main, /const retained = visibleDisplayTranscript\(\)/);
   assert.match(html, /id="clear-caption"[^>]*aria-label="清除主畫面字幕，不刪除本次完整字幕"/);
   assert.match(html, /即時字幕保留最後一段已確認內容/);
+});
+
+
+test("manual clear leaves main caption blank until another transcript arrives", () => {
+  assert.match(main, /captionManuallyCleared = true;\s*updateCaptionDisplay\(""\)/);
+  assert.match(main, /captionManuallyCleared \? "" : "正在聆聽…"/);
+  assert.match(main, /if \(interimText\.trim\(\)\) captionManuallyCleared = false/);
+  assert.match(main, /lastDisplayFinal = item;\s*captionManuallyCleared = false/);
+  assert.doesNotMatch(main, /畫面已清除，等待新字幕|畫面已清除。/);
 });

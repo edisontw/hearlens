@@ -104,7 +104,7 @@ try {
   // Deliberately do not request mic permission. Clear the currently visible
   // synthetic caption and verify the display action responds in the browser.
   await page.locator("#clear-caption").click();
-  assert.equal(await page.locator("#caption").innerText(), "畫面已清除。");
+  assert.equal(await page.locator("#caption").innerText(), "", "manual clear must be visually blank");
   assert(await page.locator("#recall").isVisible());
 
   assert.deepEqual(errors, [], "static web page must have no unhandled script errors");
