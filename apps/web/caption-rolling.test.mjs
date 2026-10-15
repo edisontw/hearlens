@@ -34,7 +34,7 @@ test("session reports keep full finals despite rolling display expiration", () =
 });
 
 test("rolling caption version is consistent across browser assets", () => {
-  const version = "20261015-caption-retain1";
+  const version = "20261015-caption-clear1";
   assert.equal(build.buildId, version);
   assert(main.includes('./transcript-window.mjs?v=' + version));
   assert(html.includes('./main.js?v=' + version));
