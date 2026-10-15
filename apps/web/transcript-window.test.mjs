@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   currentCaptionText,
+  retainedCaptionText,
   completeSessionTranscriptText,
   recentTranscriptItems,
   recentTranscriptText,
@@ -97,4 +98,50 @@ test("full-session copy is explicit, disabled without finals, and reset at each 
   assert.match(main, /copyCompleteTranscript\.disabled = sessionFinals\.length === 0/);
   assert.match(main, /navigator\.clipboard\.writeText\(text\)/);
   assert.match(main, /els\.copyCompleteTranscript\?\.addEventListener\("click"/);
+});
+
+
+test("old confirmed caption remains visible indefinitely while recent finals expire", () => {
+  const now = 100_000;
+  const previous = { text: "請下週回診", time: 10_000 };
+  const current = { text: "請記得帶報告", time: 95_000 };
+  const recent = [previous, current];
+  assert.equal(retainedCaptionText(recent, current, "", null, now),
+    "請記得帶報告");
+  assert.equal(retainedCaptionText(recent, current, "", null, now + 60_000),
+    "請記得帶報告");
+  assert.equal(retainedCaptionText([], current, "", null, now + 360_000),
+    "請記得帶報告");
+  assert.equal(retainedCaptionText([], null, "", null, now + 360_000), "");
+});
+
+test("new recognized speech updates visible finals without pinning stale partials", () => {
+  const now = 100_000;
+  const prior = { text: "上段已確認", time: 60_000 };
+  const fresh = { text: "最新一段", time: 95_000 };
+  assert.equal(retainedCaptionText([prior, fresh], fresh, "正在辨識", 99_000, now),
+    "最新一段 正在辨識");
+  assert.equal(retainedCaptionText([], prior, "未完成的片段", 99_000, now),
+    "上段已確認 未完成的片段");
+  assert.equal(retainedCaptionText([], prior, "已過期部分", 99_000, now + 30_001),
+    "上段已確認");
+  assert.equal(retainedCaptionText([], null, "已過期部分", 99_000, now + 30_001),
+    "");
+});
+
+test("screen clear can remove display pointers without deleting source finals or recent history", () => {
+  const old = { text: "主畫面原有文字", time: 90_000 };
+  const recall = [old];
+  const sessionFinals = [old];
+  const displayed = [old];
+  let pinned = old;
+  displayed.length = 0;
+  pinned = null;
+  assert.equal(retainedCaptionText(displayed, pinned, "", null, 100_000), "");
+  assert.equal(recentTranscriptText(recall), "主畫面原有文字");
+  assert.equal(completeSessionTranscriptText(sessionFinals), "主畫面原有文字");
+  displayed.push({ text: "清除後的新字幕", time: 100_010 });
+  pinned = displayed[0];
+  assert.equal(retainedCaptionText(displayed, pinned, "", null, 100_020),
+    "清除後的新字幕");
 });

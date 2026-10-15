@@ -19,7 +19,7 @@ test("rolling window refresh is bounded and has an explicit shutdown path", () =
 test("live captions update text only on changes without re-announcing every second", () => {
   assert.match(main, /if \(els\.caption\.textContent === text\) return/);
   assert.match(main, /updateCaptionDisplay\(nextText\)/);
-  assert.match(main, /currentCaptionText\(\s*transcript, interimText, lastInterimAt, now, ROLLING_WINDOW_MS\)/);
+  assert.match(main, /retainedCaptionText\(\s*displayFinals, lastDisplayFinal, interimText, lastInterimAt, now, ROLLING_WINDOW_MS\)/);
   assert.match(main, /lastInterimAt = interimText\.trim\(\) \? Date\.now\(\) : null/);
   assert.match(main, /const fallback = liveInterim\(now\) \|\| recentRecognizedText\(now\)/);
   assert.match(main, /recentTranscriptText\(items\) \|\|\s*liveInterim\(\)/);
@@ -34,8 +34,22 @@ test("session reports keep full finals despite rolling display expiration", () =
 });
 
 test("rolling caption version is consistent across browser assets", () => {
-  const version = "20261015-caption-focus1";
+  const version = "20261015-caption-retain1";
   assert.equal(build.buildId, version);
   assert(main.includes('./transcript-window.mjs?v=' + version));
   assert(html.includes('./main.js?v=' + version));
+});
+
+
+test("main live caption retains last confirmed final and manual clear never deletes session history", () => {
+  assert.match(main, /displayFinals\.push\(item\)/);
+  assert.match(main, /lastDisplayFinal = item/);
+  assert.match(main, /function visibleDisplayTranscript\(now = Date\.now\(\)\)/);
+  assert.match(main, /const combined = visibleDisplayTranscript\(now\)/);
+  assert.match(main, /els\.clearCaption\?\.addEventListener\("click"/);
+  assert.match(main, /displayFinals\.length = 0;\s*lastDisplayFinal = null;/);
+  assert.match(main, /sessionFinals\.push\(item\)/);
+  assert.match(main, /const retained = visibleDisplayTranscript\(\)/);
+  assert.match(html, /id="clear-caption"[^>]*aria-label="清除主畫面字幕，不刪除本次完整字幕"/);
+  assert.match(html, /即時字幕保留最後一段已確認內容/);
 });

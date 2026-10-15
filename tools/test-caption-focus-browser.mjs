@@ -69,6 +69,7 @@ try {
   assert(focusHeight > regularHeight + 50,
     "focus must visibly enlarge the caption viewport on a portrait phone");
   assert.equal(await page.locator("#caption").innerText(), "這是一段測試字幕。");
+  assert(await page.locator("#clear-caption").isVisible(), "clear remains available in focus mode");
   for (const id of ["start", "stop", "recall"]) {
     assert(await page.locator("#" + id).isVisible(), id + " remains visible");
   }
@@ -99,6 +100,12 @@ try {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   assert(landscapeOverflow <= 2, "landscape focus must not cause horizontal overflow");
+
+  // Deliberately do not request mic permission. Clear the currently visible
+  // synthetic caption and verify the display action responds in the browser.
+  await page.locator("#clear-caption").click();
+  assert.equal(await page.locator("#caption").innerText(), "畫面已清除。");
+  assert(await page.locator("#recall").isVisible());
 
   assert.deepEqual(errors, [], "static web page must have no unhandled script errors");
   console.log("PASS M01 Chromium: portrait + landscape focus toggle, enlarged caption, preserved essential controls, retained text/font, no horizontal overflow; no capture/playback.");
