@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261015-stt-privacy1" />
+    <link rel="stylesheet" href="./styles.css?v=20261015-session-review1" />
   </head>
   <body>
     <main class="shell">
@@ -78,9 +78,16 @@
           </div>
           <button id="close-recall" class="text-button" type="button">關閉</button>
         </div>
+        <div class="recall-mode-controls" role="group" aria-label="字幕回顧範圍">
+          <button id="recall-recent" class="secondary" type="button"
+            aria-pressed="true" aria-controls="recall-list">最近 30 秒</button>
+          <button id="recall-complete" class="secondary" type="button"
+            aria-pressed="false" aria-controls="recall-list">本次對話</button>
+        </div>
         <div id="recall-list" class="recall-list" aria-live="polite">
           <div class="recall-empty">目前沒有最近 30 秒的字幕。</div>
         </div>
+        <button id="recall-load-earlier" class="secondary recall-load-earlier" type="button" hidden>顯示更早的字幕</button>
         <div class="recall-actions">
           <button id="copy-recent-transcript" class="secondary" type="button">
             複製近期字幕
@@ -90,7 +97,7 @@
           </button>
           <span id="recall-copy-status" class="copy-status" aria-live="polite"></span>
         </div>
-        <p class="hint">完整字幕只包含本次已確認的辨識文字，不含正在辨識的片段。文字僅暫存在這個分頁；重新開始或關閉後無法取回。複製後請注意對話隱私。</p>
+        <p class="hint">「本次對話」可直接回看本次已確認的字幕，不包含未確認文字。字幕僅暫存在這個分頁；重新開始或關閉後無法取回。複製後請注意對話隱私。</p>
       </section>
 
       <section class="panel research-panel">
@@ -271,6 +278,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261015-stt-privacy1"></script>
+    <script type="module" src="./main.js?v=20261015-session-review1"></script>
   </body>
 </html>
