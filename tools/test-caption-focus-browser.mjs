@@ -116,6 +116,26 @@ try {
   assert.equal(await page.locator("#caption").innerText(), "", "manual clear must be visually blank");
   assert(await page.locator("#recall").isVisible());
 
+  // Open the ordinary 30-second recall and switch to memory-only session review.
+  // Empty-session state is tested without triggering the microphone.
+  await page.locator("#recall").click();
+  assert(await page.locator("#recall-panel").isVisible());
+  assert.equal(await page.locator("#recall-recent").getAttribute("aria-pressed"), "true");
+  assert.equal(await page.locator("#recall-complete").getAttribute("aria-pressed"), "false");
+  await page.locator("#recall-complete").click();
+  assert.equal(await page.locator("#recall-complete").getAttribute("aria-pressed"), "true");
+  assert.equal(await page.locator("#recall-recent").getAttribute("aria-pressed"), "false");
+  assert.equal(await page.locator("#recall-list").getAttribute("aria-live"), "off");
+  assert.match(await page.locator("#recall-list").innerText(), /本次尚無已確認字幕/);
+  assert.equal(await page.locator("#recall-load-earlier").isVisible(), false);
+  assert(await page.locator("#recall-list").evaluate(
+    el => el.classList.contains("full-session-review")), "full review uses bounded scroll");
+  await page.locator("#recall-recent").click();
+  assert.equal(await page.locator("#recall-recent").getAttribute("aria-pressed"), "true");
+  assert.equal(await page.locator("#recall-list").getAttribute("aria-live"), "polite");
+  await page.locator("#close-recall").click();
+  assert.equal(await page.locator("#recall-panel").isVisible(), false);
+
   // Verify query-configured alternatives before any microphone action.
   for (const { mode, expected, excluded } of [
     { mode: "browser", expected: /瀏覽器.*可能使用雲端/, excluded: /Google Gemini/ },
