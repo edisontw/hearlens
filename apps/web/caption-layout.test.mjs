@@ -52,7 +52,7 @@ test("caption update follows near-bottom while keeping manual reread position", 
   assert.match(main, /shouldFollowCaptionScroll\(/);
   assert.match(main, /if \(follow\) els\.caption\.scrollTop = els\.caption\.scrollHeight/);
   assert.match(main, /updateCaptionDisplay\(nextText\)/);
-  assert.match(main, /updateCaptionDisplay\(recent \|\| "字幕會顯示在這裡。"\)/);
+  assert.match(main, /updateCaptionDisplay\(retained \|\| \(captionManuallyCleared/);
 });
 
 test("responsive asset version has browser cache bust and no hearing playback", () => {
