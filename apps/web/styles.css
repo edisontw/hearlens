@@ -831,3 +831,26 @@ body.caption-focus-mode .caption {
     min-height: 6.5rem;
   }
 }
+
+
+/* Display-only clear action: remains visible in normal and focus modes. */
+.caption-clear {
+  min-height: 44px;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+@media (max-width: 540px) {
+  .primary-panel > .status-row {
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+  }
+  .caption-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .caption-clear {
+    padding: 0.45rem 0.4rem;
+    font-size: 0.82rem;
+  }
+}
