@@ -22,6 +22,16 @@ export function recentTranscriptText(items = []) {
     .join("\n");
 }
 
+/**
+ * Opt-in copy-only projection of finalized captions from the current session.
+ * Unlike the rolling 30-second display, this does not trim by age.
+ * The caller MUST supply the finalized-only session collection (never interim).
+ * No persistence, audio or external network I/O happens here.
+ */
+export function completeSessionTranscriptText(finalizedItems = []) {
+  return recentTranscriptText(finalizedItems);
+}
+
 export function relativeTranscriptTime(itemTime, now = Date.now()) {
   const ageMs = Math.max(0, now - Number(itemTime || now));
   const seconds = Math.round(ageMs / 1000);
