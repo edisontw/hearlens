@@ -690,7 +690,6 @@ function loadEarlierSessionCaptions() {
   const beforeTop = els.recallList.scrollTop;
   const beforeHeight = els.recallList.scrollHeight;
   reviewVisibleCount += SESSION_REVIEW_PAGE_SIZE;
-  lastFullReviewSignature = "";
   renderRecall();
   // Prepending earlier messages should preserve the reader's current
   // sentence rather than unexpectedly jumping to another position.
