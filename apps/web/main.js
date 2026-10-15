@@ -1,11 +1,11 @@
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-caption-retain1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-caption-retain1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-caption-retain1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-caption-clear1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-caption-clear1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-caption-clear1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-caption-retain1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-caption-clear1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -17,7 +17,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261015-caption-retain1";
+} from "./transcript-window.mjs?v=20261015-caption-clear1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -43,7 +43,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261015-caption-retain1";
+const BUILD_ID = "20261015-caption-clear1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -486,7 +486,7 @@ function refreshCaptionWindow() {
     renderCaption();
   } else if (!activeSessionId) {
     const text = visibleDisplayTranscript() || (captionManuallyCleared
-      ? "畫面已清除。" : "字幕會顯示在這裡。");
+      ? "" : "字幕會顯示在這裡。");
     updateCaptionDisplay(text);
   }
   if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
@@ -517,8 +517,7 @@ function updateCaptionDisplay(text) {
 function renderCaption() {
   const now = Date.now();
   const combined = visibleDisplayTranscript(now);
-  const nextText = combined || (captionManuallyCleared
-    ? "畫面已清除，等待新字幕…" : "正在聆聽…");
+  const nextText = combined || (captionManuallyCleared ? "" : "正在聆聽…");
   // No repeat announcement for an unchanged caption, and no forced jump
   // when a user has scrolled up to reread an earlier long sentence.
   updateCaptionDisplay(nextText);
@@ -863,7 +862,7 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
     trimTranscript();
     updateCaptionDisplay(
       visibleDisplayTranscript() || (captionManuallyCleared
-        ? "畫面已清除。" : "字幕已中斷，請重新開始。"));
+        ? "" : "字幕已中斷，請重新開始。"));
     els.diagStt.textContent = message;
     els.start.disabled = false;
     els.stop.disabled = true;
@@ -1093,7 +1092,7 @@ async function stopSession() {
   trimTranscript();
   const retained = visibleDisplayTranscript();
   updateCaptionDisplay(retained || (captionManuallyCleared
-    ? "畫面已清除。" : "字幕會顯示在這裡。"));
+    ? "" : "字幕會顯示在這裡。"));
   els.diagMic.textContent = "未使用";
   activeSessionId = 0;
   els.start.disabled = false;
@@ -1177,7 +1176,7 @@ els.clearCaption?.addEventListener("click", () => {
   rawInterimText = "";
   lastInterimAt = null;
   captionManuallyCleared = true;
-  updateCaptionDisplay(activeSessionId ? "畫面已清除，等待新字幕…" : "畫面已清除。");
+  updateCaptionDisplay("");
   syncCaptionRefreshTimer();
 });
 els.recall.addEventListener("click", showRecall);
