@@ -9,14 +9,14 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261015-caption-clear1" />
+    <link rel="stylesheet" href="./styles.css?v=20261015-stt-privacy1" />
   </head>
   <body>
     <main class="shell">
       <header class="hero">
         <p class="eyebrow">HearLens · Research prototype</p>
         <h1>聽清楚對話</h1>
-        <p class="lead">把手機靠近說話的人，按下開始。沒有耳機也可以只看字幕。</p>
+        <p class="lead">按下開始即可看即時字幕；辨識不清楚時，再把手機移近說話者。</p>
       </header>
 
       <section class="panel primary-panel" aria-labelledby="listen-title">
@@ -31,12 +31,14 @@
           </div>
         </div>
 
+        <p id="stt-privacy-notice" class="stt-privacy-notice" role="note">開始後，麥克風聲音會傳送至 Google Gemini 進行雲端辨識。請先告知對話者。</p>
+
         <div id="caption" class="caption" tabindex="0"
           role="log" aria-label="即時字幕，內容過長時可在框內捲動"
           aria-live="polite" aria-atomic="true" aria-relevant="text">字幕會顯示在這裡。</div>
 
         <div class="actions">
-          <button id="start" class="primary" type="button">開始聆聽</button>
+          <button id="start" class="primary" type="button" aria-describedby="stt-privacy-notice">開始聆聽</button>
           <button id="stop" class="secondary stop-action" type="button" disabled>停止聆聽</button>
         </div>
 
@@ -64,7 +66,7 @@
         </div>
 
         <p class="hint">
-          聽不清楚時，先把手機移到說話者附近。HearLens 目前不會把麥克風聲音放大到手機喇叭。
+          若環境吵雜，可試著調整手機方向或位置。HearLens 目前不會把麥克風聲音放大到手機喇叭。
         </p>
       </section>
 
@@ -269,6 +271,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261015-caption-clear1"></script>
+    <script type="module" src="./main.js?v=20261015-stt-privacy1"></script>
   </body>
 </html>

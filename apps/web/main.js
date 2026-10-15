@@ -1,11 +1,12 @@
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-caption-clear1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-caption-clear1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-caption-clear1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261015-stt-privacy1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-stt-privacy1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-stt-privacy1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-stt-privacy1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-caption-clear1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-stt-privacy1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -17,7 +18,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261015-caption-clear1";
+} from "./transcript-window.mjs?v=20261015-stt-privacy1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -43,7 +44,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261015-caption-clear1";
+const BUILD_ID = "20261015-stt-privacy1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -95,6 +96,7 @@ const runtimeSttConfig = readRuntimeSttConfig();
 
 const els = {
   start: document.querySelector("#start"),
+  sttPrivacyNotice: document.querySelector("#stt-privacy-notice"),
   stop: document.querySelector("#stop"),
   recall: document.querySelector("#recall"),
   closeRecall: document.querySelector("#close-recall"),
@@ -144,6 +146,11 @@ const els = {
   copyTestReport: document.querySelector("#copy-test-report"),
   copyTestReportStatus: document.querySelector("#copy-test-report-status"),
 };
+
+// Populate the already-visible pre-capture notice from the selected provider.
+if (els.sttPrivacyNotice) {
+  els.sttPrivacyNotice.textContent = captionSttPrivacyNotice(runtimeSttConfig.provider);
+}
 
 // Presentation only: no microphone, STT, audio or persistence privileges.
 createCaptionFocusMode({ body: document.body, button: els.captionFocusToggle });

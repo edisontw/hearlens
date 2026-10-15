@@ -59,7 +59,16 @@ try {
   assert(await page.locator("#quick-preset").isVisible());
   await page.locator("#caption").evaluate(el => { el.textContent = "這是一段測試字幕。"; });
 
+  assert.match(await page.locator("#stt-privacy-notice").innerText(), /Google Gemini/);
+  assert(await page.locator("#stt-privacy-notice").isVisible(), "notice shown before start");
+  const beforeStart = await page.evaluate(() => {
+    const notice = document.querySelector("#stt-privacy-notice");
+    const start = document.querySelector("#start");
+    return Boolean(notice.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  assert(beforeStart, "privacy notice must occur before Start in document order");
   await page.locator("#caption-focus-toggle").click();
+  assert(await page.locator("#stt-privacy-notice").isVisible(), "notice survives focus mode");
   assert.equal(await page.locator("#caption-focus-toggle").getAttribute("aria-pressed"), "true");
   assert.equal(await page.locator("#caption-focus-toggle").innerText(), "返回一般畫面");
   assert.equal(await page.locator(".hero").isVisible(), false);
@@ -106,6 +115,21 @@ try {
   await page.locator("#clear-caption").click();
   assert.equal(await page.locator("#caption").innerText(), "", "manual clear must be visually blank");
   assert(await page.locator("#recall").isVisible());
+
+  // Verify query-configured alternatives before any microphone action.
+  for (const { mode, expected, excluded } of [
+    { mode: "browser", expected: /瀏覽器.*可能使用雲端/, excluded: /Google Gemini/ },
+    { mode: "google", expected: /語音代理.*Google Cloud/, excluded: /Google Gemini/ },
+  ]) {
+    await page.goto(origin + "/index.html?stt=" + mode, { waitUntil: "networkidle" });
+    const notice = await page.locator("#stt-privacy-notice").innerText();
+    assert.match(notice, expected);
+    assert.doesNotMatch(notice, excluded);
+    assert(await page.locator("#start").isVisible());
+    await page.locator("#caption-focus-toggle").click();
+    assert(await page.locator("#stt-privacy-notice").isVisible(),
+      "privacy notice must remain visible in focus mode for " + mode);
+  }
 
   assert.deepEqual(errors, [], "static web page must have no unhandled script errors");
   console.log("PASS M01 Chromium: portrait + landscape focus toggle, enlarged caption, preserved essential controls, retained text/font, no horizontal overflow; no capture/playback.");
