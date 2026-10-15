@@ -777,3 +777,57 @@ details > summary {
     line-height: 1.3;
   }
 }
+
+
+/* Optional, reversible focus mode. Does not modify speech capture or history. */
+.caption-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.focus-toggle {
+  min-height: 44px;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+.focus-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  font-weight: 800;
+}
+body.caption-focus-mode .shell {
+  width: min(1000px, 100%);
+}
+body.caption-focus-mode .hero,
+body.caption-focus-mode .research-panel,
+body.caption-focus-mode .note,
+body.caption-focus-mode .quick-profile,
+body.caption-focus-mode .primary-panel > .hint {
+  display: none;
+}
+body.caption-focus-mode .primary-panel {
+  margin-top: 0.3rem;
+}
+body.caption-focus-mode .caption {
+  height: clamp(13rem, 53dvh, 38rem);
+  min-height: 12rem;
+  max-height: none;
+}
+@media (max-width: 540px) {
+  .caption-header-actions {
+    gap: 0.3rem;
+  }
+  .focus-toggle {
+    padding: 0.45rem 0.4rem;
+    font-size: 0.82rem;
+  }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  body.caption-focus-mode .caption {
+    height: clamp(6.5rem, 43dvh, 18rem);
+    min-height: 6.5rem;
+  }
+}
