@@ -1001,10 +1001,10 @@ async function startSession() {
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
   renderCaptionLatencyTelemetry();
   sessionFinals.length = 0;
+  syncCompleteTranscriptCopyButton();
   reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
   lastFullReviewSignature = "";
   if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
-  syncCompleteTranscriptCopyButton();
   if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
   transcript.length = 0;
   displayFinals.length = 0;
