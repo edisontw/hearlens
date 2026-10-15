@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261015-caption-focus1" />
+    <link rel="stylesheet" href="./styles.css?v=20261015-caption-retain1" />
   </head>
   <body>
     <main class="shell">
@@ -24,6 +24,8 @@
           <h2 id="listen-title">即時字幕</h2>
           <div class="caption-header-actions">
             <span id="status" class="status" data-state="idle">尚未開始</span>
+            <button id="clear-caption" class="secondary caption-clear" type="button"
+              aria-label="清除主畫面字幕，不刪除本次完整字幕">清除畫面</button>
             <button id="caption-focus-toggle" class="secondary focus-toggle" type="button"
               aria-pressed="false">專注閱讀</button>
           </div>
@@ -262,11 +264,11 @@
           也不輸出放大的麥克風聲音。
         </p>
         <p>
-          即時顯示的是最近 30 秒字幕；本次已確認的完整字幕可於停止後手動複製，重新開始或重新載入後清除。
+          即時字幕保留最後一段已確認內容，直到新字幕出現或手動清除畫面；「剛剛說什麼？」仍只顯示最近 30 秒。本次完整字幕可手動複製，重新開始或重新載入後清除。
         </p>
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261015-caption-focus1"></script>
+    <script type="module" src="./main.js?v=20261015-caption-retain1"></script>
   </body>
 </html>
