@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261015-session-copy1" />
+    <link rel="stylesheet" href="./styles.css?v=20261015-caption-focus1" />
   </head>
   <body>
     <main class="shell">
@@ -22,7 +22,11 @@
       <section class="panel primary-panel" aria-labelledby="listen-title">
         <div class="status-row">
           <h2 id="listen-title">即時字幕</h2>
-          <span id="status" class="status" data-state="idle">尚未開始</span>
+          <div class="caption-header-actions">
+            <span id="status" class="status" data-state="idle">尚未開始</span>
+            <button id="caption-focus-toggle" class="secondary focus-toggle" type="button"
+              aria-pressed="false">專注閱讀</button>
+          </div>
         </div>
 
         <div id="caption" class="caption" tabindex="0"
@@ -85,7 +89,7 @@
         <p class="hint">完整字幕只包含本次已確認的辨識文字，不含正在辨識的片段。文字僅暫存在這個分頁；重新開始或關閉後無法取回。複製後請注意對話隱私。</p>
       </section>
 
-      <section class="panel">
+      <section class="panel research-panel">
         <details>
           <summary>研究／裝置資訊</summary>
           <p class="hint">
@@ -258,11 +262,11 @@
           也不輸出放大的麥克風聲音。
         </p>
         <p>
-          最近字幕只保留在此頁面記憶體中；停止或重新載入頁面後會清除。
+          即時顯示的是最近 30 秒字幕；本次已確認的完整字幕可於停止後手動複製，重新開始或重新載入後清除。
         </p>
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261015-session-copy1"></script>
+    <script type="module" src="./main.js?v=20261015-caption-focus1"></script>
   </body>
 </html>
