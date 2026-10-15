@@ -1,10 +1,10 @@
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261014-caption-wake1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261014-caption-wake1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-session-copy1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-session-copy1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261014-caption-wake1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-session-copy1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -13,8 +13,9 @@ import {
   currentCaptionText,
   recentTranscriptItems,
   recentTranscriptText,
+  completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261014-caption-wake1";
+} from "./transcript-window.mjs?v=20261015-session-copy1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -40,7 +41,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261014-caption-wake1";
+const BUILD_ID = "20261015-session-copy1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -96,6 +97,7 @@ const els = {
   recall: document.querySelector("#recall"),
   closeRecall: document.querySelector("#close-recall"),
   copyRecentTranscript: document.querySelector("#copy-recent-transcript"),
+  copyCompleteTranscript: document.querySelector("#copy-complete-transcript"),
   recallList: document.querySelector("#recall-list"),
   recallMeta: document.querySelector("#recall-meta"),
   recallCopyStatus: document.querySelector("#recall-copy-status"),
@@ -519,6 +521,7 @@ function addFinalTranscript(text, rawText = text) {
   };
   transcript.push(item);
   sessionFinals.push(item);
+  syncCompleteTranscriptCopyButton();
   rememberRecognizedText(clean, now);
   trimTranscript(now);
   renderCaption();
@@ -570,6 +573,33 @@ function showRecall() {
   renderRecall();
   syncCaptionRefreshTimer();
   els.recallPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function syncCompleteTranscriptCopyButton() {
+  if (els.copyCompleteTranscript) {
+    els.copyCompleteTranscript.disabled = sessionFinals.length === 0;
+  }
+}
+
+async function copyCompleteTranscript() {
+  // Only finalized text from this one session; never interims or debug logs.
+  const text = completeSessionTranscriptText(sessionFinals);
+  if (!text) {
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "本次尚無已確認的字幕";
+    }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "已複製本次完整字幕（僅已確認內容）";
+    }
+  } catch {
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "瀏覽器禁止自動複製，尚未儲存字幕";
+    }
+  }
 }
 
 async function copyRecentTranscript() {
@@ -848,6 +878,8 @@ async function startSession() {
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
   renderCaptionLatencyTelemetry();
   sessionFinals.length = 0;
+  syncCompleteTranscriptCopyButton();
+  if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
   transcript.length = 0;
   lastRecognizedText = "";
   lastRecognizedAt = 0;
@@ -1118,6 +1150,10 @@ els.closeRecall.addEventListener("click", () => {
 els.copyRecentTranscript?.addEventListener("click", () => {
   void copyRecentTranscript();
 });
+els.copyCompleteTranscript?.addEventListener("click", () => {
+  void copyCompleteTranscript();
+});
+syncCompleteTranscriptCopyButton();
 for (const button of els.captionSizeButtons) {
   button.addEventListener("click", () => {
     applyCaptionSize(button.dataset.captionSize);
