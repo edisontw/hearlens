@@ -32,6 +32,30 @@ export function completeSessionTranscriptText(finalizedItems = []) {
   return recentTranscriptText(finalizedItems);
 }
 
+/**
+ * Live caption projection with a persistent FINAL-only fallback.
+ *
+ * Once the short rolling window is empty, keep only the latest confirmed
+ * segment on screen. Never pin a partial/interim transcription. The caller
+ * owns the independent visibleItems/lastFinal state, so a manual clear can
+ * reset the display without deleting recall or complete-session history.
+ * No storage, network, or microphone side effects.
+ */
+export function retainedCaptionText(
+  visibleItems = [],
+  lastFinal = null,
+  interim = "",
+  interimAt = null,
+  now = Date.now(),
+  windowMs = DEFAULT_ROLLING_TRANSCRIPT_WINDOW_MS,
+) {
+  const recent = recentTranscriptItems(visibleItems, now, windowMs);
+  const recentText = recent.map(item => String(item.text).trim()).join(" ");
+  const fallback = String(lastFinal?.text || "").trim();
+  const freshInterim = currentCaptionText([], interim, interimAt, now, windowMs);
+  return [recentText || fallback, freshInterim].filter(Boolean).join(" ").trim();
+}
+
 export function relativeTranscriptTime(itemTime, now = Date.now()) {
   const ageMs = Math.max(0, now - Number(itemTime || now));
   const seconds = Math.round(ageMs / 1000);
