@@ -47,6 +47,7 @@ Goal: validate the simplest useful product.
 - [x] 30 s rolling transcript with segmented recent-history view,
 - [x] "What did they just say?" recent-history panel with copy action,
 - [x] **M01 full-session caption copy (2026-10-15):** explicit secondary action in the existing recent-history panel copies all **finalized** text retained from the current session (including captions older than 30 s), excluding interim/debug text; disabled without finals, cleared on each new session; no automatic local/cloud persistence. Clipboard is user-triggered and privacy warning is shown. This reuses existing memory-only report finals and leaves live caption/STT behavior unchanged. [Notes](./M01_COMPLETE_SESSION_CAPTION_COPY_2026-10-15.md).
+- [x] **M01 in-page session caption review (2026-10-15):** 「剛剛說什麼？」now switches between the original last-30-second view and a final-only 「本次對話」 view. Show newest 60 segments first, load earlier 60 on demand; readable scrolling, no extra copy/paste App, no raw/interim text, full-session copy unchanged and no persistence. CI includes bounded projection tests and a Chromium view-switch regression (no actual mic capture). [Record](./M01_SESSION_CAPTION_REVIEW_2026-10-15.md).
 - [x] explicit persistent text-size control (一般 / 大 / 特大),
 - no login,
 - no audio amplification.
