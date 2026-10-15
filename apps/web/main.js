@@ -1,12 +1,13 @@
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261015-stt-privacy1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-stt-privacy1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-stt-privacy1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-stt-privacy1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261015-session-review1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261015-session-review1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-session-review1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-session-review1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-session-review1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-stt-privacy1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-session-review1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -18,7 +19,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261015-stt-privacy1";
+} from "./transcript-window.mjs?v=20261015-session-review1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -44,7 +45,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261015-stt-privacy1";
+const BUILD_ID = "20261015-session-review1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -99,6 +100,9 @@ const els = {
   sttPrivacyNotice: document.querySelector("#stt-privacy-notice"),
   stop: document.querySelector("#stop"),
   recall: document.querySelector("#recall"),
+  recallRecent: document.querySelector("#recall-recent"),
+  recallComplete: document.querySelector("#recall-complete"),
+  recallLoadEarlier: document.querySelector("#recall-load-earlier"),
   closeRecall: document.querySelector("#close-recall"),
   copyRecentTranscript: document.querySelector("#copy-recent-transcript"),
   copyCompleteTranscript: document.querySelector("#copy-complete-transcript"),
@@ -176,6 +180,9 @@ const displayFinals = []; // Only recent confirmed text visible since last scree
 let lastDisplayFinal = null; // Final-only retained caption, never a partial.
 let captionManuallyCleared = false;
 const sessionFinals = [];
+let recallView = "recent";
+let reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
+let lastFullReviewSignature = "";
 const debugLines = [];
 const reportDebugLines = [];
 
@@ -561,6 +568,72 @@ function addFinalTranscript(text, rawText = text) {
 function renderRecall() {
   if (!els.recallList || !els.recallMeta) return;
 
+  const full = recallView === "session";
+  els.recallRecent?.setAttribute("aria-pressed", String(!full));
+  els.recallComplete?.setAttribute("aria-pressed", String(full));
+  els.recallList.classList.toggle("full-session-review", full);
+  if (els.recallLoadEarlier) els.recallLoadEarlier.hidden = true;
+
+  if (full) {
+    // Current-session review is final-only, so it must never show stale or
+    // provisional recognition results that were not confirmed by STT.
+    els.recallList.setAttribute("aria-live", "off");
+    els.recallList.setAttribute("aria-label", "本次已確認字幕，可在框內捲動");
+    els.recallList.tabIndex = 0;
+    const page = sessionReviewWindow(sessionFinals, reviewVisibleCount);
+    els.recallMeta.textContent = page.total
+      ? "本次對話 · 顯示 " + page.items.length + " / " + page.total + " 段已確認字幕"
+      : "本次對話 · 尚無已確認字幕";
+    if (els.recallLoadEarlier) els.recallLoadEarlier.hidden = page.hiddenCount === 0;
+
+    // The 1-second recent-history refresh must not recreate a long list,
+    // steal the scroll position or repeatedly announce its contents.
+    const signature = sessionCounter + ":" + page.total + ":" + page.items.length;
+    if (signature === lastFullReviewSignature) return;
+    const priorTop = els.recallList.scrollTop;
+    const priorHeight = els.recallList.scrollHeight;
+    const wasNearBottom = priorHeight - priorTop - els.recallList.clientHeight <= 56;
+    const wasRendered = lastFullReviewSignature !== "";
+    els.recallList.replaceChildren();
+
+    if (!page.items.length) {
+      const empty = document.createElement("div");
+      empty.className = "recall-empty";
+      empty.textContent = "本次尚無已確認字幕。";
+      els.recallList.append(empty);
+    } else {
+      page.items.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "recall-item";
+        const time = document.createElement("span");
+        time.className = "recall-item-time";
+        const timeLabel = Number.isFinite(item.time)
+          ? new Date(item.time).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })
+          : "";
+        time.textContent = "第 " + (page.hiddenCount + index + 1) + " 段" +
+          (timeLabel ? " · " + timeLabel : "");
+        const text = document.createElement("div");
+        text.className = "recall-item-text";
+        text.textContent = item.text;
+        row.append(time, text);
+        els.recallList.append(row);
+      });
+    }
+
+    lastFullReviewSignature = signature;
+    if (!wasRendered || wasNearBottom) {
+      els.recallList.scrollTop = els.recallList.scrollHeight;
+    } else {
+      els.recallList.scrollTop = priorTop;
+    }
+    return;
+  }
+
+  lastFullReviewSignature = "";
+  els.recallList.classList.remove("full-session-review");
+  els.recallList.setAttribute("aria-live", "polite");
+  els.recallList.removeAttribute("aria-label");
+  els.recallList.removeAttribute("tabindex");
   const now = Date.now();
   const items = recentTranscriptItems(transcript, now, ROLLING_WINDOW_MS);
   els.recallList.replaceChildren();
@@ -591,15 +664,37 @@ function renderRecall() {
     els.recallList.append(row);
   }
 
-  els.recallMeta.textContent =
-    "最近 30 秒 · " + items.length + " 段字幕";
+  els.recallMeta.textContent = "最近 30 秒 · " + items.length + " 段字幕";
 }
 
 function showRecall() {
+  recallView = "recent";
+  reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
+  lastFullReviewSignature = "";
   els.recallPanel.hidden = false;
   renderRecall();
   syncCaptionRefreshTimer();
   els.recallPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function chooseRecallView(mode) {
+  if (mode !== "recent" && mode !== "session") return;
+  recallView = mode;
+  reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
+  lastFullReviewSignature = "";
+  renderRecall();
+}
+
+function loadEarlierSessionCaptions() {
+  if (recallView !== "session") return;
+  const beforeTop = els.recallList.scrollTop;
+  const beforeHeight = els.recallList.scrollHeight;
+  reviewVisibleCount += SESSION_REVIEW_PAGE_SIZE;
+  renderRecall();
+  // Prepending earlier messages should preserve the reader's current
+  // sentence rather than unexpectedly jumping to another position.
+  els.recallList.scrollTop = beforeTop +
+    Math.max(0, els.recallList.scrollHeight - beforeHeight);
 }
 
 function syncCompleteTranscriptCopyButton() {
@@ -907,6 +1002,9 @@ async function startSession() {
   renderCaptionLatencyTelemetry();
   sessionFinals.length = 0;
   syncCompleteTranscriptCopyButton();
+  reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
+  lastFullReviewSignature = "";
+  if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
   if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
   transcript.length = 0;
   displayFinals.length = 0;
@@ -1187,6 +1285,9 @@ els.clearCaption?.addEventListener("click", () => {
   syncCaptionRefreshTimer();
 });
 els.recall.addEventListener("click", showRecall);
+els.recallRecent?.addEventListener("click", () => chooseRecallView("recent"));
+els.recallComplete?.addEventListener("click", () => chooseRecallView("session"));
+els.recallLoadEarlier?.addEventListener("click", loadEarlierSessionCaptions);
 els.closeRecall.addEventListener("click", () => {
   els.recallPanel.hidden = true;
   syncCaptionRefreshTimer();

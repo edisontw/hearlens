@@ -879,3 +879,38 @@ body.caption-focus-mode .caption {
   }
 }
 
+
+
+/* Session-only review uses the existing text size; long conversations are
+ * windowed in JavaScript and scroll inside the panel without losing controls. */
+.recall-mode-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.recall-mode-controls button {
+  min-width: 0;
+  min-height: 48px;
+}
+.recall-mode-controls button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.recall-list.full-session-review {
+  max-height: min(48dvh, 30rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.2rem;
+  scrollbar-gutter: stable;
+}
+.recall-list.full-session-review:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.recall-load-earlier {
+  width: 100%;
+  margin-top: 0.65rem;
+  min-height: 48px;
+}

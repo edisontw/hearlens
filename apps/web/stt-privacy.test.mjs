@@ -30,7 +30,7 @@ test("notice is visible before Start and associated with the accessibility tree"
   assert.match(html, /id="start"[^>]*aria-describedby="stt-privacy-notice"/);
   assert.match(main, /captionSttPrivacyNotice\(runtimeSttConfig\.provider\)/);
   assert.match(main, /els\.sttPrivacyNotice\.textContent = captionSttPrivacyNotice/);
-  assert.match(main, /\.\/stt-privacy\.mjs\?v=20261015-stt-privacy1/);
+  assert.match(main, /\.\/stt-privacy\.mjs\?v=20261015-session-review1/);
   assert.match(css, /\.stt-privacy-notice \{/);
   assert.doesNotMatch(css, /body\.caption-focus-mode \.stt-privacy-notice[^}]*display:\s*none/);
   assert.match(html, /辨識不清楚時，再把手機移近說話者/);
