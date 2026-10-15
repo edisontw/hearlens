@@ -35,7 +35,7 @@ test("abnormal socket close stops capture; explicit stop still supports final dr
 });
 
 test("fatal fix refreshes the browser's main, provider, and provider-implementation URLs", () => {
-  const version = "20261015-session-copy1";
+  const version = "20261015-caption-focus1";
   assert.equal(build.buildId, version);
   assert.match(main, new RegExp('const BUILD_ID = "' + version + '"'));
   assert(main.includes("./stt/provider.js?v=" + version));
