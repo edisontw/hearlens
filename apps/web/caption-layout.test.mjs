@@ -56,7 +56,7 @@ test("caption update follows near-bottom while keeping manual reread position", 
 });
 
 test("responsive asset version has browser cache bust and no hearing playback", () => {
-  const version = "20261015-caption-focus1";
+  const version = "20261015-caption-retain1";
   assert.equal(build.buildId, version);
   assert(main.includes('./caption-scroll.mjs?v=' + version));
   assert(html.includes('./styles.css?v=' + version));
