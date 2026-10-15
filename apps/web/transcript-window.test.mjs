@@ -81,7 +81,7 @@ test("complete session opt-in text includes expired finals but never modifies th
   ];
   const before = JSON.stringify(finals);
   assert.equal(completeSessionTranscriptText(finals),
-    "醫師說明檢查結果。\\n請兩週後再回診。");
+    "醫師說明檢查結果。\n請兩週後再回診。");
   assert.equal(JSON.stringify(finals), before);
   assert.equal(completeSessionTranscriptText([]), "");
 });
@@ -91,10 +91,10 @@ test("full-session copy is explicit, disabled without finals, and reset at each 
   const main = readFileSync("apps/web/main.js", "utf8");
   assert.match(html, /id="copy-complete-transcript"[^>]*disabled/);
   assert.match(html, /文字僅暫存在這個分頁/);
-  assert.match(main, /completeSessionTranscriptText\\(sessionFinals\\)/);
-  assert.match(main, /sessionFinals\\.push\\(item\\);\\s*syncCompleteTranscriptCopyButton\\(\\)/);
-  assert.match(main, /sessionFinals\\.length = 0;\\s*syncCompleteTranscriptCopyButton\\(\\)/);
-  assert.match(main, /copyCompleteTranscript\\.disabled = sessionFinals\\.length === 0/);
-  assert.match(main, /navigator\\.clipboard\\.writeText\\(text\\)/);
-  assert.match(main, /els\\.copyCompleteTranscript\\?\\.addEventListener\\("click"/);
+  assert.match(main, /completeSessionTranscriptText\(sessionFinals\)/);
+  assert.match(main, /sessionFinals\.push\(item\);\s*syncCompleteTranscriptCopyButton\(\)/);
+  assert.match(main, /sessionFinals\.length = 0;\s*syncCompleteTranscriptCopyButton\(\)/);
+  assert.match(main, /copyCompleteTranscript\.disabled = sessionFinals\.length === 0/);
+  assert.match(main, /navigator\.clipboard\.writeText\(text\)/);
+  assert.match(main, /els\.copyCompleteTranscript\?\.addEventListener\("click"/);
 });
