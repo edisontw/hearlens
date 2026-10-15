@@ -43,6 +43,7 @@ Goal: validate the simplest useful product.
 - [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
 - [x] 30 s rolling transcript with segmented recent-history view,
 - [x] "What did they just say?" recent-history panel with copy action,
+- [x] **M01 full-session caption copy (2026-10-15):** explicit secondary action in the existing recent-history panel copies all **finalized** text retained from the current session (including captions older than 30 s), excluding interim/debug text; disabled without finals, cleared on each new session; no automatic local/cloud persistence. Clipboard is user-triggered and privacy warning is shown. This reuses existing memory-only report finals and leaves live caption/STT behavior unchanged. [Notes](./M01_COMPLETE_SESSION_CAPTION_COPY_2026-10-15.md).
 - [x] explicit persistent text-size control (一般 / 大 / 特大),
 - no login,
 - no audio amplification.
@@ -71,7 +72,7 @@ Exit: evidence that proximity improves useful speech capture under target scenes
 
 - [x] Add an independent family/research web page to enter left/right audiogram dB HL values at six frequencies, inspect measured-only points, explicitly store locally, import/export versioned JSON and delete saved data without invoking microphone or audio output. Reuse the original M03 schema validator in the Pages artifact, not a fork. [Scope and validation](./M03_AUDIOGRAM_LOCAL_UI_2026-10-14.md).
 - [x] M03 profile page follow-up: show unsaved-edit status, confirm destructive import over unsaved edits, reject asynchronous import when the form changes mid-read, retain exported JSON Blob URL long enough for mobile downloads, accept valid non-5-dB numeric entries, and assert the copied canonical validator exists in CI/Pages staging. No hearing-output code.
-- [ ] **M03 browser E2E gate (2026-10-15):** separate conditional GitHub Actions job uses actual headless Chromium to open the staged static page and verify independent bilateral values, zero vs absent measurements, explicit local save, reload, JSON download, cancel/accept overwrite of unsaved changes, import without autosave, invalid JSON rejection, and clear/reload. Checks no unapproved external network requests or browser module errors. **Pending PR CI; not Moto g62 field acceptance or a clinical test.**
+- [x] **M03 browser E2E gate (2026-10-15):** separate conditional GitHub Actions job uses actual headless Chromium to open the staged static page and verify independent bilateral values, zero vs absent measurements, explicit local save, reload, JSON download, cancel/accept overwrite of unsaved changes, import without autosave, invalid JSON rejection, and clear/reload. Checks no unapproved external network requests or browser module errors. **PR #75 browser E2E and CI PASS; not Moto g62 field acceptance or a clinical test.**
 - [ ] Moto g62 field acceptance for editing, browser reload, import/export and delete. **No amplification or clinical fitting claim.**
 
 ## M03 — Audiogram Profile + Offline DSP Tests
