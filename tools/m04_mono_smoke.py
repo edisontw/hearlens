@@ -312,7 +312,7 @@ def main():
                 "hard_block": "HearLens M04 live hearing output remains BLOCKED"
             }
             args.json.parent.mkdir(parents=True, exist_ok=True)
-            args.json.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+            args.json.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         else:
             inputs = {k: getattr(args, k) for k in ("direct", "muted", "on", "moved")}
             result, conditions, baseline, on_med, moved_med = report(
