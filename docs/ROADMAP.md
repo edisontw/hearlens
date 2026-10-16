@@ -124,6 +124,13 @@ No live-ear safety claim.
 - [ ] Actual Moto g62 → HearLens DSP → AIR31 nonhuman acoustic latency **NOT MEASURED**: physical hard-mute, speaker-fallback, ear-level output and safe output authorization remain blocked.
 - [x] Deterministic synthetic regression included in CI. Do not repeat accepted SW1–SW4 field diagnostics. See [M04-D1 protocol](./M04D1_MONO_CHIRP_SMOKE_2026-10-16.md).
 
+## M04-D3 — Owner-approved off-ear Bluetooth acoustic test (2026-10-17)
+
+- [x] Remove the previous *zero possible phone-speaker fallback* proof as a precondition for **nonhuman, low-volume, off-ear acoustic experimentation**. Owner accepts possible brief speaker leakage and requires app-side stop on BT loss. [Decision and test design](./M04D3_NONHUMAN_BLUETOOTH_BENCH_DECISION_2026-10-17.md).
+- [ ] Implement a separate native Android bench APK: Moto g62 built-in microphone → guarded PCM output → AIR31 A2DP; verify actual playing device after silent arm, bounded digital cap, manual/automatic fail-stop, flush, call/focus/lifecycle/route changes, 40-second timer, zero auto-reconnect.
+- [ ] Run existing-equipment nonhuman direct/on/moved acoustic tests; report signal identity and measured P50/P95/jitter without pretending Android public callbacks guarantee zero already-queued speaker output.
+- [ ] Retain independent safety requirements for **worn live hearing amplification**: acoustic L/R output calibration, feedback and loudness safeguards. M01 captions are unaffected.
+
 ## M04-D2 — Physical output evidence gate (2026-10-16)
 
 - [x] Record current Moto g62/AIR31 SW1/SW3/SW4 + synthetic limiter evidence in a versioned **metadata-only** manifest. Added `tools/m04-output-safety-gate.mjs` and CI adversarial tests; even fabricated complete evidence **cannot** grant audio playback.
