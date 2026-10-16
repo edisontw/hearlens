@@ -14,6 +14,10 @@ jobs:
           node-version: 22
       - name: Unit tests and JavaScript syntax
         run: npm test
+      - name: M04 output physical-evidence gate (NO PLAYBACK, always fail closed)
+        run: |
+          node --test tools/m04-output-safety-gate.test.mjs
+          node tools/m04-output-safety-gate.mjs --evidence testdata/results/2026-10-16-m04-output-safety-state.json
       - name: M03 browser profile entry and import/export contract
         run: |
           node --test apps/web/audiogram-editor.test.mjs
