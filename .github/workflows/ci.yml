@@ -60,3 +60,5 @@ jobs:
         run: npm run verify:camfit:python
       - name: M04 offline acoustic WAV parser and lag-analysis correctness (NO PLAYBACK)
         run: python -m unittest discover -s tools -p 'test_m04_acoustic_wav.py' -v
+      - name: M04 mono microphone chirp smoke synthetic controls (NO PLAYBACK)
+        run: python -m unittest discover -s tools -p 'test_m04_mono_smoke.py' -v

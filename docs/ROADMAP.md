@@ -117,6 +117,13 @@ No live-ear safety claim.
 - [x] **SW4-B (method/protocol):** distinguish existing software input clock and passive output-route observations from **physical** phone mic SPL→dBFS transfer, nonhuman A2DP/LE acoustic latency, left/right ear-coupler MPO and proven speaker fallback hard mute. Minimum instrumentation requirements and GO/NO-GO documented.
 - [ ] **Hardware gated / explicitly deferred:** synchronized nonhuman acoustic Bluetooth playback latency and output-route fault bench; separately calibrated ear-simulator L/R output; verification that an OS route change **never emits amplified sound from the phone speaker**. No on-ear amplification authorized, and no mandatory repeated SW1 mic or SW3 AIR31 field tests.
 
+## M04-D1 — Mono acoustic chirp kit (2026-10-16)
+
+- [x] Offline 24-event quiet chirp WAV generator, no audio playback.
+- [x] Single Realtek microphone controls-only baseline check, plus conditional 4-recording matched-chirp comparison (direct, muted, on, moved) with room-echo exclusion and exploratory P50/P95/jitter.
+- [ ] Actual Moto g62 → HearLens DSP → AIR31 nonhuman acoustic latency **NOT MEASURED**: physical hard-mute, speaker-fallback, ear-level output and safe output authorization remain blocked.
+- [x] Deterministic synthetic regression included in CI. Do not repeat accepted SW1–SW4 field diagnostics. See [M04-D1 protocol](./M04D1_MONO_CHIRP_SMOKE_2026-10-16.md).
+
 ## M04 — SOFTWARE-FIRST phone DSP / microphone-routing ceiling (updated 2026-10-12)
 
 **LATEST USER DIRECTION (2026-10-12, field follow-up):** use the **PHONE built-in microphone as the primary input**, phone Native DSP to process PCM and **ordinary Bluetooth earbuds primarily for output**. Earbud microphones, HFP/SCO uplink, iOS high-quality AirPods capture and custom hardware POCs are **deferred optional fallbacks**, not next-step prerequisites. No mandatory placement near talker, occluded ear canal or separate microphone. Evaluate software-only capacity first. Do not assume a measured safe low-latency acoustic output path. Distinguish ordinary headset recording inputs from undocumented transparency/ANC microphone buses. See [M04 software-first investigation](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md).
