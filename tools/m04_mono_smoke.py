@@ -265,6 +265,13 @@ def main():
     g = sub.add_parser("generate", help="Create a quiet digital mono chirp WAV; does not play it")
     g.add_argument("output", type=pathlib.Path)
     g.add_argument("--events", type=int, default=24)
+    b = sub.add_parser("baseline", help="Safe controls-only check: no hearing output needed")
+    b.add_argument("--direct", type=pathlib.Path, required=True)
+    b.add_argument("--muted", type=pathlib.Path, required=True)
+    b.add_argument("--events", type=int, default=24)
+    b.add_argument("--min-lag-ms", type=int, default=25)
+    b.add_argument("--max-lag-ms", type=int, default=400)
+    b.add_argument("--json", type=pathlib.Path, required=True)
     a = sub.add_parser("analyze", help="Compare FOUR separate mono PCM16 recordings")
     for name in ("direct", "muted", "on", "moved"):
         a.add_argument("--" + name, type=pathlib.Path, required=True)
@@ -282,6 +289,30 @@ def main():
         if args.cmd == "generate":
             args.output.parent.mkdir(parents=True, exist_ok=True)
             result = write_source(args.output, args.events)
+        elif args.cmd == "baseline":
+            if not 8 <= args.events <= 30 or not 10 <= args.min_lag_ms < args.max_lag_ms <= 700:
+                raise ValueError("Require 8–30 events and 10 <= min-lag < max-lag <= 700 ms")
+            direct = load_condition(args.direct, args.events, args.min_lag_ms, args.max_lag_ms)
+            muted = load_condition(args.muted, args.events, args.min_lag_ms, args.max_lag_ms)
+            if direct["rate"] != muted["rate"]:
+                raise ValueError("Recordings have different sample rates")
+            background = np.maximum(np.median(direct["ratios"], axis=0),
+                                    np.median(muted["ratios"], axis=0))
+            echo_peaks, _ = find_peaks(background, prominence=0.08, distance=4)
+            echoes = sorted(echo_peaks, key=lambda i: background[i], reverse=True)
+            result = {
+                "schema": "hearlens-m04-mono-baseline-v1",
+                "status": "CONTROL_RECORDING_VALID_NO_BLUETOOTH_LATENCY_MEASURED",
+                "direct_wav_sha256": direct["sha256"], "muted_wav_sha256": muted["sha256"],
+                "events_detected": {"direct": len(direct["anchors"]), "muted": len(muted["anchors"])},
+                "sample_rate_hz": direct["rate"],
+                "room_echo_lags_ms": [int(direct["lags"][i]) for i in echoes[:12]],
+                "not_proven": ["AIR31 actual output", "Bluetooth end-to-end delay",
+                               "hardware mute", "ear SPL safety"],
+                "hard_block": "HearLens M04 live hearing output remains BLOCKED"
+            }
+            args.json.parent.mkdir(parents=True, exist_ok=True)
+            args.json.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
         else:
             inputs = {k: getattr(args, k) for k in ("direct", "muted", "on", "moved")}
             result, conditions, baseline, on_med, moved_med = report(
