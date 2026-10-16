@@ -124,6 +124,13 @@ No live-ear safety claim.
 - [ ] Actual Moto g62 → HearLens DSP → AIR31 nonhuman acoustic latency **NOT MEASURED**: physical hard-mute, speaker-fallback, ear-level output and safe output authorization remain blocked.
 - [x] Deterministic synthetic regression included in CI. Do not repeat accepted SW1–SW4 field diagnostics. See [M04-D1 protocol](./M04D1_MONO_CHIRP_SMOKE_2026-10-16.md).
 
+## M04-D2 — Physical output evidence gate (2026-10-16)
+
+- [x] Record current Moto g62/AIR31 SW1/SW3/SW4 + synthetic limiter evidence in a versioned **metadata-only** manifest. Added `tools/m04-output-safety-gate.mjs` and CI adversarial tests; even fabricated complete evidence **cannot** grant audio playback.
+- [ ] Physically verify independent hardware mute/no phone-speaker fallback after Bluetooth disconnect, call/focus changes and queued audio; **unproven with present Android 13 public APIs**.
+- [ ] Verify actual media sink while playing, calibrated L/R receiver acoustic SPL/MPO and final real-path limiter before any nonhuman live audio trial.
+- **Decision:** live phone-mic → AIR31 amplification remains **BLOCKED**; do not repeat SW1–SW4, require new hardware purchases, or call a route prediction physical proof. [D2 gate and stop rule](./M04D2_PHYSICAL_OUTPUT_EVIDENCE_GATE_2026-10-16.md).
+
 ## M04 — SOFTWARE-FIRST phone DSP / microphone-routing ceiling (updated 2026-10-12)
 
 **LATEST USER DIRECTION (2026-10-12, field follow-up):** use the **PHONE built-in microphone as the primary input**, phone Native DSP to process PCM and **ordinary Bluetooth earbuds primarily for output**. Earbud microphones, HFP/SCO uplink, iOS high-quality AirPods capture and custom hardware POCs are **deferred optional fallbacks**, not next-step prerequisites. No mandatory placement near talker, occluded ear canal or separate microphone. Evaluate software-only capacity first. Do not assume a measured safe low-latency acoustic output path. Distinguish ordinary headset recording inputs from undocumented transparency/ANC microphone buses. See [M04 software-first investigation](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md).

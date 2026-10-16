@@ -1,0 +1,46 @@
+{
+  "schema": "hearlens-m04-output-safety-evidence-v1",
+  "target": {
+    "phone": "moto-g62-android13",
+    "earbuds": "AIR31",
+    "repository_sha": "9625aab1a2506a26d09499af8ae613e8d942506c"
+  },
+  "items": [
+    {
+      "id": "built_in_microphone",
+      "basis": "observed",
+      "result": "PASS",
+      "source": "docs/SW1_FOLLOWUP_PHONE_MIC_PRIMARY_2026-10-12.md"
+    },
+    {
+      "id": "post_dsp_digital_limiter",
+      "basis": "unit",
+      "result": "PASS",
+      "source": "packages/dsp/offline-wdrc.timed.test.mjs (synthetic PCM digital bounds only)"
+    },
+    {
+      "id": "bounded_gain_per_ear",
+      "basis": "simulated",
+      "result": "PASS",
+      "source": "packages/dsp/offline-route-safety.test.mjs (not calibrated physical per-ear MPO)"
+    },
+    {
+      "id": "low_volume_ramp_and_manual_stop",
+      "basis": "simulated",
+      "result": "PASS",
+      "source": "packages/dsp/offline-bluetooth-output-policy.test.mjs (model-only ramp)"
+    },
+    {
+      "id": "capture_watchdog_and_dropout",
+      "basis": "simulated",
+      "result": "PASS",
+      "source": "packages/dsp/offline-callback-port.test.mjs (no real sink)"
+    },
+    {
+      "id": "actual_a2dp_output_not_prediction",
+      "basis": "simulated",
+      "result": "PASS",
+      "source": "docs/SW3_NATIVE_AIR31_FIELD_RESULT_2026-10-13.md (predicted, no playback)"
+    }
+  ]
+}
