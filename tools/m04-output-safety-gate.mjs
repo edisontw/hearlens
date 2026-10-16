@@ -7,7 +7,8 @@
  * event log must not be promoted to physical no-speaker-fallback evidence.
  */
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
 export const SCHEMA = "hearlens-m04-output-safety-evidence-v1";
 const SHA256 = /^[a-f0-9]{64}$/i;
@@ -125,4 +126,4 @@ function main() {
     process.exitCode=2;
   }
 }
-if(process.argv[1] && fileURLToPath(import.meta.url)===fileURLToPath(new URL("file://"+process.argv[1].replaceAll("\\","/"))))main();
+if(process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();
