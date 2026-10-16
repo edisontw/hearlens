@@ -100,7 +100,39 @@ def locate(score, rate, events):
             good += score[p] >= gate
         if good >= math.ceil(0.80 * events):
             return np.asarray(anchors, dtype=int)
-    raise ValueError("No stable direct chirp train; check recording lead-in and 1 s spacing")
+    # Weak real-world chirps can sit below the absolute detection threshold
+    # when line hum/recording noise is present. Use the *known periodicity*
+    # and phase-shifted within-file null windows, but refuse weak/noisy trains.
+    end = len(score) - (events - 1) * step - round(.72 * rate)
+    scan_end = min(round(8 * rate), end)
+    scan_start = round(.15 * rate)
+    if scan_end <= scan_start:
+        raise ValueError("Recording is too short for events plus reference controls")
+    comb = np.zeros(scan_end - scan_start, dtype=np.float64)
+    for i in range(events):
+        off = scan_start + i * step
+        comb += score[off:off + len(comb)]
+    anchor = scan_start + int(np.argmax(comb))
+    pad = max(1, round(.012 * rate))
+    centers = []
+    contrast = []
+    for i in range(events):
+        center = anchor + i * step
+        lo, hi = center - pad, center + pad + 1
+        direct = lo + int(np.argmax(score[lo:hi]))
+        controls = []
+        for seconds in (.23, .41, .63):
+            offset = center + round(seconds * rate)
+            controls.append(float(np.max(score[offset - pad:offset + pad + 1])))
+        median_control = max(float(np.median(controls)), 1e-12)
+        centers.append(direct)
+        contrast.append(float(score[direct]) / median_control)
+    # A fixed 1-s electronic artifact could still fool this: positive
+    # waveform presence is only a reference-quality check, NOT route proof.
+    enough = sum(c > 1.30 for c in contrast) >= math.ceil(.75 * events)
+    if enough and np.median(contrast) >= 1.45:
+        return np.asarray(centers, dtype=int)
+    raise ValueError("No reliable 1-s chirp train above local off-phase controls")
 
 
 def take_profile(score, anchors, rate, start_ms, stop_ms):
@@ -143,13 +175,14 @@ def report(inputs, events=24, low_ms=25, high_ms=400, on_distance=None,
     if len(rates) != 1:
         raise ValueError("Recordings differ in sample rate; do not silently resample")
     direct = conditions["direct"]
-    muted = conditions["muted"]
+    muted = conditions.get("muted")
     on = conditions["on"]
     moved = conditions["moved"]
     # Independent-recording clocks are NEVER subtracted; lag references are
     # found anew in every recording using that recording's direct chirps.
-    background = np.maximum(np.median(direct["ratios"], axis=0),
-                            np.median(muted["ratios"], axis=0))
+    background = np.median(direct["ratios"], axis=0)
+    if muted is not None:
+        background = np.maximum(background, np.median(muted["ratios"], axis=0))
     on_med = np.median(on["ratios"], axis=0)
     moved_med = np.median(moved["ratios"], axis=0)
     # Candidate must emerge ABOVE direct/muted room-echo controls at the
@@ -207,7 +240,9 @@ def report(inputs, events=24, low_ms=25, high_ms=400, on_distance=None,
         "events_expected": events, "sample_rate_hz": int(next(iter(rates))),
         "lag_search_ms": [low_ms, high_ms],
         "clock_rule": "Every lag is within its own mono WAV; never compare absolute times across recordings",
-        "controls": "direct and muted fixed-echo profiles; on and physically moved-earbud comparisons",
+        "controls": ("direct/muted fixed-echo profiles; on/moved-earbud comparisons"
+                     if muted is not None else
+                     "direct-only fixed-echo reference; on/moved-earbud comparison (no optional muted take)"),
         "candidate_checks": details[:12],
         "geometry": {"earbud_to_mic_m": on_distance, "moved_earbud_to_mic_m": moved_distance,
                      "speaker_to_phone_m": source_phone, "speaker_to_recorder_m": source_recorder,
@@ -291,14 +326,15 @@ def main():
     g.add_argument("--events", type=int, default=24)
     b = sub.add_parser("baseline", help="Safe controls-only check: no hearing output needed")
     b.add_argument("--direct", type=pathlib.Path, required=True)
-    b.add_argument("--muted", type=pathlib.Path, required=True)
+    b.add_argument("--muted", type=pathlib.Path, help="Optional additional no-output control")
     b.add_argument("--events", type=int, default=24)
     b.add_argument("--min-lag-ms", type=int, default=10)
     b.add_argument("--max-lag-ms", type=int, default=400)
     b.add_argument("--json", type=pathlib.Path, required=True)
-    a = sub.add_parser("analyze", help="Compare FOUR separate mono PCM16 recordings")
-    for name in ("direct", "muted", "on", "moved"):
+    a = sub.add_parser("analyze", help="Compare THREE mono recordings; optional extra muted reference")
+    for name in ("direct", "on", "moved"):
         a.add_argument("--" + name, type=pathlib.Path, required=True)
+    a.add_argument("--muted", type=pathlib.Path, help="Optional extra direct-sound/no-output reference")
     a.add_argument("--events", type=int, default=24)
     a.add_argument("--min-lag-ms", type=int, default=10)
     a.add_argument("--max-lag-ms", type=int, default=400)
@@ -317,18 +353,24 @@ def main():
             if not 8 <= args.events <= 30 or not 10 <= args.min_lag_ms < args.max_lag_ms <= 700:
                 raise ValueError("Require 8–30 events and 10 <= min-lag < max-lag <= 700 ms")
             direct = load_condition(args.direct, args.events, args.min_lag_ms, args.max_lag_ms)
-            muted = load_condition(args.muted, args.events, args.min_lag_ms, args.max_lag_ms)
-            if direct["rate"] != muted["rate"]:
+            muted = (load_condition(args.muted, args.events, args.min_lag_ms, args.max_lag_ms)
+                     if args.muted is not None else None)
+            if muted is not None and direct["rate"] != muted["rate"]:
                 raise ValueError("Recordings have different sample rates")
-            background = np.maximum(np.median(direct["ratios"], axis=0),
-                                    np.median(muted["ratios"], axis=0))
+            background = np.median(direct["ratios"], axis=0)
+            if muted is not None:
+                background = np.maximum(background, np.median(muted["ratios"], axis=0))
             echo_peaks, _ = find_peaks(background, prominence=0.08, distance=4)
             echoes = sorted(echo_peaks, key=lambda i: background[i], reverse=True)
             result = {
                 "schema": "hearlens-m04-mono-baseline-v1",
-                "status": "CONTROL_RECORDING_VALID_NO_BLUETOOTH_LATENCY_MEASURED",
-                "direct_wav_sha256": direct["sha256"], "muted_wav_sha256": muted["sha256"],
-                "events_detected": {"direct": len(direct["anchors"]), "muted": len(muted["anchors"])},
+                "status": "DIRECT_REFERENCE_VALID_NO_BLUETOOTH_LATENCY_MEASURED",
+                "direct_wav_sha256": direct["sha256"],
+                "muted_wav_sha256": muted["sha256"] if muted is not None else None,
+                "events_detected": {"direct": len(direct["anchors"]),
+                                     "muted": len(muted["anchors"]) if muted is not None else None},
+                "reference_timestamps_s": [round(float(i / direct["rate"]), 5)
+                                           for i in direct["anchors"]],
                 "sample_rate_hz": direct["rate"],
                 "room_echo_lags_ms": [int(direct["lags"][i]) for i in echoes[:12]],
                 "not_proven": ["AIR31 actual output", "Bluetooth end-to-end delay",
@@ -338,7 +380,9 @@ def main():
             args.json.parent.mkdir(parents=True, exist_ok=True)
             args.json.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         else:
-            inputs = {k: getattr(args, k) for k in ("direct", "muted", "on", "moved")}
+            inputs = {k: getattr(args, k) for k in ("direct", "on", "moved")}
+            if args.muted is not None:
+                inputs["muted"] = args.muted
             result, conditions, baseline, on_med, moved_med = report(
                 inputs, args.events, args.min_lag_ms, args.max_lag_ms,
                 args.on_earbud_m, args.moved_earbud_m,

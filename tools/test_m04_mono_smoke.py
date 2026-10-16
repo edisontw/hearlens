@@ -98,6 +98,42 @@ class MonoSmokeTests(unittest.TestCase):
             self.assertTrue(result["status"].startswith("INCONCLUSIVE"))
             self.assertIsNone(result["summary_ms"])
 
+    def test_weak_repeated_chirp_with_60hz_hum_detectable_without_muted(self):
+        rate = 48000
+        count = 24
+        length = int(29.4 * rate)
+        ticks = np.arange(length, dtype=np.float64) / rate
+        rng = np.random.default_rng(1626)
+        base = 0.007 * np.sin(2 * np.pi * 60 * ticks)
+        base += rng.normal(0, .00055, length)
+        audio = base.copy()
+        pulse = m.chirp(rate) * 0.00036
+        for i in range(count):
+            at = round((3.66 + i) * rate)
+            audio[at:at + len(pulse)] += pulse
+        with tempfile.TemporaryDirectory() as temp:
+            f = pathlib.Path(temp) / "weak.wav"
+            pcm_file(f, audio, rate)
+            result = m.load_condition(f, count, 10, 400)
+            self.assertEqual(len(result["anchors"]), count)
+            self.assertAlmostEqual(float(np.median(result["anchors"]) / rate),
+                                   3.66 + 11.5, delta=.02)
+            only_hum = pathlib.Path(temp) / "no_chirps.wav"
+            pcm_file(only_hum, base, rate)
+            with self.assertRaisesRegex(ValueError, "No reliable"):
+                m.load_condition(only_hum, count, 10, 400)
+
+    def test_no_muted_file_needed_for_synthetic_reference(self):
+        with tempfile.TemporaryDirectory() as temp:
+            f = fixture(temp)
+            f.pop("muted")
+            result, _, _, _, _ = m.report(f, events=12, on_distance=.15,
+                                           moved_distance=1.522,
+                                           source_phone=.6, source_recorder=.45)
+            self.assertEqual(result["status"],
+                             "EXPLORATORY_SOURCE_DISCRIMINATED_NOT_OUTPUT_SAFETY_PASS")
+            self.assertNotIn("muted", result["conditions"])
+
     def test_silence_and_clipping_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             f = pathlib.Path(temp) / "bad.wav"
