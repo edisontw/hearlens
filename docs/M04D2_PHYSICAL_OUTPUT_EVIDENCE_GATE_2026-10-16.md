@@ -23,7 +23,7 @@ node tools/m04-output-safety-gate.mjs --evidence testdata/results/2026-10-16-m04
 
 ## Decision gate / why the next output experiment is not unlocked
 
-These must be demonstrated before any EarHearLens microphone→DSP→AIR31 experimental audio output, including a test-only real-time audio loop:
+These must be demonstrated before any HearLens microphone→DSP→AIR31 experimental audio output, including a test-only real-time audio loop:
 
 | Requirement | What is known on the current Moto g62 / AIR31 |
 | --- | --- |
