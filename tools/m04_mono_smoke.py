@@ -160,6 +160,8 @@ def report(inputs, events=24, low_ms=25, high_ms=400, on_distance=None,
     choices = sorted((int(i) for i in peaks if keep[i]), key=lambda i: on_med[i], reverse=True)
     details = []
     selected = None
+    selected_index = None
+    selected_mask = None
     expected_shift = None
     if on_distance is not None and moved_distance is not None:
         if min(on_distance, moved_distance) < 0:
@@ -190,6 +192,8 @@ def report(inputs, events=24, low_ms=25, high_ms=400, on_distance=None,
         if count >= math.ceil(events * 0.75) and move_ok and selected is None:
             delays = event_lags[valid].astype(float)
             selected = delays
+            selected_index = idx
+            selected_mask = valid
             break
     status = ("EXPLORATORY_SOURCE_DISCRIMINATED_NOT_OUTPUT_SAFETY_PASS"
               if selected is not None else "INCONCLUSIVE_ROOM_ECHO_OR_OUTPUT_NOT_CONFIRMED")
@@ -214,11 +218,24 @@ def report(inputs, events=24, low_ms=25, high_ms=400, on_distance=None,
         "hard_block": "HearLens M04 live hearing output remains BLOCKED"
     }
     if selected is not None:
+        result["event_results"] = [
+            {"event": i + 1,
+             "direct_arrival_s": round(float(direct_sample) / on["rate"], 5),
+             "candidate_arrival_s": (round(float(direct_sample) / on["rate"] +
+                                           float(on["positions"][i, selected_index]) / 1000, 5)
+                                     if selected_mask[i] else None),
+             "delay_ms": (round(float(on["positions"][i, selected_index]), 3)
+                          if selected_mask[i] else None),
+             "accepted": bool(selected_mask[i]),
+             "reason": ("MATCHED_MOVED_EARBUD_CONTROL" if selected_mask[i]
+                        else "WEAK_OR_INCONSISTENT_CANDIDATE")}
+            for i, direct_sample in enumerate(on["anchors"])
+        ]
         geometry_adjust = None
         if None not in (on_distance, source_phone, source_recorder):
             geometry_adjust = 1000 * (on_distance + source_phone - source_recorder) / AIR_SPEED_M_S
         result["summary_ms"] = {
-            "count": int(len(selected)), "p50": round(float(np.percentile(selected, 50)), 3),
+            "count": int(len(selected)), "unresolved_count": int(events - len(selected)), "p50": round(float(np.percentile(selected, 50)), 3),
             "p95": round(float(np.percentile(selected, 95)), 3),
             "min": round(float(selected.min()), 3), "max": round(float(selected.max()), 3),
             "jitter_p95_minus_p50": round(float(np.percentile(selected, 95) - np.percentile(selected, 50)), 3),
@@ -227,6 +244,13 @@ def report(inputs, events=24, low_ms=25, high_ms=400, on_distance=None,
                                           if geometry_adjust is not None else None),
             "individual_lags_ms": [round(float(x), 3) for x in selected]
         }
+    if selected is None:
+        result["event_results"] = [
+            {"event": i + 1, "direct_arrival_s": round(float(sample) / on["rate"], 5),
+             "candidate_arrival_s": None, "delay_ms": None, "accepted": False,
+             "reason": "CANNOT_EXCLUDE_FIXED_ECHO_OR_MOVEMENT_NOT_VERIFIED"}
+            for i, sample in enumerate(on["anchors"])
+        ]
     return result, conditions, background, on_med, moved_med
 
 
@@ -269,14 +293,14 @@ def main():
     b.add_argument("--direct", type=pathlib.Path, required=True)
     b.add_argument("--muted", type=pathlib.Path, required=True)
     b.add_argument("--events", type=int, default=24)
-    b.add_argument("--min-lag-ms", type=int, default=25)
+    b.add_argument("--min-lag-ms", type=int, default=10)
     b.add_argument("--max-lag-ms", type=int, default=400)
     b.add_argument("--json", type=pathlib.Path, required=True)
     a = sub.add_parser("analyze", help="Compare FOUR separate mono PCM16 recordings")
     for name in ("direct", "muted", "on", "moved"):
         a.add_argument("--" + name, type=pathlib.Path, required=True)
     a.add_argument("--events", type=int, default=24)
-    a.add_argument("--min-lag-ms", type=int, default=25)
+    a.add_argument("--min-lag-ms", type=int, default=10)
     a.add_argument("--max-lag-ms", type=int, default=400)
     a.add_argument("--on-earbud-m", type=float)
     a.add_argument("--moved-earbud-m", type=float)
