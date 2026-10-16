@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'org.hearlens.acousticbench'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.hearlens.acousticbench'
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName '0.1.0-m04d3-off-ear'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
