@@ -124,6 +124,15 @@ No live-ear safety claim.
 - [ ] Actual Moto g62 → HearLens DSP → AIR31 nonhuman acoustic latency **NOT MEASURED**: physical hard-mute, speaker-fallback, ear-level output and safe output authorization remain blocked.
 - [x] Deterministic synthetic regression included in CI. Do not repeat accepted SW1–SW4 field diagnostics. See [M04-D1 protocol](./M04D1_MONO_CHIRP_SMOKE_2026-10-16.md).
 
+## M04-D4 — Standalone native off-ear acoustic loop (2026-10-17)
+
+- [x] Add separate Android 13 debug bench source for Moto g62 **built-in microphone → 48 kHz bounded linear passthrough → AIR31 A2DP**. Silent playing-track route check is required before nonzero PCM. [Build/test instructions](../apps/android-acoustic-bench/README.md).
+- [x] Add route/call/focus/background/input-watchdog/40 s fail-stop, manual Stop, no auto-resume, fixed digital ceiling, track-volume scaling, diagnostics without audio upload. No CAMFIT/audiogram fitting and no wear test.
+- [x] Add JVM pure route-state and Node contract tests plus separately published CI Android APK artifact.
+- [ ] Verify debug APK build and physical Moto g62/AIR31 field dry run; CI cannot certify hardware behavior.
+- [ ] Record `on.wav` and `moved.wav` using iPhone source and Realtek PC mic, then compare with existing `direct2.wav` via M04-D1. A separate `muted.wav` is optional.
+- **Scope:** owner accepts possible brief unintended phone-speaker playback after disconnect **for nonworn low-level testing only**. Worn hearing amplification remains unapproved.
+
 ## M04-D3 — Owner-approved off-ear Bluetooth acoustic test (2026-10-17)
 
 - [x] Remove the previous *zero possible phone-speaker fallback* proof as a precondition for **nonhuman, low-volume, off-ear acoustic experimentation**. Owner accepts possible brief speaker leakage and requires app-side stop on BT loss. [Decision and test design](./M04D3_NONHUMAN_BLUETOOTH_BENCH_DECISION_2026-10-17.md).
