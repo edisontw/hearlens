@@ -129,7 +129,8 @@ No live-ear safety claim.
 - [x] Add separate Android 13 debug bench source for Moto g62 **built-in microphone → 48 kHz bounded linear passthrough → AIR31 A2DP**. Silent playing-track route check is required before nonzero PCM. [Build/test instructions](../apps/android-acoustic-bench/README.md).
 - [x] Add route/call/focus/background/input-watchdog/40 s fail-stop, manual Stop, no auto-resume, fixed digital ceiling, track-volume scaling, diagnostics without audio upload. No CAMFIT/audiogram fitting and no wear test.
 - [x] Add JVM pure route-state and Node contract tests plus separately published CI Android APK artifact.
-- [ ] Verify debug APK build and physical Moto g62/AIR31 field dry run; CI cannot certify hardware behavior.
+- [x] Verify debug APK build and first Moto g62/AIR31 actual route field run (two separate sessions observed A2DP#285, BUILTIN_MIC#15, 40 s software-stop; not an acoustic-output or physical fallback PASS). [Field details](./M04D4_FIRST_AIR31_FIELD_RESULT_2026-10-17.md).
+- [ ] Resolve lack of repeated iPhone direct chirps in the newly uploaded `on.wav` (0/24) and `moved.wav` (3/24) despite 22/24 in earlier `direct2.wav`. First do one same-geometry iPhone→Realtek reference check; do not blindly increase DSP gain or repeat moved first.
 - [ ] Record `on.wav` and `moved.wav` using iPhone source and Realtek PC mic, then compare with existing `direct2.wav` via M04-D1. A separate `muted.wav` is optional.
 - **Scope:** owner accepts possible brief unintended phone-speaker playback after disconnect **for nonworn low-level testing only**. Worn hearing amplification remains unapproved.
 
