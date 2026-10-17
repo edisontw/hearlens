@@ -189,9 +189,9 @@ public final class MainActivity extends Activity {
         }
         selectedId = bt.getId();
         startedAt = SystemClock.elapsedRealtime();
-        gate = new BenchSessionGate(selectedId,startedAt,
-            offEar.isChecked() && volumeLow.isChecked());
-        if (!gate.begin(selectedId,startedAt,true)) {
+        gate = new BenchSessionGate();
+        if (!gate.begin(selectedId,startedAt,
+                offEar.isChecked() && volumeLow.isChecked())) {
             log("blocked=" + gate.reason());
             return;
         }
