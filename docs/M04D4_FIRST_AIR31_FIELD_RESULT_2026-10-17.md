@@ -1,0 +1,44 @@
+# M04-D4 first real Moto g62 → AIR31 bench (2026-10-17): route observed, acoustic latency inconclusive
+
+## Test materials, distinct evidence levels
+
+The owner used **Moto g62 (Android 13)**, actual connected **AIR31 A2DP**, iPhone as fixed external chirp speaker, and Windows Realtek wired mono microphone. Submitted the debug-app text log for two sessions, plus `on.wav` (near earbud), `moved.wav` (earbud moved) and the earlier `direct2.wav` reference. Exact geometric distances for this pair were not yet supplied; do not assume the suggested diagram distances were measured.
+
+**No raw microphone recordings are committed to GitHub** (privacy/storage); reproducibility relies on filenames, SHA-256 and summarized signal diagnostics.
+
+### Android native log — actual route verification
+
+| Metric | on session | moved session |
+| --- | --- | --- |
+| Session start/stop elapsed | 40,152 ms | 40,107 ms |
+| Observed playback sink | `A2DP#285`, product AIR31 | `A2DP#285`, product AIR31 |
+| Observed input | `BUILTIN_MIC#15` | `BUILTIN_MIC#15` |
+| Digital gain, PCM16 cap, track scalar | `8x / ±384 / 0.15` | same |
+| Source frames processed | 1,872,960 | 1,879,680 |
+| Partial/noncompleted AudioTrack writes | 3 | 1 |
+| Stop | `timeout_call_or_mic_watchdog` at ~40 s | same |
+
+Both sessions reached actual observed playing-track A2DP route and a built-in phone microphone, rather than merely SW3's predicted route. The earlier unconfirmed checkboxes/permission attempts occurred before the successful run, not during it. There is **no evidence of a route-loss incident** in either run; physical BLE/A2DP disconnect speaker-fallback response remains untested. A `dropped_writes` count does not itself establish audible gap duration. Real hardware latency is not inferable from these software timestamps or frames.
+
+### Recording QA and chirp matching
+
+| WAV | SHA-256 | PCM format | Duration | Fullband RMS | Matched chirp train events (exploratory) |
+| --- | --- | --- | ---: | ---: | ---: |
+| `direct2.wav` | `fe50189ca76f8f4f039efd459b6e4ef87008ef75ff9c2c1614deeb9e6cff3c51` | 48 kHz mono PCM16 | 29.43 s | −45.23 dBFS | 22/24 |
+| `on.wav` | `8021c5c0f1972377f81852f2be3c13dbf915e0310b4100965c100ebea04bd0aa` | same | 30.14 s | −43.60 dBFS | 0/24 |
+| `moved.wav` | `523f925803ea39587eddb80c5705e418dcb7040373ba460b6ff7371bac82b9e0` | same | 34.52 s | −43.24 dBFS | 3/24; does not form a reliable sequence |
+
+No clipping (`abs(pcm) >= 32760`) observed in any of these three files. All have a substantial constant low-frequency component near 60 Hz. Bandpass 900–3800 Hz and 40 ms energy folded at a 1-s period yields maximum contrast against the same recording's background of approximately **13.4%** in `direct2`, **2.6%** in `on` and **4.1%** in `moved`. A matched filter using the repository's 40 ms 900→3800 Hz Hann² chirp, the expected 24-event timing, and a heuristic per-event local/off-phase ratio greater than 1.3 yields the counts above; this heuristic is for **triage** rather than a standardized hypothesis-test threshold or SPL measurement.
+
+**Acoustic decision: INCONCLUSIVE_NO_RELIABLE_DIRECT_CHIRP_REFERENCE_IN_ON_AND_MOVED.** The independently recorded `on` and `moved` lack a reliable direct iPhone chirp sequence. Thus their later candidate peaks cannot be confidently attributed to a moving AIR31 source or separated from room reflections. **No Bluetooth latency P50/P95/jitter was measured. Do not use the apparent first peaks or subtract timestamps across WAV sessions.**
+
+Potential explanations include a missed/incorrect iPhone source playback within recording, changed source→Realtek microphone geometry/orientation, inadequate source level compared with recording noise, incorrect Windows input/level, or insufficient AIR31 output; **the available WAVs do not distinguish them**. The existing digital cap and volume are deliberately very low and may make AIR31 acoustically inconspicuous, but absence of the direct iPhone chirp prohibits attributing the whole failure to earbud volume. Do not raise hearing-path gain blindly.
+
+## Next owner action: only ONE controlled check before repeating either AIR31 position
+
+1. Leave iPhone, Moto g62 and Realtek PC microphone **stationary** in the new setup. Confirm Audacity is capturing **Microphone (Realtek(R) Audio)** (48 kHz, mono PCM16) and its input indicator responds near the PC mic. Verify iPhone speaker is the active source output and the original **25.5-s, 24-chirp WAV** is actually played while Audacity records.
+2. With the AIR31 **not playing**, record **one** same-geometry `direct_current.wav` if the prior `direct2.wav` was made before changing positions or volume. Keep this exact geometry thereafter. This is **not** a new `muted.wav` requirement.
+3. If the 24 direct chirps are clearly recovered, do **one** new near-earbud `on2.wav` with existing M04-D4 debug APK, AIR31 on table/off ears, same fixed positions, low Android media volume and 40 s window. Do **not** repeat moved until on2 yields identifiable moving-earbud candidate. If silent/no candidate, inspect app log and acoustic levels before any gain increase.
+4. Upload the single check and, if attempted, on2 plus app diagnostic. Record actual speaker→Moto, speaker→Realtek, earbud-near→Realtek and earbud-moved→Realtek distances when a credible source chirp exists. Do not require SW1–SW4 repeats.
+
+**Roadmap:** Android actual A2DP and builtin microphone route on the phone = first field PASS. Acoustic chirp capture in `on/moved` = NOT VERIFIED. Bluetooth mic→ear acoustic latency, receiver loudness/feedback and worn-assistance safety = NOT VERIFIED. Owner-approved nonhuman low-output testing policy from M04-D3 is unchanged.
