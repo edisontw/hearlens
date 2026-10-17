@@ -1,12 +1,22 @@
-# M04-D4 — Moto g62 → AIR31 acoustic bench (nonhuman, debug-only)
+# M04-D5 — Moto g62 → AIR31 graded-output acoustic bench (nonhuman, debug-only)
 
-**No consumer hearing assistance and no use while wearing the earphones.** This is an intentionally separate native Android APK, `org.hearlens.acousticbench`, not the existing SW4 input-only diagnostic APK and not the M01 caption website. It intentionally implements only a bounded **phone built-in microphone → fixed test gain → digital limiter → connected A2DP** stream, to establish whether ordinary Bluetooth is fast enough for the HearLens product concept.
+**No consumer hearing assistance and no use while wearing the earphones.** This is an intentionally separate native Android APK, `org.hearlens.acousticbench`, not the existing SW4 input-only diagnostic APK and not the M01 caption website. It intentionally implements only a bounded **phone built-in microphone → selected fixed measurement gain → digital limiter → connected A2DP** stream, to establish whether ordinary Bluetooth is fast enough for the HearLens product concept.
 
 ## Scope and sound limits
 
 - A *single* connected Bluetooth A2DP endpoint must be present. The app logs the Android product name and device ID; verify it is AIR31. Other devices or ambiguous A2DP endpoints block start.
 - The AIR31 earphones must be **on a table, never worn**. On-screen confirmations are mandatory before each run. No clinician-verified output, acoustic SPL/MPO, or feedback bounds are claimed.
-- Format: input PCM16/48 kHz/mono, streamed PCM16/48 kHz/stereo; each sample duplicated to L/R. **Fixed research gain 8x**, hard output sample ceiling `±384 / 32768` (roughly −38.6 dBFS before the additional AudioTrack scalar `0.15`). The physical output level depends on the Android OS media volume and AIR31 amplification, and is **not** calibrated. Start with Android media volume low. If sounds or feedback are unexpectedly loud, press Stop immediately.
+- Format: input PCM16/48 kHz/mono, streamed PCM16/48 kHz/stereo; each sample duplicated to L/R. **Output is a three-level, pre-start selection only**, not calibrated ear loudness, audiogram amplification or general volume control:
+
+| Level | App gain | Hard cap (PCM16) | AudioTrack scalar | Absolute pre-OS numerical ceiling (at full-scale input) |
+| --- | ---: | ---: | ---: | ---: |
+| **L0 baseline (default)** | 8× | ±384 | 0.15 | about −55.1 dBFS |
+| **L1 measurement (next trial)** | 16× | ±768 | 0.25 | about −44.6 dBFS |
+| **L2 measurement (only if L1 remains inconclusive)** | 24× | ±1536 | 0.35 | about −35.7 dBFS |
+
+These calculated ceilings apply **before** Android's media-volume control and AIR31's acoustic transfer. They do not imply any verified dB SPL output or zero speaker leakage. Profile cannot be changed during playback. Each new session requires both off-ear and low-OS-volume checkboxes again; do not jump to L2 without first inspecting L1. Fixed one-second software ramp is applied to all modes.
+- At manual/automatic stop the app reports `digital_levels` including `raw_rms_dbfs`, `raw_peak_dbfs`, `out_pcm_rms_dbfs`, `out_pcm_peak_dbfs`, `limited_pct`, attempted PCM frames, chosen tier and Android media-volume step. These are **metadata of digital PCM attempted before AudioTrack/OS output**, not an earbud-microphone SPL measurement, recording of speech, or proof of which samples reached the receiver. A tiny `raw_rms_dbfs` can explain why increasing the app level has limited benefit. Stopping during the test still logs the attempted sample summary.
+
 - Track starts at volume zero; only after three stable observed `AudioTrack.getRoutedDevice()` A2DP checks while the track is playing *silent buffers*, and confirmation of a **built-in** microphone's actual input route, can nonzero PCM begin. Note that an actual routed-device query is **not** a hard lock against Android buffered speaker fallback.
 - Foreground-only, fixed **40-second maximum**, immediate visible Stop, no app recording to file, no internet permission, no raw speech export; only metadata/text diagnostics can be shared. The existing SW4 input-only APK is not modified.
 
@@ -16,7 +26,7 @@ The app attempts to stop new PCM production, zero the player volume, pause/flush
 
 ## Build and install
 
-CI: GitHub Actions **Android M04 Off-Ear Acoustic Bench**, artifact `hearlens-m04d4-offear-bench-debug` contains `hearlens-m04d4-offear-v0.1.0-debug.apk`.
+CI: GitHub Actions **Android M04 Off-Ear Acoustic Bench**, artifact `hearlens-m04d5-offear-bench-debug` contains `hearlens-m04d5-offear-v0.2.0-debug.apk`.
 
 Manual build requires Java 17, Android SDK 35 and Gradle with Android Gradle Plugin 8.7.3:
 
@@ -26,6 +36,18 @@ adb install -r apps/android-acoustic-bench/app/build/outputs/apk/debug/app-debug
 ```
 
 Install only on the owned Moto g62 Android 13 test phone. App identity `org.hearlens.acousticbench` avoids collisions with `org.hearlens.micprobe`. Debug signing certificates on different GitHub Actions runners can differ; an existing debug build might need uninstalling *that bench APK only*. Never uninstall SW4 or change the caption site just to install the bench.
+
+## Immediate M04-D5 acoustic next step (after M04-D4 on3)
+
+Previous `on3.wav` showed **24/24 clear iPhone direct-source chirps** with iPhone 10 cm from Realtek, and verified AIR31 A2DP/phone mic routing, but no separated **late AIR31 chirp**. Thus the only next field trial should be **L1**, not a repeat of SW1–SW4 or an automatic second-position recording.
+
+1. Keep the successful **on3 geometry**: iPhone speaker about **10 cm from Realtek**, Moto g62 built-in mic about **10–20 cm from iPhone speaker**, AIR31 both earphones placed **5–10 cm from Realtek** and **not worn**. The three devices other than AIR31 stay stationary. Do not obstruct the direct iPhone→Realtek line.
+2. Pair AIR31 to Moto over **A2DP media**; phone media volume initially low, fixed for the run. Open the **new M04-D5 v0.2.0** Android bench. Select **L1 測量** (NOT L2); reconfirm both safety checkboxes.
+3. Start Audacity on Windows/Realtek at 48-kHz mono. Press Start on Moto, wait for `active_route=A2DP`, and then play the **same boosted -20 dBFS, 25.5-second, 24×40 ms iPhone Chirp** used in successful on3. Ensure *actual physical speaker playback* and keep everything still until completion.
+4. Stop within 40 seconds. Export exactly one `on4_l1.wav`, and share **the full M04-D5 diagnostic text including `digital_levels`**. Do **not** make `moved` yet. Compare same-recording early direct-source chirps versus any delayed candidate after the track volume is raised one step.
+5. If direct 24/24 remains detectable but no AIR31 candidate emerges, diagnose `raw_rms_dbfs` / `out_pcm_rms_dbfs` / `limited_pct` and source→Moto positioning before deciding whether a single **L2** run is warranted. Avoid changing iPhone source or Windows recording levels between controlled comparisons. If AIR31 produces an identifiable delayed component, only then perform a single moved-earbud recording at the **same level** for source-motion confirmation.
+
+The `direct_close.wav` near-source baseline (18 consecutive events) and `on3.wav` (24/24 direct events) already establish capture; **do not repeat baseline** unless the room geometry changes appreciably. A digital PCM level change alone does not prove AIR31's actual acoustic latency.
 
 ## Field test with existing hardware — one session per condition
 

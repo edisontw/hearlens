@@ -5,11 +5,12 @@ import {readFileSync} from "node:fs";
 const root="apps/android-acoustic-bench/";
 const main=readFileSync(root+"app/src/main/java/org/hearlens/acousticbench/MainActivity.java","utf8");
 const gate=readFileSync(root+"app/src/main/java/org/hearlens/acousticbench/BenchSessionGate.java","utf8");
+const profile=readFileSync(root+"app/src/main/java/org/hearlens/acousticbench/BenchOutputProfile.java","utf8");
 const manifest=readFileSync(root+"app/src/main/AndroidManifest.xml","utf8");
 const sw4=readFileSync("apps/android-mic-probe/app/src/main/java/org/hearlens/micprobe/MainActivity.java","utf8");
 
 test("M04-D4 separate debug-only APK must never modify existing SW4 input probe",()=>{
-  assert.match(main,/HearLens M04-D4/);
+  assert.match(main,/HearLens M04-D5/);
   assert.match(sw4,/SW4_OUTPUT_ACTUAL_ROUTE=UNOBSERVABLE_NO_PLAYBACK|SW3_OUTPUT_ACTUAL_ROUTE=UNOBSERVABLE_NO_PLAYBACK/);
   assert.doesNotMatch(sw4,/new\s+AudioTrack\s*\(/);
   assert.doesNotMatch(manifest,/android\.permission\.INTERNET/);
@@ -17,16 +18,26 @@ test("M04-D4 separate debug-only APK must never modify existing SW4 input probe"
   assert.match(manifest,/android\.permission\.RECORD_AUDIO/);
   assert.match(manifest,/android\.permission\.BLUETOOTH_CONNECT/);
 });
-test("M04-D4 nonhuman PCM path defaults to weak, bounded, time-limited and manually stopped",()=>{
-  assert.match(main,/DIGITAL_LIMIT\s*=\s*384/);
-  assert.match(main,/TRACK_VOLUME\s*=\s*0\.15f/);
-  assert.match(main,/DIGITAL_GAIN\s*=\s*8/);
-  assert.match(main,/Math\.max\(-DIGITAL_LIMIT,Math\.min\(DIGITAL_LIMIT,sample\)\)/);
+test("M04-D5 nonhuman PCM stays bounded and starts with conservative baseline",()=>{
+  assert.match(profile,/L0_BASELINE\("L0 基準", 8, 384, 0\.15f\)/);
+  assert.match(profile,/L1_MEASURE\("L1 測量", 16, 768, 0\.25f\)/);
+  assert.match(profile,/L2_MEASURE\("L2 測量", 24, 1536, 0\.35f\)/);
+  assert.match(profile,/Math\.max\(-level\.cap, Math\.min\(level\.cap, boosted\)\)/);
+  assert.match(profile,/Math\.min\(1\.0, frames \/ \(double\) SAMPLE_RATE\)/);
   assert.match(main,/track\.setVolume\(0f\)/);
-  assert.match(main,/track\.setVolume\(TRACK_VOLUME\)/);
+  assert.match(main,/track\.setVolume\(profile\.level\(\)\.trackVolume\)/);
+  assert.match(main,/outputLevels\.check\(8000\)/);
+  assert.match(main,/profile\.process\(in\[i\]\)/);
+  assert.match(main,/profile\.metrics\(\)/);
+  assert.match(main,/outputLevels\.getChildAt\(i\)\.setEnabled\(!active\.get\(\)\)/);
   assert.match(main,/setText\("立即停止"\)/);
   assert.match(main,/offEar\.isChecked\(\)/);
   assert.match(main,/volumeLow\.isChecked\(\)/);
+  assert.match(main,/offEar\.setChecked\(false\)/);
+  assert.match(main,/volumeLow\.setChecked\(false\)/);
+  assert.match(profile,/limited_pct=/);
+  assert.match(profile,/raw_rms_dbfs=/);
+  assert.match(profile,/out_pcm_rms_dbfs=/);
   assert.match(gate,/SESSION_MS\s*=\s*40_000/);
   assert.match(gate,/State\.SILENT_ROUTE_CHECK/);
   assert.match(gate,/state\s*=\s*State\.STOPPED/);

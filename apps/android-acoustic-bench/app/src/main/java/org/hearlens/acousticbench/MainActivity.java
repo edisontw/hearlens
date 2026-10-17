@@ -21,6 +21,8 @@ import android.os.SystemClock;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -28,16 +30,13 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Separate M04-D4 research fixture: non-worn, short, digitally bounded
+ * Separate M04-D5 research fixture: non-worn, short, digitally bounded
  * microphone -> A2DP loop. NOT a hearing aid or route isolation guarantee.
  * The existing SW4 input-only probe and caption website remain untouched.
  */
 public final class MainActivity extends Activity {
     private static final int RATE = 48000;
     private static final int FRAMES = 480; // 10ms
-    private static final int DIGITAL_LIMIT = 384; // about -38.6 dBFS before track volume
-    private static final float TRACK_VOLUME = 0.15f;
-    private static final int DIGITAL_GAIN = 8; // bounded test signal, not audiogram fitting
     private static final int REQUEST_PERMISSIONS = 417;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final StringBuilder report = new StringBuilder(2048);
@@ -60,6 +59,8 @@ public final class MainActivity extends Activity {
     private TextView status;
     private CheckBox offEar;
     private CheckBox volumeLow;
+    private RadioGroup outputLevels;
+    private volatile BenchOutputProfile currentProfile;
     private Button startButton;
     private Button stopButton;
     private volatile boolean focusHeld;
@@ -73,7 +74,7 @@ public final class MainActivity extends Activity {
         int p = (int)(16 * getResources().getDisplayMetrics().density);
         root.setPadding(p,p,p,p);
         TextView title = new TextView(this);
-        title.setText("HearLens M04-D4｜AIR31 桌面延遲測試");
+        title.setText("HearLens M04-D5｜AIR31 桌面延遲測試");
         title.setTextSize(20);
         root.addView(title);
         TextView warning = new TextView(this);
@@ -82,6 +83,26 @@ public final class MainActivity extends Activity {
             + " 不存音訊、不上傳、不使用聽力圖增益。最長 40 秒。");
         warning.setTextSize(15);
         root.addView(warning);
+        TextView levelHelp = new TextView(this);
+        levelHelp.setText("非配戴測量輸出檔位（逐級測試；每次開始前選擇）。此設定不是實際耳內聲壓。");
+        root.addView(levelHelp);
+        outputLevels = new RadioGroup(this);
+        outputLevels.setOrientation(RadioGroup.VERTICAL);
+        for (int i=0; i<BenchOutputProfile.Level.values().length; i++) {
+            BenchOutputProfile.Level level = BenchOutputProfile.Level.fromIndex(i);
+            RadioButton option = new RadioButton(this);
+            option.setId(8000+i);
+            option.setText(level.label + "｜gain " + level.gain + "x，PCM ±"
+                + level.cap + "，track " + level.trackVolume);
+            outputLevels.addView(option);
+        }
+        outputLevels.check(8000); // explicit conservative initial baseline
+        outputLevels.setOnCheckedChangeListener((group,id) -> {
+            if (active.get()) return;
+            if (offEar!=null)offEar.setChecked(false);
+            if (volumeLow!=null)volumeLow.setChecked(false);
+        });
+        root.addView(outputLevels);
         offEar = new CheckBox(this);
         offEar.setText("確認 AIR31 沒有戴在任何人的耳朵上");
         root.addView(offEar);
@@ -114,7 +135,7 @@ public final class MainActivity extends Activity {
             startActivity(Intent.createChooser(intent,"分享 M04 測試紀錄"));
         });
         runningForeground = true;
-        log("build=m04d4-v0.1.0 target=Moto_g62_Android13 AIR31_A2DP");
+        log("build=m04d5-v0.2.0 target=Moto_g62_Android13 AIR31_A2DP");
         log("audio_output=NOT_CALIBRATED no_physical_speaker_isolation_guarantee=true");
         refreshUi();
     }
@@ -174,6 +195,13 @@ public final class MainActivity extends Activity {
             log("blocked=active_background_or_call");
             return;
         }
+        int levelIndex = outputLevels.getCheckedRadioButtonId()-8000;
+        if (levelIndex < 0 || levelIndex >= BenchOutputProfile.Level.values().length) {
+            log("blocked=invalid_measurement_level");
+            return;
+        }
+        final BenchOutputProfile selectedProfile =
+            new BenchOutputProfile(BenchOutputProfile.Level.fromIndex(levelIndex));
         final AudioDeviceInfo bt;
         final AudioDeviceInfo mic;
         try {
@@ -195,11 +223,18 @@ public final class MainActivity extends Activity {
             log("blocked=" + gate.reason());
             return;
         }
+        currentProfile = selectedProfile;
         active.set(true);
+        outputLevels.setEnabled(false);
+        for (int i=0; i<outputLevels.getChildCount();i++)
+            outputLevels.getChildAt(i).setEnabled(false);
         writtenFrames = 0;
         droppedWrites = 0;
         missedReads = 0;
-        log("start_a2dp_id=" + selectedId + " name=" + bt.getProductName());
+        log("start_a2dp_id=" + selectedId + " name=" + bt.getProductName()
+            + " level=" + selectedProfile.level().name()
+            + " media_volume=" + manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            + "/" + manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
         focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setAudioAttributes(mediaAttributes())
             .setOnAudioFocusChangeListener(change -> {
@@ -240,6 +275,7 @@ public final class MainActivity extends Activity {
     }
 
     private void runAudioLoop(AudioDeviceInfo bt,AudioDeviceInfo mic) {
+        final BenchOutputProfile profile = currentProfile;
         AudioTrack track = null;
         AudioRecord record = null;
         try {
@@ -290,10 +326,11 @@ public final class MainActivity extends Activity {
                 throw new IllegalStateException("not_builtin_mic");
             if (!gate.check(selectedId,true,true,focusHeld,SystemClock.elapsedRealtime()))
                 throw new IllegalStateException("pre_output_gate_fault");
-            track.setVolume(TRACK_VOLUME);
+            track.setVolume(profile.level().trackVolume);
             log("active_route=A2DP#" + selectedId + " input=BUILTIN_MIC#" + input.getId()
-                + " gain=" + DIGITAL_GAIN + " cap_pcm16=" + DIGITAL_LIMIT
-                + " track_volume=" + TRACK_VOLUME);
+                + " level=" + profile.level().name()
+                + " gain=" + profile.level().gain + " cap_pcm16=" + profile.level().cap
+                + " track_volume=" + profile.level().trackVolume);
             routeListener = routing -> checkActualRoutes();
             track.addOnRoutingChangedListener(routeListener,ui);
             short[] in = new short[FRAMES];
@@ -320,10 +357,7 @@ public final class MainActivity extends Activity {
                 if (n==0) { missedReads++; SystemClock.sleep(2); continue; }
                 lastInput = now;
                 for (int i=0;i<n;i++) {
-                    int sample = in[i]*DIGITAL_GAIN;
-                    sample = Math.max(-DIGITAL_LIMIT,Math.min(DIGITAL_LIMIT,sample));
-                    float ramp = Math.min(1f,writtenFrames/(float)RATE);
-                    short v = (short)Math.round(sample*ramp);
+                    short v = profile.process(in[i]);
                     out[2*i]=v;
                     out[2*i+1]=v;
                     in[i]=0;
@@ -401,9 +435,19 @@ public final class MainActivity extends Activity {
             manager.abandonAudioFocusRequest(focusRequest);
             focusHeld=false;
         }
+        BenchOutputProfile profile = currentProfile;
+        if(profile != null) log("digital_levels " + profile.metrics());
         log("stop=" + why + " elapsed_ms=" + (SystemClock.elapsedRealtime()-startedAt)
             + " mic_frames=" + writtenFrames + " dropped_writes=" + droppedWrites
+            + " missed_reads=" + missedReads
             + " no_audio_file=true speaker_zero_leak_not_proven=true");
+        ui.post(() -> {
+            if (!active.get()) {
+                offEar.setChecked(false);
+                volumeLow.setChecked(false);
+            }
+            refreshUi();
+        });
     }
     private void log(String line) {
         String timestamp = String.format(Locale.US,"%d",SystemClock.elapsedRealtime());
@@ -415,6 +459,11 @@ public final class MainActivity extends Activity {
         status.setText(report.toString());
         startButton.setEnabled(!active.get());
         stopButton.setEnabled(active.get());
+        if(outputLevels!=null) {
+            outputLevels.setEnabled(!active.get());
+            for(int i=0;i<outputLevels.getChildCount();i++)
+                outputLevels.getChildAt(i).setEnabled(!active.get());
+        }
     }
     @Override public void onPause() {
         runningForeground=false;
