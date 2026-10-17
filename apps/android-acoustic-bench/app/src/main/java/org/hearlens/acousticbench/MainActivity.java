@@ -46,13 +46,13 @@ public final class MainActivity extends Activity {
 
     private AudioManager manager;
     private AudioFocusRequest focusRequest;
-    private AudioTrack playback;
-    private AudioRecord capture;
+    private volatile AudioTrack playback;
+    private volatile AudioRecord capture;
     private Thread worker;
     private AudioDeviceCallback deviceCallback;
     private AudioRouting.OnRoutingChangedListener routeListener;
     private BenchSessionGate gate;
-    private int selectedId = -1;
+    private volatile int selectedId = -1;
     private long startedAt;
     private long writtenFrames;
     private int droppedWrites;
@@ -62,8 +62,8 @@ public final class MainActivity extends Activity {
     private CheckBox volumeLow;
     private Button startButton;
     private Button stopButton;
-    private boolean focusHeld;
-    private boolean runningForeground;
+    private volatile boolean focusHeld;
+    private volatile boolean runningForeground;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -370,10 +370,17 @@ public final class MainActivity extends Activity {
         if (!runningForeground || !normalMode()) {
             abort("background_or_phone_call"); return;
         }
-        if(gate == null || !gate.tick(SystemClock.elapsedRealtime())) {
-            abort("timer_ended");return;
+        BenchSessionGate localGate = gate;
+        if(localGate == null) { abort("no_route_gate"); return; }
+        if(localGate.state() == BenchSessionGate.State.RUNNING) {
+            if(!localGate.tick(SystemClock.elapsedRealtime())) {
+                abort("timer_ended"); return;
+            }
+            checkActualRoutes();
+        } else if(localGate.state() == BenchSessionGate.State.STOPPED ||
+                SystemClock.elapsedRealtime()-startedAt >= BenchSessionGate.SESSION_MS) {
+            abort("silent_route_timeout"); return;
         }
-        checkActualRoutes();
         if(active.get())ui.postDelayed(this::monitor,100);
     }
     private void abort(String why) {
