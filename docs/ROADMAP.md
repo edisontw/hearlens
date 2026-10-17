@@ -124,6 +124,15 @@ No live-ear safety claim.
 - [ ] Actual Moto g62 → HearLens DSP → AIR31 nonhuman acoustic latency **NOT MEASURED**: physical hard-mute, speaker-fallback, ear-level output and safe output authorization remain blocked.
 - [x] Deterministic synthetic regression included in CI. Do not repeat accepted SW1–SW4 field diagnostics. See [M04-D1 protocol](./M04D1_MONO_CHIRP_SMOKE_2026-10-16.md).
 
+## M04-D5 — Bounded bench level steps and PCM evidence (2026-10-17)
+
+- [x] From the latest main, keep D4 input and actual AIR31 route architecture intact, but add isolated **L0 baseline (8×/±384/.15), L1 (16×/±768/.25), L2 (24×/±1536/.35)** for off-ear testing only; 1-second ramp, always hard-clamped output, profile locked while running. Default remains L0.
+- [x] Log selected profile, Android media-volume index, raw mic RMS/peak, attempted pre-OS PCM RMS/peak, limiter percentage, and partial writes; **no audio recording**, no automatic gain adjustment or on-ear claim.
+- [x] Reset off-ear/OS-low-volume acknowledgments after each session and level change. Preserve 40-second timeout, foreground/focus/route stop and no auto-resume.
+- [x] Add pure Java fixture tests for all three profiles/limiter/soft-start/metadata; update Node contracts, Android APK v0.2.0 CI artifact and operator guide. [App and field test plan](../apps/android-acoustic-bench/README.md).
+- [ ] Field check only **one** L1 `on4_l1.wav` using the previous successful 10-cm iPhone→Realtek boosted Chirp; inspect audio-level diagnostics before any L2 or moved-earbud recording. M04-D4 `on3.wav` had 24/24 direct Chirps but no identifiable AIR31 acoustic lag.
+- **Nonhuman off-ear research only:** digital PCM dBFS is not calibrated sound pressure or guaranteed isolation of speaker fallback.
+
 ## M04-D4 — Standalone native off-ear acoustic loop (2026-10-17)
 
 - [x] Add separate Android 13 debug bench source for Moto g62 **built-in microphone → 48 kHz bounded linear passthrough → AIR31 A2DP**. Silent playing-track route check is required before nonzero PCM. [Build/test instructions](../apps/android-acoustic-bench/README.md).
