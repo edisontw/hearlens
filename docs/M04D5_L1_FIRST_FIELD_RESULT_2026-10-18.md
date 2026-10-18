@@ -24,7 +24,7 @@ Owner submitted `on4_l1.wav` after the M04-D5 v0.2.0 debug app ran at L1, using 
 
 ## Delayed AIR31 candidate search
 
-- For each direct chirp, find its local source matched-filter peak and align events to avoid interdevice clock drift. Search for an additional 900–3800-Hz chirp in **50–950 ms after** the direct chirp, allowing for phase inversion and signal jitter.
+- For each direct chirp, find its local source matched-filter peak and align events to avoid interdevice clock drift. Search for an additional 900–3800-Hz chirp in **50–950 ms after** the direct chirp, checking repeated, consistent late matched-filter peaks; phase-inverted or strongly distorted earbud audio might evade this specific detector.
 - There is **no stable reproducible late chirp** distinguishable from environmental/matched-filter background across 24 events. Max stacked late *positive* normalized matched correlation is ~**0.049** for on4 L1 (vs ~**0.053** for on3 baseline and ~**0.067** for direct_close without earbud playback). The differences are exploratory noise comparisons with different recording conditions and counts, **not** a validated detection significance test.
 - Realtek 900–3800-Hz RMS: on3 **−65.98 dBFS**, on4 L1 **−65.64 dBFS** (**+0.34 dB** only); both contain a strong direct source. This does not demonstrate a second acoustic AIR31 signal after increased programmatic gain.
 - Result: **ANDROID_ROUTE_PASS / DIRECT_CHIRP_PASS / AIR31_ACOUSTIC_PRESENCE_INCONCLUSIVE / A2DP_MIC_LOOP_P50_P95_JITTER_NOT_MEASURED**.
