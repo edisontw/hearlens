@@ -4,11 +4,13 @@ on:
     paths:
       - 'apps/android-acoustic-bench/**'
       - 'tools/test-m04d4-native-bench.test.mjs'
+      - 'tools/test-m04d6-output-selftest.test.mjs'
       - '.github/workflows/android-m04-offear-bench.yml'
   pull_request:
     paths:
       - 'apps/android-acoustic-bench/**'
       - 'tools/test-m04d4-native-bench.test.mjs'
+      - 'tools/test-m04d6-output-selftest.test.mjs'
       - '.github/workflows/android-m04-offear-bench.yml'
   workflow_dispatch:
 
@@ -23,7 +25,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify isolated nonhuman output policy
-        run: node --test tools/test-m04d4-native-bench.test.mjs
+        run: node --test tools/test-m04d4-native-bench.test.mjs tools/test-m04d6-output-selftest.test.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -39,16 +41,23 @@ jobs:
             apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchOutputProfile.java \
             apps/android-acoustic-bench/tests/org/hearlens/acousticbench/BenchOutputProfileTest.java
           java -cp /tmp/hearlens-m04-bench org.hearlens.acousticbench.BenchOutputProfileTest
+      - name: Test deterministic six-chirp L1 output source
+        run: |
+          javac -d /tmp/hearlens-m04-bench \
+            apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchOutputProfile.java \
+            apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchSelfTestSignal.java \
+            apps/android-acoustic-bench/tests/org/hearlens/acousticbench/BenchSelfTestSignalTest.java
+          java -cp /tmp/hearlens-m04-bench org.hearlens.acousticbench.BenchSelfTestSignalTest
       - name: Compile standalone off-ear debug APK
         run: gradle --no-daemon -p apps/android-acoustic-bench assembleDebug
       - name: Name artifact distinctly from SW4 input-only tool
         run: |
           cp apps/android-acoustic-bench/app/build/outputs/apk/debug/app-debug.apk \
-            apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d5-offear-v0.2.0-debug.apk
+            apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d6-offear-v0.3.0-debug.apk
       - name: Publish debug APK only
         uses: actions/upload-artifact@v4
         with:
-          name: hearlens-m04d5-offear-bench-debug
-          path: apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d5-offear-v0.2.0-debug.apk
+          name: hearlens-m04d6-offear-bench-debug
+          path: apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d6-offear-v0.3.0-debug.apk
           if-no-files-found: error
           retention-days: 14
