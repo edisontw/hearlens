@@ -52,6 +52,15 @@ public final class BenchSessionGateTest {
         gate=new BenchSessionGate();
         check(!gate.begin(-1,0,true),"must specify paired endpoint");
         noResume(gate);
-        System.out.println("M04-D4 Java off-ear route gate: PASS");
+        gate=armed();
+        check(gate.checkOutputOnly(13,true,true,1010),"output-only exact A2DP");
+        check(!gate.checkOutputOnly(13,false,true,1100),"output route loss");
+        check("lost_a2dp_route".equals(gate.reason()),"route stop reason");
+        noResume(gate);
+        gate=armed();
+        check(!gate.checkOutputOnly(13,true,false,1100),"output-only audio focus lost");
+        check("audio_focus_lost".equals(gate.reason()),"focus stop reason");
+        noResume(gate);
+        System.out.println("M04-D6 Java off-ear route gate: PASS");
     }
 }

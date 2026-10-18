@@ -1,4 +1,17 @@
-# M04-D5 — Moto g62 → AIR31 graded-output acoustic bench (nonhuman, debug-only)
+# M04-D6 — AIR31 independent output self-test (off-ear, v0.3.0)
+
+**NEW default mode: OUTPUT_SELF_TEST.** The App directly generates six known, Hann-windowed 40-ms 900–3800-Hz Chirps at 48 kHz, beginning 1.25 seconds after output begins, at 800-ms intervals; total PCM playback is 6.5 seconds. This mode **does not open or read a microphone**. The former M04-D5 `MICROPHONE_LOOP` remains available as a separate labeled mode but is **not** required for the next test.
+
+D6 forces **L1_MEASURE** only (16× processing, ±768 PCM16 limiter, AudioTrack 0.25 scalar), with existing one-second smooth ramp. L0 and L2 cannot be selected for D6. It requires manual off-ear and low-volume confirmations, exactly one identifiable AIR31 A2DP output, actual AudioTrack A2DP routing on silent buffers, and **nonzero Android media volume ≤20% of maximum** (Moto g62 3/15 is accepted). Changing route, focus, volume, phone mode or foreground state triggers fail-stop. Stop manually at any time. No reconnect autorestart. Software cannot guarantee zero queued phone-speaker sound or physical safe SPL.
+
+**Next physical test: only D6**. Place AIR31 off-ear within 5–10 cm of Windows Realtek mic; **do not play any iPhone chirps**. Start Audacity 48-kHz mono recording, then run D6 with Moto media volume 3/15 and both confirmations. The app auto-stops after approximately 6.5 seconds. Export `d6_selftest_l1.wav` and the diagnostic text. Search for the six App-generated Chirps. If detected, AIR31 output audibility is provisionally established; investigate Moto mic −84.1 dBFS next. If absent, inspect volume, A2DP route and PCM writes **without escalating to L2 or rerunning D5 on/moved**. Do not interpret this as E2E latency, SPL, or clinical-use evidence.
+
+CI workflow **Android M04 Off-Ear Acoustic Bench** publishes `hearlens-m04d6-offear-bench-debug` containing `hearlens-m04d6-offear-v0.3.0-debug.apk`. Install on owned Moto g62 only using `adb install -r`; distinct app ID remains `org.hearlens.acousticbench`. Its debug signature may require uninstalling the prior **bench only**, not SW4. Nothing records audio; diagnostics report mode, L1, digital RMS/peak/limiter, actual route, Android volume, PCM writes and stop reason. See [D6 technical handoff](../../docs/M04D6_OUTPUT_SELFTEST_2026-10-19.md).
+
+---
+
+## Historical M04-D5 procedure (do not repeat for D6)
+
 
 **No consumer hearing assistance and no use while wearing the earphones.** This is an intentionally separate native Android APK, `org.hearlens.acousticbench`, not the existing SW4 input-only diagnostic APK and not the M01 caption website. It intentionally implements only a bounded **phone built-in microphone → selected fixed measurement gain → digital limiter → connected A2DP** stream, to establish whether ordinary Bluetooth is fast enough for the HearLens product concept.
 

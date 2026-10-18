@@ -32,6 +32,17 @@ public final class BenchSessionGate {
         reason = "off_ear_only_active";
         return true;
     }
+    /** D6 bypasses microphone entirely; require only actual A2DP and audio focus. */
+    public synchronized boolean checkOutputOnly(int actualDeviceId, boolean isA2dp,
+                                                boolean focusOk, long nowMs) {
+        if (state != State.SILENT_ROUTE_CHECK && state != State.RUNNING) return false;
+        if (nowMs < 0 || nowMs >= deadlineMs) return stop("timeout");
+        if (!isA2dp || actualDeviceId != endpointId) return stop("lost_a2dp_route");
+        if (!focusOk) return stop("audio_focus_lost");
+        state = State.RUNNING;
+        reason = "off_ear_only_active";
+        return true;
+    }
     public synchronized boolean tick(long nowMs) {
         if (state != State.RUNNING) return false;
         if (nowMs < 0 || nowMs >= deadlineMs) return stop("timeout");
