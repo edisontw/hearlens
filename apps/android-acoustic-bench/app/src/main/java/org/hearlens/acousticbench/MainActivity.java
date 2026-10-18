@@ -98,7 +98,7 @@ public final class MainActivity extends Activity {
         testModes.addView(selfOption);
         RadioButton micOption = new RadioButton(this);
         micOption.setId(9000);
-        micOption.setText("D5 Microphone Loop｜Moto 麥克風即時輸出（舊模式）");
+        micOption.setText("HearLens M04-D5 Microphone Loop｜Moto 麥克風即時輸出（舊模式）");
         testModes.addView(micOption);
         testModes.check(9001);
         root.addView(testModes);
