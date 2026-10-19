@@ -3,7 +3,7 @@ package org.hearlens.acousticbench;
 /** Deterministic 48-kHz off-ear chirps; NO microphone input. */
 public final class BenchSelfTestSignal {
     public static final int SAMPLE_RATE=48_000;
-    public static final int CHIRP_MS=40;
+    public static final int CHIRP_MS=160;
     public static final int CHIRP_COUNT=6;
     public static final int FIRST_CHIRP_MS=1_250;
     public static final int PERIOD_MS=800;
@@ -26,6 +26,7 @@ public final class BenchSelfTestSignal {
         double duration=CHIRP_MS/1000.0;
         double phase=2*Math.PI*(900*t+0.5*(3800-900)*t*t/duration);
         double window=0.5*(1-Math.cos(2*Math.PI*local/(CHIRP_FRAMES-1)));
+        // Longer than D6 (4x duration/energy), unchanged raw and L1 peak bounds.
         // Existing L1 gain, slow ramp and limiter enforce +/-768 PCM16 output.
         return (int)Math.round(64*window*Math.sin(phase));
     }
