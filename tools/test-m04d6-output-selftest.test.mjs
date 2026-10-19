@@ -22,7 +22,7 @@ test("D6 is L1-only with digital limit, bounded session and media volume",()=>{
  assert.match(self,/safeSelfTestMediaVolume\(\)/);
  assert.match(signal,/TOTAL_MS=6_500/);
  assert.match(signal,/CHIRP_COUNT=6/);
- assert.match(signal,/CHIRP_MS=40/);
+ assert.match(signal,/CHIRP_MS=160/);
 });
 test("D6 keeps off-ear checks and fail-stop A2DP safeguards",()=>{
  assert.match(main,/offEar\.isChecked\(\) && volumeLow\.isChecked\(\)/);
@@ -34,4 +34,21 @@ test("D6 keeps off-ear checks and fail-stop A2DP safeguards",()=>{
  assert.match(main,/app_left_foreground/);
  assert.match(main,/user_pressed_stop/);
  assert.match(gate,/state\s*=\s*State\.STOPPED/);
+});
+
+test("D6.1 queues PCM against playback-head progress and never treats write completion as playback",()=>{
+ assert.match(self,/new BenchPlaybackProgress\(/);
+ assert.match(self,/track\.getPlaybackHeadPosition\(\)/);
+ assert.match(self,/progress\.canQueue\(\)/);
+ assert.match(self,/progress\.startDrain\(/);
+ assert.match(self,/if\(progress\.drained\(\)\)/);
+ assert.match(self,/self_test_drain_timeout/);
+ assert.match(self,/self_test_playback_head_stalled/);
+ assert.match(self,/self_test_android_playback_drain_confirmed=true/);
+ assert.match(main,/android_drain_confirmed=/);
+ assert.match(main,/acoustic_output_verified=false/);
+ const completeIndex=self.indexOf('abort("self_test_complete")');
+ const drainedIndex=self.indexOf("if(progress.drained())");
+ assert.ok(completeIndex>drainedIndex && drainedIndex>=0);
+ assert.doesNotMatch(self,/SystemClock\.elapsedRealtime\(\)-stallStart>500/);
 });
