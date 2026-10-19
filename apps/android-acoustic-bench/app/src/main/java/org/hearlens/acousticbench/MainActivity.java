@@ -57,6 +57,12 @@ public final class MainActivity extends Activity {
     private long writtenFrames;
     private int droppedWrites;
     private int missedReads;
+    private volatile long playbackSubmittedFrames;
+    private volatile long playbackHeadFrames;
+    private volatile long playbackPrimingFrames;
+    private volatile int writeZeroCount;
+    private volatile int writePartialCount;
+    private volatile boolean drainConfirmed;
     private TextView status;
     private CheckBox offEar;
     private CheckBox volumeLow;
@@ -78,13 +84,13 @@ public final class MainActivity extends Activity {
         int p = (int)(16 * getResources().getDisplayMetrics().density);
         root.setPadding(p,p,p,p);
         TextView title = new TextView(this);
-        title.setText("HearLens M04-D6｜AIR31 桌面輸出自測");
+        title.setText("HearLens M04-D6.1｜AIR31 桌面輸出自測");
         title.setTextSize(20);
         root.addView(title);
         TextView warning = new TextView(this);
         warning.setText("僅限非配戴實驗。將 AIR31 放在桌上、遠離耳朵。請先調低 Android 媒體音量，避免麥克風與耳機靠近回授。\n"
             + "Bluetooth 斷線會嘗試立即停止，但已送進系統的聲音仍可能短暫從手機喇叭播出。"
-            + " 不存音訊、不上傳、不使用聽力圖增益。D6 自產 Chirp 約 6.5 秒；原麥克風測試最長 40 秒。");
+            + " 不存音訊、不上傳、不使用聽力圖增益。D6 自產 Chirp 約 6.5 秒，等待播放進度確認；原麥克風測試最長 40 秒。");
         warning.setTextSize(15);
         root.addView(warning);
         TextView modeHelp = new TextView(this);
@@ -162,7 +168,7 @@ public final class MainActivity extends Activity {
             startActivity(Intent.createChooser(intent,"分享 M04 測試紀錄"));
         });
         runningForeground = true;
-        log("build=m04d6-v0.3.0 target=Moto_g62_Android13 AIR31_A2DP");
+        log("build=m04d61-v0.3.1 target=Moto_g62_Android13 AIR31_A2DP");
         log("audio_output=NOT_CALIBRATED no_physical_speaker_isolation_guarantee=true");
         refreshUi();
     }
@@ -284,6 +290,12 @@ public final class MainActivity extends Activity {
         writtenFrames = 0;
         droppedWrites = 0;
         missedReads = 0;
+        playbackSubmittedFrames = 0;
+        playbackHeadFrames = 0;
+        playbackPrimingFrames = 0;
+        writeZeroCount = 0;
+        writePartialCount = 0;
+        drainConfirmed = false;
         log("test_mode=" + (selfTest ? "OUTPUT_SELF_TEST" : "MICROPHONE_LOOP")
             + " source=" + (selfTest ? "APP_GENERATED_CHIRP_NO_MIC" : "BUILTIN_MIC_LIVE")
             + " duration_limit_ms=" + (selfTest ? BenchSelfTestSignal.TOTAL_MS : BenchSessionGate.SESSION_MS));
@@ -456,6 +468,10 @@ public final class MainActivity extends Activity {
      * The deterministic signal goes through the same L1 process(), ramp,
      * limiter, A2DP routing and fail-stop lifecycle as the existing loop.
      */
+    /**
+     * D6.1: distinguish AudioTrack acceptance from its observed playback cursor.
+     * The cursor is an OS software/driver signal, NOT proof of acoustic output.
+     */
     private void runSelfTestLoop(AudioDeviceInfo bt) {
         final BenchOutputProfile profile = currentProfile;
         final BenchSelfTestSignal signal = new BenchSelfTestSignal();
@@ -466,24 +482,28 @@ public final class MainActivity extends Activity {
             if(minOut <= 0) throw new IllegalStateException("unsupported_output_format");
             track = new AudioTrack.Builder().setAudioAttributes(mediaAttributes())
                     .setAudioFormat(outputFormat()).setTransferMode(AudioTrack.MODE_STREAM)
-                    .setBufferSizeInBytes(Math.max(minOut, FRAMES*4*4)).build();
+                    .setBufferSizeInBytes(Math.max(minOut,FRAMES*4*4)).build();
             if(track.getState()!=AudioTrack.STATE_INITIALIZED)
                 throw new IllegalStateException("track_init");
             if(!track.setPreferredDevice(bt))
                 throw new IllegalStateException("output_preference_rejected");
             synchronized(outputLock) {
-                if(!active.get()) return;
-                playback = track;
+                if(!active.get())return;
+                playback=track;
                 track.setVolume(0f);
                 track.play();
             }
-            short[] silence = new short[FRAMES*2];
-            int stable = 0;
-            long routeStart = SystemClock.elapsedRealtime();
+
+            short[] silence=new short[FRAMES*2];
+            long primedFrames=0;
+            int stable=0;
+            long routeStart=SystemClock.elapsedRealtime();
             while(active.get() && stable<3 &&
                     SystemClock.elapsedRealtime()-routeStart<1200) {
-                track.write(silence,0,silence.length,AudioTrack.WRITE_NON_BLOCKING);
-                AudioDeviceInfo routed = track.getRoutedDevice();
+                int n=track.write(silence,0,silence.length,AudioTrack.WRITE_NON_BLOCKING);
+                if(n<0)throw new IllegalStateException("silent_write_error_"+n);
+                primedFrames+=n/2;
+                AudioDeviceInfo routed=track.getRoutedDevice();
                 if(routed!=null) {
                     if(routed.getType()!=AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
                             routed.getId()!=selectedId)
@@ -498,82 +518,145 @@ public final class MainActivity extends Activity {
                 throw new IllegalStateException("pre_output_gate_fault");
             if(!safeSelfTestMediaVolume())
                 throw new IllegalStateException("media_volume_changed");
+
+            long now=SystemClock.elapsedRealtime();
+            long initialHead=Integer.toUnsignedLong(track.getPlaybackHeadPosition());
+            BenchPlaybackProgress progress=new BenchPlaybackProgress(primedFrames,initialHead,now);
+            playbackSubmittedFrames=primedFrames;
+            playbackHeadFrames=initialHead;
+            playbackPrimingFrames=primedFrames;
             track.setVolume(profile.level().trackVolume);
-            lastActualRoute="A2DP#" + selectedId;
-            log("active_route=A2DP#" + selectedId + " input=NONE source=APP_GENERATED_CHIRP"
-                + " level=" + profile.level().name()
-                + " gain=" + profile.level().gain + " cap_pcm16=" + profile.level().cap
-                + " track_volume=" + profile.level().trackVolume
-                + " chirp_count=" + BenchSelfTestSignal.CHIRP_COUNT
-                + " chirp_ms=" + BenchSelfTestSignal.CHIRP_MS);
-            routeListener = routing -> checkActualRoutes();
-            track.addOnRoutingChangedListener(routeListener, ui);
-            short[] out = new short[FRAMES*2];
-            long produced = 0;
-            while(active.get() && produced < signal.totalFrames()) {
-                long now = SystemClock.elapsedRealtime();
+            lastActualRoute="A2DP#"+selectedId;
+            log("active_route=A2DP#"+selectedId+" input=NONE source=APP_GENERATED_CHIRP"
+                +" level="+profile.level().name()
+                +" gain="+profile.level().gain+" cap_pcm16="+profile.level().cap
+                +" track_volume="+profile.level().trackVolume
+                +" chirp_count="+BenchSelfTestSignal.CHIRP_COUNT
+                +" chirp_ms="+BenchSelfTestSignal.CHIRP_MS
+                +" playback_head_initial="+initialHead
+                +" priming_frames="+primedFrames);
+            routeListener=routing->checkActualRoutes();
+            track.addOnRoutingChangedListener(routeListener,ui);
+
+            short[] out=new short[FRAMES*2];
+            long produced=0;
+            while(active.get() && produced<signal.totalFrames()) {
+                now=SystemClock.elapsedRealtime();
                 if(!runningForeground || !normalMode() || !safeSelfTestMediaVolume()) {
-                    abort("self_test_foreground_call_or_volume_change"); break;
+                    abort("self_test_foreground_call_or_volume_change");break;
                 }
-                AudioDeviceInfo route = track.getRoutedDevice();
-                boolean exact = route!=null && route.getId()==selectedId &&
+                AudioDeviceInfo route=track.getRoutedDevice();
+                boolean exact=route!=null && route.getId()==selectedId &&
                     route.getType()==AudioDeviceInfo.TYPE_BLUETOOTH_A2DP;
-                lastActualRoute = route==null ? "UNKNOWN" : (route.getType() + "#" + route.getId());
-                if(!gate.checkOutputOnly(route==null?-1:route.getId(), exact,
-                        focusHeld,now)) {
-                    abort(gate.reason()); break;
+                lastActualRoute=route==null?"UNKNOWN":(route.getType()+"#"+route.getId());
+                if(!gate.checkOutputOnly(route==null?-1:route.getId(),exact,focusHeld,now)){
+                    abort(gate.reason());break;
                 }
+                progress.observe(Integer.toUnsignedLong(track.getPlaybackHeadPosition()),now);
+                playbackHeadFrames=progress.playedFrames();
+                if(progress.stalled(now)){
+                    abort("self_test_playback_head_stalled");break;
+                }
+                if(!progress.canQueue()){
+                    SystemClock.sleep(5);continue; // bounded queue: no unpaced fast forwarding
+                }
+
                 for(int i=0;i<FRAMES;i++) {
-                    short v = profile.process(signal.sampleAt(produced+i));
+                    short v=profile.process(signal.sampleAt(produced+i));
                     out[2*i]=v;
                     out[2*i+1]=v;
                 }
-                produced += FRAMES;
+                produced+=FRAMES;
                 int offset=0;
-                long stallStart=SystemClock.elapsedRealtime();
+                long lastAcceptedAt=SystemClock.elapsedRealtime();
                 while(active.get() && offset<out.length) {
+                    now=SystemClock.elapsedRealtime();
                     int done=track.write(out,offset,out.length-offset,AudioTrack.WRITE_NON_BLOCKING);
-                    if(done<0) {abort("output_write_error_"+done); break;}
-                    if(done==0) {
-                        droppedWrites++;
-                        if(SystemClock.elapsedRealtime()-stallStart>500) {
-                            abort("self_test_write_stalled"); break;
+                    if(done<0){abort("output_write_error_"+done);break;}
+                    if(done==0){
+                        droppedWrites++;writeZeroCount++;
+                        if(now-lastAcceptedAt>BenchPlaybackProgress.STALL_MS){
+                            abort("self_test_write_stalled");break;
                         }
-                        SystemClock.sleep(4);
-                    } else {
+                        SystemClock.sleep(5);
+                    }else{
                         offset+=done;
-                        if(offset<out.length)droppedWrites++;
-                        stallStart=SystemClock.elapsedRealtime();
+                        writtenFrames+=done/2;
+                        progress.accepted(done/2);
+                        playbackSubmittedFrames=progress.submittedFrames();
+                        if(offset<out.length){droppedWrites++;writePartialCount++;}
+                        lastAcceptedAt=now;
                     }
-                    if(!runningForeground || !normalMode() || !safeSelfTestMediaVolume()) {
-                        abort("self_test_interrupted_during_write"); break;
+                    if(!runningForeground || !normalMode() || !safeSelfTestMediaVolume()){
+                        abort("self_test_interrupted_during_write");break;
                     }
                     AudioDeviceInfo duringWrite=track.getRoutedDevice();
                     if(duringWrite==null ||
                             duringWrite.getType()!=AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                            duringWrite.getId()!=selectedId) {
-                        abort("self_test_route_lost_during_write"); break;
+                            duringWrite.getId()!=selectedId){
+                        abort("self_test_route_lost_during_write");break;
+                    }
+                    if(!gate.checkOutputOnly(selectedId,true,focusHeld,now)){
+                        abort(gate.reason());break;
                     }
                 }
-                writtenFrames+=offset/2;
                 java.util.Arrays.fill(out,(short)0);
-                if(!active.get()) break;
             }
-            if(active.get())abort("self_test_complete");
-        } catch(SecurityException e) {
+            if(active.get()){
+                long drainStarted=SystemClock.elapsedRealtime();
+                progress.startDrain(drainStarted);
+                log("self_test_pcm_submitted accepted_frames="+writtenFrames
+                    +" priming_frames="+primedFrames
+                    +" total_submitted_frames="+progress.submittedFrames()
+                    +" head_frames="+progress.playedFrames()
+                    +" drain_timeout_ms="+BenchPlaybackProgress.DRAIN_TIMEOUT_MS);
+                while(active.get()){
+                    now=SystemClock.elapsedRealtime();
+                    if(!runningForeground || !normalMode() || !safeSelfTestMediaVolume()){
+                        abort("self_test_interrupted_during_drain");break;
+                    }
+                    AudioDeviceInfo route=track.getRoutedDevice();
+                    boolean exact=route!=null && route.getId()==selectedId &&
+                        route.getType()==AudioDeviceInfo.TYPE_BLUETOOTH_A2DP;
+                    lastActualRoute=route==null?"UNKNOWN":(route.getType()+"#"+route.getId());
+                    if(!gate.checkOutputOnly(route==null?-1:route.getId(),exact,focusHeld,now)){
+                        abort(gate.reason());break;
+                    }
+                    progress.observe(Integer.toUnsignedLong(track.getPlaybackHeadPosition()),now);
+                    playbackHeadFrames=progress.playedFrames();
+                    if(progress.drained()){
+                        drainConfirmed=true;
+                        log("self_test_android_playback_drain_confirmed=true"
+                            +" accepted_frames="+progress.submittedFrames()
+                            +" played_frames="+progress.playedFrames()
+                            +" drain_elapsed_ms="+(now-drainStarted)
+                            +" acoustic_output_verified=false");
+                        abort("self_test_complete");
+                        break;
+                    }
+                    if(progress.stalled(now)){
+                        abort("self_test_playback_head_stalled_during_drain");break;
+                    }
+                    if(progress.drainTimedOut(now)){
+                        abort("self_test_drain_timeout");break;
+                    }
+                    SystemClock.sleep(15);
+                }
+            }
+        }catch(SecurityException e){
             abort("permission_revoked");
-        } catch(Exception e) {
-            abort("self_test_error_" + e.getClass().getSimpleName()
-                + "_" + (e.getMessage()==null?"unknown":e.getMessage()));
-        } finally {
-            if(track!=null) {
+        }catch(Exception e){
+            abort("self_test_error_"+e.getClass().getSimpleName()
+                +"_"+(e.getMessage()==null?"unknown":e.getMessage()));
+        }finally{
+            if(track!=null){
                 try{track.setVolume(0f);}catch(Exception ignored){}
                 try{if(routeListener!=null)track.removeOnRoutingChangedListener(routeListener);}
                 catch(Exception ignored){}
                 try{track.pause();track.flush();track.stop();}catch(Exception ignored){}
                 try{track.release();}catch(Exception ignored){}
             }
-            synchronized(outputLock) {playback=null;}
+            synchronized(outputLock){playback=null;}
             if(active.get())abort("self_test_loop_ended");
         }
     }
@@ -634,6 +717,13 @@ public final class MainActivity extends Activity {
             + " mic_frames=" + (selfTestActive ? 0 : writtenFrames)
             + " attempted_pcm_frames=" + writtenFrames
             + " dropped_writes=" + droppedWrites
+            + " write_retry_zero=" + writeZeroCount
+            + " write_retry_partial=" + writePartialCount
+            + " track_submitted_frames=" + playbackSubmittedFrames
+            + " track_played_frames=" + playbackHeadFrames
+            + " track_priming_frames=" + playbackPrimingFrames
+            + " android_drain_confirmed=" + drainConfirmed
+            + " acoustic_output_verified=false"
             + " missed_reads=" + missedReads
             + " no_audio_file=true speaker_zero_leak_not_proven=true");
         ui.post(() -> {
