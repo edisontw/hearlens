@@ -1,4 +1,21 @@
-# M04-D6 — AIR31 independent output self-test (off-ear, v0.3.0)
+# M04-D6.1 — AIR31 output playback-head verification (off-ear, v0.3.1)
+
+**D6.1 is the next single diagnostic test.** Review of the first D6 desktop recording and Moto diagnostics established: (a) 312,000 application-generated frames were accepted by AudioTrack but six acoustic Chirps were not reliably detected; (b) a second run stalled before the first Chirp. The earlier `self_test_complete` did **not** wait for the Android playback cursor. This change fixes that diagnostic ambiguity; it does **not** prove physical AIR31 speaker output.
+
+The **OUTPUT_SELF_TEST** mode remains microphone-free and generates six Hann-windowed **160-ms** 900–3800-Hz Chirps at 48 kHz, at 1.25, 2.05, 2.85, 3.65, 4.45 and 5.25 seconds. The PCM stream remains 6.5 seconds; 160 ms is 4× the former pulse duration with **unchanged 64-unit raw peak**, same L1 gain 16, PCM16 hard cap ±768, AudioTrack scalar 0.25 and Moto media-volume ceiling 3/15. It increases integrated energy and visual identifiability **without raising the peak ceiling**. No L2 and no wearing the earphones.
+
+The D6.1 worker paces `AudioTrack.write(WRITE_NON_BLOCKING)` using `getPlaybackHeadPosition()`, restricts outstanding AudioTrack PCM to roughly 200 ms, separately logs zero and partial write retries, and **only** records `stop=self_test_complete` after the Android playback head catches up with all accepted PCM (including silent route-validation buffers). A stalled playback head, unavailable routing, interrupted focus, foreground exit, route loss or volume change stops the session. The playback cursor can still reflect OS/driver consumption rather than actual RF arrival or acoustic sound: `android_drain_confirmed=true` is **not** `acoustic_output_verified=true`. If a device fails to advance the Android playback cursor correctly, report the new stop reason rather than infer output. Normal drain is bounded to 3.5 seconds; playback progress stall watchdog is 1.8 seconds. Stop/route-loss immediately mute and flush.
+
+**Only next owner field test:** AIR31 off-ear, 5–10 cm from PC Realtek microphone; no iPhone playback or Moto microphone input. Audacity 48 kHz mono, Moto A2DP at 3/15, both mandatory safety confirmations, D6.1 L1 only, run once. Export one `d61_selftest_l1.wav` and the entire diagnostic text, including `track_submitted_frames`, `track_played_frames`, `android_drain_confirmed`, `write_retry_zero`, `write_retry_partial` and stop reason. If acoustic chirps are identified and confirmed as AIR31, proceed to investigate weak Moto microphone input; otherwise analyze playback route / Android buffering at **L1**, no repetitive D5 trials.
+
+CI **Android M04 Off-Ear Acoustic Bench** packages `hearlens-m04d61-offear-bench-debug` containing `hearlens-m04d61-offear-v0.3.1-debug.apk`. Debug signing may require uninstalling the **bench only**, never SW4. M01 captions, M03 DSP, and D5 legacy mode are unchanged.
+
+See [D6.1 playback troubleshooting](../../docs/M04D61_AIR31_PLAYBACK_HEAD_2026-10-19.md) and the earlier [D6 research record](../../docs/M04D6_OUTPUT_SELFTEST_2026-10-19.md).
+
+---
+
+## Previous M04-D6 implementation (historical)
+
 
 **NEW default mode: OUTPUT_SELF_TEST.** The App directly generates six known, Hann-windowed 40-ms 900–3800-Hz Chirps at 48 kHz, beginning 1.25 seconds after output begins, at 800-ms intervals; total PCM playback is 6.5 seconds. This mode **does not open or read a microphone**. The former M04-D5 `MICROPHONE_LOOP` remains available as a separate labeled mode but is **not** required for the next test.
 
