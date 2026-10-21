@@ -30,7 +30,7 @@ preserves earlier completion details and superseded instructions; its unchecked 
 - [x] Separate source/attempted frames, accepted frames, retry events and legacy-loop discarded tail.
 - [x] Publish final counters only after writer cleanup; prevent restart until cleanup finishes.
 - [x] Preserve D6.1 playback-head/drain checks and all existing output bounds.
-- [ ] Pass Java behavior tests, existing Node checks and Android APK build on the reviewed commit.
+- [x] Java behavior tests, existing Node checks and Android APK build PASS on PR #94 code commit `e1d6e8c` ([Android run](https://github.com/edisontw/hearlens/actions/runs/39651830155)); subsequent README changes do not change APK source.
 - [ ] Review resulting diagnostics before scheduling a physical trial. No new recordings requested now.
 
 ## Priority 2 — Detectable AIR31 output (conditional, one short session)

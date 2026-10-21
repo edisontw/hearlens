@@ -64,3 +64,9 @@ negative full scale, digital cap and nominal scalar arithmetic. Existing route/p
 and Node tests remain required; Android CI compiles actual Activity integration.
 These checks cannot verify real Android scheduling, physical sound, fallback isolation or worn benefit.
 No request for a new recording is made until the software results and measurability are reviewed.
+
+Validation completed: local npm 251/251, existing Node Android contracts 8/8, five Java behavior
+suites PASS. GitHub [Android APK run](https://github.com/edisontw/hearlens/actions/runs/39651830155)
+and [CI run](https://github.com/edisontw/hearlens/actions/runs/39651830218) passed on `e1d6e8c`;
+subsequent entry-point and verification-note edits are documentation only. Artifact is
+`hearlens-m04d62-offear-bench-debug`, version 0.3.2. Physical evidence remains unchanged.
