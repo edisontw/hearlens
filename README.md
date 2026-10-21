@@ -6,6 +6,9 @@ The initial product hypothesis is:
 
 > Bringing the phone closer to the talker + low-latency captions + conservative audiogram-aware sound processing may improve everyday communication for adults with mild-to-moderate hearing difficulty.
 
+Current work order: [active roadmap](docs/ROADMAP.md). Earlier milestone instructions are
+preserved as history and should not trigger repeated field measurements.
+
 ## Product direction
 
 HearLens is **caption-first**, not a browser-based replacement for a hearing aid.
@@ -22,8 +25,9 @@ The project is intentionally split into three capability layers:
 - The browser is used to validate captions, UX, device diagnostics and experimental DSP.
 - Do not claim absolute ear-level SPL on uncalibrated hardware.
 - Do not depend on browser background/screen-off execution for a production hearing path.
-- Do not use Bluetooth as the reference low-latency hearing path.
-- Initial calibrated hardware work should use a small supported-device matrix, beginning with a specified Android phone + wired USB-C earbud.
+- Prefer the phone built-in microphone and ordinary Bluetooth output for the existing-device feasibility study.
+- Do not assume Bluetooth is low latency. Establish output detectability before attempting acoustic delay measurement.
+- No new hardware purchase, mandatory wired-earbud baseline or external microphone is required for the active phase.
 - No amplified microphone signal may fall back to the phone speaker if a headset disconnects.
 - A final output limiter, gain ramping and per-ear safety limits are architecture requirements from the first DSP implementation.
 
