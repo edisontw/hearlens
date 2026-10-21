@@ -38,12 +38,20 @@ jobs:
             apps/android-acoustic-bench/tests/org/hearlens/acousticbench/BenchSessionGateTest.java
           java -cp /tmp/hearlens-m04-bench org.hearlens.acousticbench.BenchSessionGateTest
           javac -d /tmp/hearlens-m04-bench \
+            apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchSignalWindow.java \
             apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchOutputProfile.java \
             apps/android-acoustic-bench/tests/org/hearlens/acousticbench/BenchOutputProfileTest.java
           java -cp /tmp/hearlens-m04-bench org.hearlens.acousticbench.BenchOutputProfileTest
+      - name: Test sparse-signal windows and exact-zero diagnostics
+        run: |
+          javac -d /tmp/hearlens-m04-bench \
+            apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchSignalWindow.java \
+            apps/android-acoustic-bench/tests/org/hearlens/acousticbench/BenchSignalWindowTest.java
+          java -cp /tmp/hearlens-m04-bench org.hearlens.acousticbench.BenchSignalWindowTest
       - name: Test deterministic six-chirp L1 output source
         run: |
           javac -d /tmp/hearlens-m04-bench \
+            apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchSignalWindow.java \
             apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchOutputProfile.java \
             apps/android-acoustic-bench/app/src/main/java/org/hearlens/acousticbench/BenchSelfTestSignal.java \
             apps/android-acoustic-bench/tests/org/hearlens/acousticbench/BenchSelfTestSignalTest.java
@@ -59,11 +67,11 @@ jobs:
       - name: Name artifact distinctly from SW4 input-only tool
         run: |
           cp apps/android-acoustic-bench/app/build/outputs/apk/debug/app-debug.apk \
-            apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d61-offear-v0.3.1-debug.apk
+            apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d62-offear-v0.3.2-debug.apk
       - name: Publish debug APK only
         uses: actions/upload-artifact@v4
         with:
-          name: hearlens-m04d61-offear-bench-debug
-          path: apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d61-offear-v0.3.1-debug.apk
+          name: hearlens-m04d62-offear-bench-debug
+          path: apps/android-acoustic-bench/app/build/outputs/apk/debug/hearlens-m04d62-offear-v0.3.2-debug.apk
           if-no-files-found: error
           retention-days: 14

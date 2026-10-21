@@ -1,242 +1,72 @@
-# Roadmap
+# Roadmap — active plan (2026-10-22)
 
-## M00 — Foundation
+This page is the current work order. [Historical roadmap](./ROADMAP_HISTORY_2026-10-20.md)
+preserves earlier completion details and superseded instructions; its unchecked boxes are **not** new work orders.
+[Evidence review and decision gates](./M04D62_DIAGNOSTICS_AND_PROGRESS_RESET_2026-10-22.md).
 
-Goal: turn research conclusions into enforceable architecture.
+## Product and equipment commitments
 
-- [x] Define product position.
-- [x] Define Web/native boundary.
-- [x] Define safety invariants.
-- [x] Define audiogram-processing research boundary.
-- [x] Define test strategy.
-- [x] Create runnable Web Hearing Lab.
-- [x] Add CI/build checks.
+- Phone built-in microphone is primary; ordinary Bluetooth earphones are preferred output.
+- Existing kit: Moto g62 / Android 13, AIR31 A2DP, iPhone source, Windows Realtek 3.5-mm mic.
+- No purchase, mandatory external microphone, ear-canal sealing, mandatory talker-side phone placement,
+  earbud microphone tests, OEM/ODM project or wired-headphone migration.
+- The existing owner-approved low-level **off-ear** bench remains separate from worn hearing output.
+  [SAFETY](./SAFETY.md) and the D3 exception still apply.
 
-Exit: repository builds, documentation and safety rules agree with implementation skeleton.
+## Current evidence
 
-## M01 — Caption Hearing Lab
+| Area | Completed | Open |
+| --- | --- | --- |
+| M01 captions | Streaming Gemini, Traditional Chinese, large text, focus mode, last-final retention, recall/copy, lifecycle guards | Combined everyday-use acceptance; formal accuracy benchmark deferred |
+| M03 personalization | Bilateral profile editor, CAMFIT research arithmetic including pinned upstream cross-check, offline WDRC/limiter | Device output calibration, worn benefit; no clinical prescription claim |
+| Android input | Built-in mic demonstrated in SW1; route observed in live bench | Event-window signal quality in recent chirp conditions |
+| AIR31 output | Actual playing A2DP route observed; D6.1 playback-head/drain implementation | Detectable earbud-specific acoustic output; D6.1/D6.2 field acceptance |
+| Latency | Analysis and bench tools | **No valid phone-mic→AIR31 acoustic latency measurement** |
 
-Goal: validate the simplest useful product.
+## Priority 1 — D6.2 diagnostic readiness (software)
 
-- microphone permission flow,
-- requested/actual capture diagnostics,
-- large-text live caption UI,
-- [x] STT provider abstraction,
-- [x] browser speech recognition as optional fallback only,
-- [x] Gemini 3.5 Transcribe Live provider + MN4 ephemeral-token broker scaffold,
-- [x] deploy Gemini token broker on MN4 and complete browser-to-Gemini Live E2E validation,
-- [x] add Traditional Chinese display conversion for Gemini captions,
-- [x] add manual input-gain and audio-level telemetry as engineering probes,
-- [x] replace fixed-gain exploration with adaptive input normalization + limiter,
-- [x] add fast customization: Auto + Far/Noisy + one-tap reset plus a collapsed bounded engineering profile layer; Near/Normal remain intentionally omitted because current 0.5 m / 1 m telemetry does not justify distinct behavior,
-- [x] log/export the active tuning profile so tests are reproducible,
-- [x] run a short controlled 0.5 / 1 / 2 m regression gate after normalization stabilizes,
-- [x] validate Far/Noisy voice capture on at least one additional receiving phone before considering it for Auto (HTC U23 2 m A/B PASS; post-run distance correction recorded),
-- [x] run one HTC U23 1 m Auto vs Far/Noisy safety A/B (PASS: voice materially improved transcript continuity with zero retained clipping; global Auto remains raw for cross-device conservatism),
-- [x] **M01 provider-specific privacy notice (2026-10-15):** clearly disclose before tapping Start whether audio will go directly to Google Gemini, through a Google Cloud speech proxy, or via browser recognition (possibly cloud); keep notice visible in focus mode and linked to Start for assistive technology. Also avoid suggesting phone-near-talker placement is mandatory. Unit tests plus Chromium pre-start/provider/focus checks; no STT data-flow or playback change. [Scope and limitations](./M01_STT_PRIVACY_DISCLOSURE_2026-10-15.md).
-- [x] **M01 mobile caption readability (2026-10-14):** responsive portrait/short-landscape controls, 44–48 px button targets, natural long-text wrapping, bounded keyboard-focusable caption scroll and near-bottom-only auto-follow; all caption sizes and STT/audiogram/output safety boundaries preserved. Structural CSS/unit CI (not phone visual acceptance). [Record](./M01_MOBILE_CAPTION_LAYOUT_2026-10-14.md).
-- [x] **M01 user-toggleable focus reading mode (2026-10-15; web UI):** caption panel expands in phone portrait/short landscape; decorative header, research and tuning controls are hidden only during focus. Start/Stop, recent/full-session recall, caption size, listening status and wake-lock information stay accessible. Mode is reversible and not saved; Node contract plus actual Chromium viewport/interaction E2E are enforced in CI; Moto field visual acceptance remains pending. No audio/STT changes. [Design and caveats](./M01_CAPTION_FOCUS_MODE_2026-10-15.md).
-- [x] **M01 foreground caption screen wake lock (2026-10-14; code + CI):** while a user-started caption session is actively listening, request the optional browser Screen Wake Lock API to reduce display sleep interruptions; release immediately on user stop, caption fatal fail-stop, hidden/pagehide, or startup failure. Reject stale async grants after a stop/restart. Browser rejection/unsupported status leaves captions usable; no auto-restart/reacquire and no background capture. Visible low-profile status warns about possible battery use. Also permit Stop when the optional STT provider was unavailable. **Actual Moto/other phone wake-lock acceptance is NOT YET field verified; no hearing output or M04 acoustic route affected.**
-- [x] **M01 live 30-second caption freshness (2026-10-13; superseded for main display by 2026-10-15):** original bounded display tick expired all final/interim text after 30s, without repeated aria-live announcements; **recent recall still uses that window**, but main screen now pins the last confirmed final indefinitely unless manually cleared or a new session begins. [Original record](./M01_LIVE_ROLLING_CAPTION_FRESHNESS_2026-10-13.md).
-- [x] **M01 persistent last-final subtitle (2026-10-15):** primary caption retains the latest confirmed segment during prolonged silence (but no stale partials), while recent recall keeps its 30-second window. Added manual main-screen-only clear, preserving recent and full-session copy history; works alongside focus layout without changing STT, gain, privacy or hearing output. Node and Chromium UI regression; real-phone visual acceptance remains open. [Behavior and safety](./M01_RETAIN_FINAL_CAPTION_2026-10-15.md).
-- [x] **M01 mobile foreground/microphone lifecycle fail-stop (2026-10-13):** fail-stop on hidden/pagehide and OS-ended capture, bounded 2-s sustained-mute response, stale async permission/token startup rejection, and no auto-resume; only deterministic browser-mock/CI verification. [Record](./M01_MOBILE_LIFECYCLE_FAILSTOP_2026-10-13.md). Real OS background tests not claimed.
-- [x] **M01 Gemini unexpected transport fail-stop (2026-10-13):** fatal WebSocket close/error now stops microphone capture, invalidates stale caption callbacks and restores a manual-start UI with finalized text retained; ordinary user Stop/drain is unaffected. Unit/synthetic regression; no new phone measurements or hearing audio. [Decision record](./M01_GEMINI_FATAL_SESSION_RECOVERY_2026-10-13.md).
-- [x] **M01 formal batch intake tooling (2026-10-13; software only):** validate locked WAV SHA-256, frozen build/source/device/preset metadata, 24 individual slots and manual section-3 cutoff/setup attestations; automatically score strict CER/key fields/anchors and summarize only complete paired cells. Historical exploratory reports are not promoted. Tests/CI added; **this does NOT complete the 24 physical runs**. [Intake instructions](./M01_FORMAL_BATCH_INTAKE_2026-10-13.md).
-- [ ] run the locked reduced-disturbance M01 Taiwan Mandarin benchmark (`docs/M01_FORMAL_BENCHMARK.md`): 24 short-prefix controlled runs through section 3, automated strict CER / key-field / utterance-coverage scoring; current client timing remains engineering telemetry until a speech-onset reference is added,
-- [x] Google Cloud streaming provider + server-side WebSocket proxy scaffold (later paid comparison),
-- [x] 30 s rolling transcript with segmented recent-history view,
-- [x] "What did they just say?" recent-history panel with copy action,
-- [x] **M01 full-session caption copy (2026-10-15):** explicit secondary action in the existing recent-history panel copies all **finalized** text retained from the current session (including captions older than 30 s), excluding interim/debug text; disabled without finals, cleared on each new session; no automatic local/cloud persistence. Clipboard is user-triggered and privacy warning is shown. This reuses existing memory-only report finals and leaves live caption/STT behavior unchanged. [Notes](./M01_COMPLETE_SESSION_CAPTION_COPY_2026-10-15.md).
-- [x] **M01 in-page session caption review (2026-10-15):** 「剛剛說什麼？」now switches between the original last-30-second view and a final-only 「本次對話」 view. Show newest 60 segments first, load earlier 60 on demand; readable scrolling, no extra copy/paste App, no raw/interim text, full-session copy unchanged and no persistence. CI includes bounded projection tests and a Chromium view-switch regression (no actual mic capture). [Record](./M01_SESSION_CAPTION_REVIEW_2026-10-15.md).
-- [x] explicit persistent text-size control (一般 / 大 / 特大),
-- no login,
-- no audio amplification.
+- [x] Publish nominal post-track scalar levels and fixed cap budget before unknown OS/earbud volume.
+- [x] Add constant-memory 100-ms source RMS windows, separate partial tail and exact-zero runs.
+- [x] Separate source/attempted frames, accepted frames, retry events and legacy-loop discarded tail.
+- [x] Publish final counters only after writer cleanup; prevent restart until cleanup finishes.
+- [x] Preserve D6.1 playback-head/drain checks and all existing output bounds.
+- [ ] Pass Java behavior tests, existing Node checks and Android APK build on the reviewed commit.
+- [ ] Review resulting diagnostics before scheduling a physical trial. No new recordings requested now.
 
-Exit criteria:
+## Priority 2 — Detectable AIR31 output (conditional, one short session)
 
-- usable on current Android Chrome and iOS Safari for caption workflow,
-- [x] client-observed first partial/final caption startup latency telemetry (first-audio-chunk reference when available; formal end-to-end benchmark remains separate),
-- session transcript clears by default,
-- [x] older-user manual UX pass (caption size, start/stop clarity, recall, one-handed mobile use).
-- [x] caption-startup telemetry smoke gate PASS on iPhone (`20261008-caption-latency1`).
+Only after Priority 1 passes and the trial's measurability is reviewed:
 
-## M02 — Phone-Near-Talker Validation
+1. Output-only known six-chirp source, no Moto microphone or iPhone source; AIR31 off ears.
+2. Use fixed near-mic geometry and existing output limits. Check live recording visibility first.
+3. Save one short Realtek recording and final diagnostic only if the signal is observable.
+4. A positive result requires recognizable six-event timing and absence of the same pattern in silence.
+   Android acceptance/drain alone is not acoustic PASS; this is not an E2E latency measurement.
+5. If not observable, label **NOT_MEASURABLE_AT_CURRENT_SETTINGS**. Diagnose level, geometry,
+   endpoint and recorder; at most one explicitly justified correction/retest in this round, then park.
+   No blind L2 escalation or another direct/on/moved batch.
 
-Goal: quantify the product's most important physical advantage.
+## Priority 3 — Coarse architecture screen (conditional)
 
-- distance test harness,
-- quiet/TV/restaurant/car/clinic scenes,
-- phone vs ear-position recordings,
-- delta-SNR analysis,
-- listening test protocol.
+After output presence passes, inspect event-window Moto input and only then reconnect the mic loop.
+Design a few longer-spaced, nonperiodic acoustic landmarks so direct source, room echoes and
+replayed source cannot be confused with the next event. Compare events within a single recording,
+record geometry and source identity controls. Do not subtract timestamps between independent WAVs.
+This may establish a coarse delay range, with uncertainty; sparse mono data cannot establish a
+validated P95/jitter, calibrated ear SPL or daily open-fit hearing suitability. Stop on ambiguous identity.
+Do not assume any measured AIR31 result from Bluetooth research estimates.
 
-Exit: evidence that proximity improves useful speech capture under target scenes.
+## Parallel useful product acceptance — M01
 
-## M03 local audiogram profile UX (2026-10-14)
+One approximately five-minute everyday caption session can cover Start/Stop, readable focus layout,
+last-final retention through silence, recall and manual restart after interruption. Record failure cases
+with build/device metadata. This is UX/stability acceptance, not a controlled STT accuracy claim.
+Do not require the 24-run formal benchmark while changing the pipeline. No new caption recording
+or transcription upload is requested by this software change.
 
-- [x] Add an independent family/research web page to enter left/right audiogram dB HL values at six frequencies, inspect measured-only points, explicitly store locally, import/export versioned JSON and delete saved data without invoking microphone or audio output. Reuse the original M03 schema validator in the Pages artifact, not a fork. [Scope and validation](./M03_AUDIOGRAM_LOCAL_UI_2026-10-14.md).
-- [x] M03 profile page follow-up: show unsaved-edit status, confirm destructive import over unsaved edits, reject asynchronous import when the form changes mid-read, retain exported JSON Blob URL long enough for mobile downloads, accept valid non-5-dB numeric entries, and assert the copied canonical validator exists in CI/Pages staging. No hearing-output code.
-- [x] **M03 browser E2E gate (2026-10-15):** separate conditional GitHub Actions job uses actual headless Chromium to open the staged static page and verify independent bilateral values, zero vs absent measurements, explicit local save, reload, JSON download, cancel/accept overwrite of unsaved changes, import without autosave, invalid JSON rejection, and clear/reload. Checks no unapproved external network requests or browser module errors. **PR #75 browser E2E and CI PASS; not Moto g62 field acceptance or a clinical test.**
-- [ ] Moto g62 field acceptance for editing, browser reload, import/export and delete. **No amplification or clinical fitting claim.**
+## Parked work
 
-## M03 — Audiogram Profile + Offline DSP Tests
-
-Goal: build the personalization domain layer before live output.
-
-- [x] M03 Part A: versioned per-ear audiogram model, validation, safe serialization, provenance and explicit missing data,
-- [x] M03 Part A: bounded log-frequency interpolation (no extrapolation), golden unit tests and documentation; no live output,
-- [x] M03 Part B: versioned offline per-ear prescription-target/I-O representation with 50/65/80 dB SPL nominal input anchors, independent 1–8 band target data, bounded interpolation and golden tests (no live output),
-- [x] **M03 Part Q (2026-10-14):** explicit **synthetic-only** CAMFIT compressive gain to existing offline STFT/WDRC fixture projection with strict fictional 65 dB model input↔dBFS reference, per-ear independent six-band/50–65–80 anchors, gain/digital clipping guards and deterministic PCM equivalence tests; explicitly no physical acoustic calibration, production gain prescription, live output/route, or ear-level MPO. [Scope and blockers](./M03_CAMFIT_SYNTHETIC_WDRC_BRIDGE_2026-10-14.md).
-- [x] **M03 Part P (2026-10-14):** reproducible CI direct **original upstream PyClarity** `gainrule_camfit_compr` plus genuine upstream `Audiogram`, SHA-pinned to Clarity commit/blob IDs; 8 bilateral audiograms, 324 exact band×input×ear cells across varied levels, **max difference 3.55e−14 dB** (tolerance 1e−6 dB) PASS. This verifies specified research arithmetic only, not NAL-NL2/DSL, real-ear measurements, calibrated WDRC or permitted hearing output. [Reference protocol, code and CI evidence](./M03_CAMFIT_PYTHON_CROSSCHECK_2026-10-14.md).
-- [x] **M03 Part O (2026-10-14):** independent offline **CAMFIT compressive** gain calculator with six coherent LTASS band intervals, six required measured thresholds per ear, 50/65/80 model-input anchors, CR and model output caps; fixed complete-grid NumPy reference reproduction at **36 individual cells** + spectral/CR values, missing-data/asymmetric negative CI. Not NAL-NL2/DSL, measured real-ear gain, independently executed PyClarity code or approved live audio output. [Record](./M03_CAMFIT_COMPRESSION_2026-10-14.md).
-- [x] **M03 Part N (2026-10-14):** real **CAMFIT linear** research gain-from-audiogram module (measured six-frequency thresholds per ear) crosschecked against PyClarity upstream golden sums 284.8 and 1589.2; nominal input levels 50/65/80 with an arithmetic cap kept **separate** from WDRC/clinical REIG/REAR and physical output. Not NAL-NL2/DSL, nonlinear compression or verified ear-level MPO. [Design record](./M03_CAMFIT_LINEAR_RESEARCH_2026-10-14.md).
-- [x] **M03 Part M (2026-10-14; software only):** exact audiogram/reference-protocol target alignment and per-ear/frequency/50–65–80 dB SPL nominal gain error reporting; invalid or mismatched origins, unsupported REAR/REIG metrics and missing measured anchors fail closed. Synthetic CI proves *comparator arithmetic only*. External reference authenticity, independent prescription formula and true numerical parity remain open. [Decision and reference requirements](./M03_PRESCRIPTION_REFERENCE_PARITY_2026-10-14.md).
-- [ ] independent audiogram-to-target prescription generation with externally verified reference targets, numerical parity evaluation and provenance review,
-- [x] M03 Part C: offline synthetic-only 6–8 band STFT WDRC prototype with per-ear independent processing, bounded target gains, attack/release smoothing and a final digital PCM limiter; deterministic no-bypass tests (not hearing-output safety validation),
-- [x] M03 Part D: deterministic synthetic frequency, input/output compression, envelope and final-limiter characterization; CLI + CI numerical report, non-gating machine-specific throughput baseline (see `docs/M03_DSP_CHARACTERIZATION.md`),
-- [x] M03 Part E: add opt-in smooth cosine-overlap frequency weighting and matched synthetic crossover/identity/limiter regression; preserve default hard mode until broader validation.
-- [x] M03 Part F: deterministic 6- and 8-band dense A/B across all 12 boundaries, selected harmonic/two-tone/transient and final-limiter probes; CI JSON report. Smooth reduces jumps in all tested synthetic seams but remains opt-in pending broader DSP/artifact verification.
-- [x] M03 Part G: offline replay-based chunk adapter, exact full-reference equivalence across chunk sizes and modes, final flush/atomic validation, no live output; **not** a bounded-memory real-time stream,
-- [x] M03 Part H: persistent synthetic-only 1024/256 STFT/WOLA, fixed 1024-sample input/sum/weight rings and 6–8 gain envelopes, exact Float32 offline-reference checks, flush, reset, strict chunk validation and fail-stop; algorithmic lookahead is not measured acoustic latency,
-- [x] M03 Part I: offline sample-clock continuity gate (gap/overlap/reordering, invalid timestamps, clock regression, simulated underrun) with explicit reset and no gap concealment; bounded state and non-gating Node CPU/heap probe; no physical route or output,
-- [x] M03 Part J: reusable per-instance Float64 FFT, energy and gain scratch arrays (preserved exact offline parity), plus a PURE synthetic route authorization/start ramp/disconnect fail-stop model; does not actually enforce device routing or calibrated SPL,
-- [x] M03 Part K (offline prototype): caller-reused output buffer API, per-instance prevalidated target anchor cache, numerical no-overwrite regression, non-gating callback CPU/heap probe and native physical-route/per-ear MPO architecture requirements; **no actual audio route**,
-- [ ] M03 Part K exit gates: verified allocation/GC and realtime behavior on target phone, verified headset route (Bluetooth-first feasibility; wired control), no speaker fallback and hard mute on disconnect, independent measured L/R MPO and acoustic calibration before any live amplification,
-- [x] M03 Part L: isolated timestamp-guarded reusable-buffer processInto and no-PCM mock route-port negative fixtures for disconnect, route switch, missing observations, sample-clock faults, reset and rearm; **only model semantics, no physical mute or output**,
-- [ ] production-grade filterbank, frequency/temporal artifact quantification, phase/delay and stream-boundary characterization before hearing output,
-- [ ] calibrated final hearing-output limiter, no-bypass safety tests and MPO verification,
-- [ ] per-ear production gain bounds and start/reconnect ramp,
-- [ ] calibration and headset-disconnect fail-safe gates before any live hearing path.
-
-No live-ear safety claim.
-
-## SW4 — Native input timing evidence and actual acoustic measurement plan (2026-10-14)
-
-- [x] **SW4-A (software instrumentation, unmeasured on phone):** Android input-only diagnostic APK v0.4.0 observes matching MONOTONIC `AudioRecord` sample timestamps + sample-frame progression during a **user-started capture**, logs timestamp age and signed frame-clock skew with missing/stale/regressing/error states, and discards each PCM sample; JVM regression and Android debug APK CI. **Not** mic acoustic input latency or Bluetooth E2E delay. [Evidence-bound measurement decision](./SW4_ANDROID_INPUT_CLOCK_AND_ACOUSTIC_BENCH_DECISION_2026-10-14.md).
-- [x] **SW4-C (2026-10-14 physical-phone evidence, input clock only):** moto g62 5G Android 13, user-started builtin MIC, 48k mono: 26 timestamp observations (1 baseline/25 STABLE), 0 timing faults, timestamp age median 4.829 ms (**timestamp polling age, NOT acoustic input latency**), frame-time skew −2.254..+2.598 ms; **20 of 26 windows show exactly zero digital PCM** despite `silenced=false`, so sustained acoustic sensitivity remains untested. No new mandatory capture runs. [Field report](./SW4_MOTO_G62_INPUT_CLOCK_FIELD_RESULT_2026-10-14.md).
-- [x] **SW4-B (method/protocol):** distinguish existing software input clock and passive output-route observations from **physical** phone mic SPL→dBFS transfer, nonhuman A2DP/LE acoustic latency, left/right ear-coupler MPO and proven speaker fallback hard mute. Minimum instrumentation requirements and GO/NO-GO documented.
-- [ ] **Hardware gated / explicitly deferred:** synchronized nonhuman acoustic Bluetooth playback latency and output-route fault bench; separately calibrated ear-simulator L/R output; verification that an OS route change **never emits amplified sound from the phone speaker**. No on-ear amplification authorized, and no mandatory repeated SW1 mic or SW3 AIR31 field tests.
-
-## M04-D1 — Mono acoustic chirp kit (2026-10-16)
-
-- [x] Offline 24-event quiet chirp WAV generator, no audio playback.
-- [x] Single Realtek microphone controls-only baseline check, plus conditional 4-recording matched-chirp comparison (direct, muted, on, moved) with room-echo exclusion and exploratory P50/P95/jitter.
-- [ ] Actual Moto g62 → HearLens DSP → AIR31 nonhuman acoustic latency **NOT MEASURED**: physical hard-mute, speaker-fallback, ear-level output and safe output authorization remain blocked.
-- [x] Deterministic synthetic regression included in CI. Do not repeat accepted SW1–SW4 field diagnostics. See [M04-D1 protocol](./M04D1_MONO_CHIRP_SMOKE_2026-10-16.md).
-
-## M04-D5 — Bounded bench level steps and PCM evidence (2026-10-17)
-
-- [x] From the latest main, keep D4 input and actual AIR31 route architecture intact, but add isolated **L0 baseline (8×/±384/.15), L1 (16×/±768/.25), L2 (24×/±1536/.35)** for off-ear testing only; 1-second ramp, always hard-clamped output, profile locked while running. Default remains L0.
-- [x] Log selected profile, Android media-volume index, raw mic RMS/peak, attempted pre-OS PCM RMS/peak, limiter percentage, and partial writes; **no audio recording**, no automatic gain adjustment or on-ear claim.
-- [x] Reset off-ear/OS-low-volume acknowledgments after each session and level change. Preserve 40-second timeout, foreground/focus/route stop and no auto-resume.
-- [x] Add pure Java fixture tests for all three profiles/limiter/soft-start/metadata; update Node contracts, Android APK v0.2.0 CI artifact and operator guide. [App and field test plan](../apps/android-acoustic-bench/README.md).
-- [x] **First L1 field result (2026-10-18):** `on4_l1.wav` direct iPhone chirp **24/24 PASS**, actual Android AIR31 A2DP#358 and built-in mic #15 route PASS; Moto raw RMS **−84.1 dBFS**, pre-OS output RMS **−64.1 dBFS**, media volume 3/15 and little limiting (0.023%). Realtek direct source clearer than `on3`, but still **no reliably identifiable late AIR31 chirp** and no acoustic latency estimate. [Field report](./M04D5_L1_FIRST_FIELD_RESULT_2026-10-18.md).
-- [ ] **Next isolate output vs input:** implement short, amplitude-limited **off-ear native AIR31 output-only chirp self-test** bypassing Moto microphone, using the existing A2DP route-check/stop state machine and Realtek geometry. Do not repeat another long mic→BT `on/moved` pair or automatically increase to L2 until output self-test confirms an acoustically detectable receiver. If it passes, investigate Moto input's very low raw RMS and possible digital-zero intervals.
-- **Nonhuman off-ear research only:** digital PCM dBFS is not calibrated sound pressure or guaranteed isolation of speaker fallback.
-
-## M04-D4 — Standalone native off-ear acoustic loop (2026-10-17)
-
-- [x] Add separate Android 13 debug bench source for Moto g62 **built-in microphone → 48 kHz bounded linear passthrough → AIR31 A2DP**. Silent playing-track route check is required before nonzero PCM. [Build/test instructions](../apps/android-acoustic-bench/README.md).
-- [x] Add route/call/focus/background/input-watchdog/40 s fail-stop, manual Stop, no auto-resume, fixed digital ceiling, track-volume scaling, diagnostics without audio upload. No CAMFIT/audiogram fitting and no wear test.
-- [x] Add JVM pure route-state and Node contract tests plus separately published CI Android APK artifact.
-- [x] Verify debug APK build and first Moto g62/AIR31 actual route field run (two separate sessions observed A2DP#285, BUILTIN_MIC#15, 40 s software-stop; not an acoustic-output or physical fallback PASS). [Field details](./M04D4_FIRST_AIR31_FIELD_RESULT_2026-10-17.md).
-- [ ] Resolve lack of repeated iPhone direct chirps in the newly uploaded `on.wav` (0/24) and `moved.wav` (3/24) despite 22/24 in earlier `direct2.wav`. First do one same-geometry iPhone→Realtek reference check; do not blindly increase DSP gain or repeat moved first.
-- [ ] Record `on.wav` and `moved.wav` using iPhone source and Realtek PC mic, then compare with existing `direct2.wav` via M04-D1. A separate `muted.wav` is optional.
-- **Scope:** owner accepts possible brief unintended phone-speaker playback after disconnect **for nonworn low-level testing only**. Worn hearing amplification remains unapproved.
-
-## M04-D3 — Owner-approved off-ear Bluetooth acoustic test (2026-10-17)
-
-- [x] Remove the previous *zero possible phone-speaker fallback* proof as a precondition for **nonhuman, low-volume, off-ear acoustic experimentation**. Owner accepts possible brief speaker leakage and requires app-side stop on BT loss. [Decision and test design](./M04D3_NONHUMAN_BLUETOOTH_BENCH_DECISION_2026-10-17.md).
-- [ ] Implement a separate native Android bench APK: Moto g62 built-in microphone → guarded PCM output → AIR31 A2DP; verify actual playing device after silent arm, bounded digital cap, manual/automatic fail-stop, flush, call/focus/lifecycle/route changes, 40-second timer, zero auto-reconnect.
-- [ ] Run existing-equipment nonhuman direct/on/moved acoustic tests; report signal identity and measured P50/P95/jitter without pretending Android public callbacks guarantee zero already-queued speaker output.
-- [ ] Retain independent safety requirements for **worn live hearing amplification**: acoustic L/R output calibration, feedback and loudness safeguards. M01 captions are unaffected.
-
-## M04-D2 — Physical output evidence gate (2026-10-16)
-
-- [x] Record current Moto g62/AIR31 SW1/SW3/SW4 + synthetic limiter evidence in a versioned **metadata-only** manifest. Added `tools/m04-output-safety-gate.mjs` and CI adversarial tests; even fabricated complete evidence **cannot** grant audio playback.
-- [ ] Physically verify independent hardware mute/no phone-speaker fallback after Bluetooth disconnect, call/focus changes and queued audio; **unproven with present Android 13 public APIs**.
-- [ ] Verify actual media sink while playing, calibrated L/R receiver acoustic SPL/MPO and final real-path limiter before any nonhuman live audio trial.
-- **Decision:** live phone-mic → AIR31 amplification remains **BLOCKED**; do not repeat SW1–SW4, require new hardware purchases, or call a route prediction physical proof. [D2 gate and stop rule](./M04D2_PHYSICAL_OUTPUT_EVIDENCE_GATE_2026-10-16.md).
-
-## M04 — SOFTWARE-FIRST phone DSP / microphone-routing ceiling (updated 2026-10-12)
-
-**LATEST USER DIRECTION (2026-10-12, field follow-up):** use the **PHONE built-in microphone as the primary input**, phone Native DSP to process PCM and **ordinary Bluetooth earbuds primarily for output**. Earbud microphones, HFP/SCO uplink, iOS high-quality AirPods capture and custom hardware POCs are **deferred optional fallbacks**, not next-step prerequisites. No mandatory placement near talker, occluded ear canal or separate microphone. Evaluate software-only capacity first. Do not assume a measured safe low-latency acoustic output path. Distinguish ordinary headset recording inputs from undocumented transparency/ANC microphone buses. See [M04 software-first investigation](./M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md).
-
-- [x] **SW0:** official Android/iOS capability recheck, S1 phone-mic→DSP→Bluetooth, S2 earbud communication-mic→phone-DSP→earbud, S3 first-party transparency+independent captions; latency/safety constraints and findings recorded.
-- [x] **SW1 Android input-only prototype + field verification (2026-10-12):** independent native Android app built/CI PASS. moto g62 5G API33 captured actual BUILTIN_MIC#15 48 kHz mono in MIC, UNPROCESSED and VOICE_RECOGNITION; **12–13 s approximate playback intervals** showed respective median RMS **−61.3/−62.7/−47.9 dBFS**, no clipping. MIC confirmed functional; VOICE_RECOGNITION is **louder, not proven better**. UNPROCESSED unsupported by device property. **AIR31 headset mic remains untested by explicit user choice; no longer a blocker.** See [first field observation](./SW1_FIRST_ANDROID_INPUT_PROBE_2026-10-12.md) and [second run and priority decision](./SW1_FOLLOWUP_PHONE_MIC_PRIMARY_2026-10-12.md).
-- [x] **SW2-A (synthetic-only):** phone-microphone 48-kHz reference, isolated causal 6/8-band IIR-residual WDRC candidate, deterministic identity/limiter/left-right/fault tests, report comparing existing **16 ms STFT lookahead** to **0 ms additional future-input lookahead** with explicit *nonzero/unknown group delay and unmeasured Bluetooth physical path*. CI synthetic characterization. [SW2 reference and limitations](./SW2_CAUSAL_DSP_SOFTWARE_CEILING_2026-10-12.md).
-- [x] **SW2-B (offline characterization):** implement exact **static/frozen-gain complex transfer**, phase and frequency-specific group-delay computation validated against direct DFT of the processor's impulse, dense 250–8000 Hz crossover scans, impulse pre/postcursor, synthetic quiet→loud→quiet WDRC level response, deterministic regression. See [SW2-B evidence and limitations](./SW2B_FILTER_PHASE_ARTIFACTS_2026-10-13.md). **This is not time-varying WDRC group delay, acoustic latency, hearing benefit, or approval to output audio.** Node benchmark remains host-only.
-- [x] **M04-B0 (2026-10-14; desk evaluation only):** software-first phone-mic→ordinary BT receiver remains preferred, but cannot be declared workable for natural daily hearing without measured acoustic delay, physically enforced no-speaker-fallback, and separate L/R output calibration. Conditional local-DSP research shortlist: nRF5340 Audio DK (public PDM/I2S + firmware work, mono per DK); Tympan Rev F (open algorithms but presently sold out); Qualcomm QCC5181 ODM (licensed access unverified). **No hardware purchase or POC approved**, ordinary AIR31 cannot be assumed programmable. [Explicit architecture exit/downselect](./M04B0_SOFTWARE_FIRST_EXIT_AND_LOCAL_DSP_DOWSELECT_2026-10-14.md).
-- [x] **M04-C1 no-purchase equipment decision and microphone inventory (2026-10-14):** PC **Realtek 3.5-mm wired mic detected with live input-level response: PASS**; AIR31 is a Bluetooth headset/receiver; Taiwan Neon **EWM1 is a Type-C phone-only wireless mic in the user's setup**, not a second PC Bluetooth input. No equipment purchase or repeated PC microphone check. Phone/EWM1 and PC analog mic are not proven to share a capture clock and cannot establish stereo acoustic latency. Protected nonhuman playback remains unapproved; actual Moto→AIR31 acoustic delay, physical no-speaker-fallback and L/R SPL/MPO remain NOT MEASURED. [Updated existing-devices-only plan](./M04C1_NO_PURCHASE_PHONE_PC_MIC_PLAN_2026-10-14.md). No SW1–SW4 retests or generic DSP loops.
-- [x] **M04-C2 Google Sound Amplifier UI/headset prerequisite (2026-10-14; USER-SUPPLIED SCREENSHOT AND FOLLOW-UP):** Moto g62 app installation/launch PASS. Screenshot shows **Phone mic selected (blue), Off not selected**, **Noise reduction ON**, **Boost ON** and frequency sliders. User additionally reports that **headphones such as AIR31 must be connected before the feature can be used**. **Do not infer that selecting Phone mic means active processing or that any sound reached AIR31**; the headset connection state at the screenshot time and actual output both remain UNCONFIRMED. A compatible wired/Bluetooth receiver is a runtime prerequisite for this Google comparator, **not proof of a HearLens audio route**. No real acoustic latency, phone-speaker fallback protection, measured L/R SPL/MPO or calibrated hearing output established. Avoid on-ear listening, raising volume or starting playback; keep output test gated by independent safety approval. [Existing-device comparator decision](./M04C1_NO_PURCHASE_PHONE_PC_MIC_PLAN_2026-10-14.md).
-- [x] **M04-C3 Moto g62→AIR31 connection/media input-free acceptance (2026-10-14; USER FIELD CONFIRMATION):** AIR31 **Bluetooth connected and media-audio toggle enabled** on Moto g62: PASS for **connection configuration only**. PC LG TV playback and Realtek 3.5-mm microphone input-level indication were also confirmed PASS. Google Sound Amplifier installed/launchable but **no verified active acoustic playback**. This does **NOT** establish actual media presentation, phone mic→AIR31 end-to-end latency, direct/delayed mixing, output fallback or per-ear SPL/MPO. No protected nonhuman playback fixture or independent hardware mute available under current **zero-purchase** constraint. **Physical latency Stage C remains BLOCKED, not failed.** Do not request duplicate headset pairing, mic meter, SW1–SW4 tests, or synthetic DSP to resolve an unmeasured acoustic blocker. Continue only upon new independent output-protection evidence and separately explicit trial approval. See [M04-C1/2 no-purchase gate](./M04C1_NO_PURCHASE_PHONE_PC_MIC_PLAN_2026-10-14.md) and [SAFETY](./SAFETY.md).
-- [ ] **SW2-C (conditional):** interpret quantified phase/crossover artifacts, choose whether matched-fit filterbank redesign would materially improve the phone-mic→Bluetooth path; only pursue if it addresses a real bottleneck. Avoid endless DSP optimization before route feasibility.
-- [x] **SW3 synthetic-only Bluetooth output route policy:** independent metadata-only model for phone built-in mic → Bluetooth A2DP/LE (mock endpoint), exact input/output identities, fresh-per-chunk mock observations, format/channel/focus/call/foreground/ear-count guards, simulated speaker fallback and reconnect fail-stop, explicit reset/user start and zero ramp on rearm. **No PCM or physical mute/route guarantee.** See [SW3 no-PCM model and limits](./SW3_BLUETOOTH_OUTPUT_FAIL_CLOSED_MODEL_2026-10-13.md).
-- [x] **SW3-Native passive output observability (code/CI):** independent Android input-only debug APK adds API 33+ `AudioManager.getAudioDevicesForAttributes` anticipated MEDIA/speech vs ACCESSIBILITY/speech output-device lists, with explicit separation from available devices, selected communication route and **unobserved active playback**. Button, foreground/devices-added/removal refresh, no sound/PCM output. It is **not** physical speaker fallback protection or measured Bluetooth latency; optional one-button field confirmation remains open. See [SW3-Native evidence](./SW3_NATIVE_ANDROID_OUTPUT_OBSERVABILITY_2026-10-13.md).
-- [x] **SW3-Native field PASS (2026-10-13):** Motorola moto g62 5G API 33, versioned SW3-Native v0.2.0, AIR31 connected. Three passive `getAudioDevicesForAttributes` checks (activity resume, device added, user button) all predicted **AIR31 Bluetooth A2DP #135** for both MEDIA/SPEECH and ACCESSIBILITY/SPEECH. **No playback; no active routed sink, Bluetooth latency or physical fallback protection observed.** [Compact field evidence](./SW3_NATIVE_AIR31_FIELD_RESULT_2026-10-13.md). No repeat of the one-button trial or microphone tests.
-- [x] **SW3-C Android API route-control decision + native 30-second silent observation audit (2026-10-13):** no-output Java state monitor, foreground polling + device events, fail-closed stale/speaker/disconnect/mode/ambiguity guards, JVM regression + versioned APK; **no track is ever played**. Public API route *preference* and late callbacks do not furnish an atomic hardware no-speaker-fallback guarantee. SW3-Native v0.2.0 AIR31 observation stays PASS and needs no repeat. [Decision and limits](./SW3C_ANDROID_ROUTE_CONTROL_DECISION_2026-10-13.md).
-- [ ] **SW3 physical output gate (DEFERRED, requires explicit user reauthorization):** if subsequently needed, isolate a nonhuman acoustic route/speaker-leakage test, independently calibrate L/R SPL/MPO, then measure real A2DP/LE E2E delay. Software prediction monitoring never grants playback.
-- [ ] **iOS capture follow-up (OPTIONAL/DEFERRED):** iOS phone-mic/A2DP viability and optional headset-mic/HFP or iOS 26 high-quality AirPods capture only after Android phone-mic-first software ceiling is clearer.
-- [ ] **HARDWARE POC / physical acoustic trials: PARKED** until user explicitly revises priority; remains a prerequisite for *any* future real-ear hearing output.
-- [ ] **M03M:** keep paused until route feasibility clarifies where lower-latency DSP engineering has value.
-
-The prior M04-A earbud-local SDK/ODM recommendation below is preserved as a **historical conditional future option**, **NOT the active work order**. Do not automatically continue to M04-B1 hardware acquisition.
-
-## M04 — Earbud-local DSP feasibility study (historical, hardware POC deferred)
-
-- [x] **M04-A (2026-10-12):** desk API/standards/vendor evidence matrix, model-specific first-party versus third-party boundaries, architecture GO/CONDITIONAL/NO-GO, two bench POCs, and no-live-output decision. See [M04A evidence and decision record](./M04A_EARBUD_LOCAL_DSP_FEASIBILITY_2026-10-12.md).
-- [ ] **M04-B1 (NOT AUTHORIZED; conditional future hardware POC):** select licensed/documented programmable local-DSP hardware or research platform, confirm device/firmware/SDK, predeclare ear-coupler/safety, fail-closed hardware and latency measurement plan.
-- [ ] **M04-B2:** perform *nonhuman* acoustic latency/routing/limiter/mute bench trials; a dedicated phone→Bluetooth route-only benchmark is secondary, never proof of daily open-fit amplification.
-- [ ] **M03M scope decision:** pause further generic STFT development until M04-B confirms an actual controllable acoustic path; then select ported on-device DSP or narrow measured remote-mic prototype.
-
-**M04 priority correction:** Bluetooth is still the preferred daily accessory/parameter interface, but primary nearby-conversation hearing must use **ear-local microphone and local DSP** *if* vendor/hardware gates pass. A phone microphone carried through LE Audio/A2DP is not the same architecture. Current M03L remains entirely synthetic; **no real-ear amplification**.
-
-
-Goal: determine whether the preferred everyday Bluetooth-controlled headset can provide **near-ear microphone → local DSP → open-ear receiver** processing under documented vendor firmware control, with phone-microphone → Bluetooth evaluated separately on a nonhuman bench for optional remote scenarios. Neither BLE/LE Audio transport nor a local chip alone proves acoustic feasibility.
-
-References:
-
-- one selected Android phone and **one fixed Bluetooth earbud/headset**, preferably with verifiable LE Audio support; retain standard Bluetooth/A2DP as a compatibility comparison,
-- **one wired USB-C pair as low-latency baseline**, not the default product requirement,
-- fixed output volume, actual audio route and microphone source verified independently (phone mic must remain the source),
-- acoustic fixture for independently measured left/right calibration.
-
-Measure:
-
-- true microphone-to-ear P50/P95, worst observed delays and jitter (do not infer from codec labels),
-- subjective delayed/direct-sound coexistence in nearby conversation vs remote microphone scenarios,
-- BT disconnect/codec change/reconnection/phone call interruptions and **physical no-speaker-fallback** traces,
-- per-ear frequency response, peak output/MPO at verified volume, channel mapping and worst-case limits,
-- CPU/battery/thermal effects and reliability.
-
-**Stop gate:** never enable actual hearing amplification until hardware route lock/mute and independently calibrated per-ear protection are physically demonstrated. Use caption-only fallback if latency or safety is unacceptable. See [M04_BLUETOOTH_EVALUATION.md](./M04_BLUETOOTH_EVALUATION.md).
-
-## M05 — Speech Enhancement Ablation
-
-- OFF,
-- lightweight/conservative enhancement,
-- experimental neural enhancement.
-
-Judge with hearing-impaired listeners, not only objective denoising scores.
-
-## M06 — Human A–G Evaluation
-
-Randomized within-subject comparison against unaided and usual-hearing-aid baselines.
-
-## Native Gate
-
-Start Android native work when any of the following becomes blocking:
-
-- Web cannot sustain required hearing latency,
-- reliable route/disconnect handling is required,
-- screen-off/background hearing is required,
-- production on-device STT is required,
-- external USB-C microphone integration is required.
-
-Native is a reliability decision, not a DSP-complexity milestone.
-
-## Development / validation discipline
-
-Detailed strategy: [DEVELOPMENT_VALIDATION_STRATEGY.md](./DEVELOPMENT_VALIDATION_STRATEGY.md)
-
-Key rule: manual `?gain=` values are exploratory engineering controls, not product tuning targets. Use small question-specific gates while the pipeline is changing; reserve the larger cross-device / cross-speaker benchmark for a frozen processing version.
+Further generic DSP tuning, neural denoising, ear-local SDK/ODM acquisition, new hardware,
+multidevice matrices, SRT trials and absolute ear-level calibration are not the next development task.
+Existing evidence should be reused; SW1–SW4 and basic microphone/pairing checks are closed.
+Worn live hearing remains unvalidated and is not enabled by D6.2.

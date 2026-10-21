@@ -49,6 +49,7 @@ public final class MainActivity extends Activity {
     private volatile AudioTrack playback;
     private volatile AudioRecord capture;
     private Thread worker;
+    private volatile boolean workerFinishing;
     private AudioDeviceCallback deviceCallback;
     private AudioRouting.OnRoutingChangedListener routeListener;
     private BenchSessionGate gate;
@@ -84,7 +85,7 @@ public final class MainActivity extends Activity {
         int p = (int)(16 * getResources().getDisplayMetrics().density);
         root.setPadding(p,p,p,p);
         TextView title = new TextView(this);
-        title.setText("HearLens M04-D6.1｜AIR31 桌面輸出自測");
+        title.setText("HearLens M04-D6.2｜AIR31 桌面輸出自測");
         title.setTextSize(20);
         root.addView(title);
         TextView warning = new TextView(this);
@@ -168,7 +169,7 @@ public final class MainActivity extends Activity {
             startActivity(Intent.createChooser(intent,"分享 M04 測試紀錄"));
         });
         runningForeground = true;
-        log("build=m04d61-v0.3.1 target=Moto_g62_Android13 AIR31_A2DP");
+        log("build=m04d62-v0.3.2 target=Moto_g62_Android13 AIR31_A2DP");
         log("audio_output=NOT_CALIBRATED no_physical_speaker_isolation_guarantee=true");
         refreshUi();
     }
@@ -181,7 +182,7 @@ public final class MainActivity extends Activity {
     }
 
     private void requestStart() {
-        if (active.get()) return;
+        if (active.get() || workerFinishing) return;
         if (!offEar.isChecked() || !volumeLow.isChecked()) {
             log("blocked=off_ear_and_low_volume_confirmation_required");
             return;
@@ -235,7 +236,7 @@ public final class MainActivity extends Activity {
     private boolean normalMode() { return manager.getMode() == AudioManager.MODE_NORMAL; }
 
     private synchronized void startSession() {
-        if (active.get() || !runningForeground || !normalMode()) {
+        if (active.get() || workerFinishing || !runningForeground || !normalMode()) {
             log("blocked=active_background_or_call");
             return;
         }
@@ -303,6 +304,9 @@ public final class MainActivity extends Activity {
             + " level=" + selectedProfile.level().name()
             + " media_volume=" + manager.getStreamVolume(AudioManager.STREAM_MUSIC)
             + "/" + manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        log("attenuation_budget " + selectedProfile.attenuationBudget());
+        log("evidence_scope=route_and_android_cursor_only acoustic_output=NOT_VERIFIED"
+            + " e2e_latency=NOT_MEASURED");
         focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setAudioAttributes(mediaAttributes())
             .setOnAudioFocusChangeListener(change -> {
@@ -325,6 +329,7 @@ public final class MainActivity extends Activity {
             if (selfTest) runSelfTestLoop(bt);
             else runAudioLoop(bt,mic);
         }, "M04-OffEar-Audio");
+        workerFinishing = true;
         worker.start();
         ui.postDelayed(this::monitor,100);
         refreshUi();
@@ -398,6 +403,7 @@ public final class MainActivity extends Activity {
             if (!gate.check(selectedId,true,true,focusHeld,SystemClock.elapsedRealtime()))
                 throw new IllegalStateException("pre_output_gate_fault");
             track.setVolume(profile.level().trackVolume);
+            lastActualRoute = "A2DP#" + selectedId;
             log("active_route=A2DP#" + selectedId + " input=BUILTIN_MIC#" + input.getId()
                 + " level=" + profile.level().name()
                 + " gain=" + profile.level().gain + " cap_pcm16=" + profile.level().cap
@@ -436,9 +442,16 @@ public final class MainActivity extends Activity {
                 if (!active.get()) break;
                 int done = track.write(out,0,n*2,AudioTrack.WRITE_NON_BLOCKING);
                 if (done<0) { abort("output_write_error_" + done); break; }
-                if (done<n*2) droppedWrites++;
+                // The legacy loop discards the unaccepted tail, unlike D6 retries.
+                // Report exact unsubmitted frames; never label every retry as audio loss.
+                if ((done & 1) != 0) { abort("output_unaligned_stereo_write"); break; }
+                if (done<n*2) {
+                    droppedWrites++;
+                    if (done==0) writeZeroCount++; else writePartialCount++;
+                }
                 java.util.Arrays.fill(out,(short)0);
-                writtenFrames+=n;
+                writtenFrames+=done/2;
+                playbackSubmittedFrames=writtenFrames;
             }
         } catch (SecurityException e) {
             abort("permission_revoked");
@@ -459,6 +472,7 @@ public final class MainActivity extends Activity {
             }
             synchronized(outputLock) { playback=null;capture=null; }
             if(active.get()) abort("audio_loop_ended");
+            finishWorkerDiagnostics();
         }
     }
 
@@ -658,6 +672,7 @@ public final class MainActivity extends Activity {
             }
             synchronized(outputLock){playback=null;}
             if(active.get())abort("self_test_loop_ended");
+            finishWorkerDiagnostics();
         }
     }
 
@@ -705,27 +720,8 @@ public final class MainActivity extends Activity {
             manager.abandonAudioFocusRequest(focusRequest);
             focusHeld=false;
         }
-        BenchOutputProfile profile = currentProfile;
-        if(profile != null) log("digital_levels " + profile.metrics());
-        log("stop=" + (gate==null?why:gate.reason())
-            + " elapsed_ms=" + (SystemClock.elapsedRealtime()-startedAt)
-            + " test_mode=" + (selfTestActive ? "OUTPUT_SELF_TEST" : "MICROPHONE_LOOP")
-            + " selected_a2dp_id=" + selectedId
-            + " last_actual_route=" + lastActualRoute
-            + " media_volume=" + manager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            + "/" + manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            + " mic_frames=" + (selfTestActive ? 0 : writtenFrames)
-            + " attempted_pcm_frames=" + writtenFrames
-            + " dropped_writes=" + droppedWrites
-            + " write_retry_zero=" + writeZeroCount
-            + " write_retry_partial=" + writePartialCount
-            + " track_submitted_frames=" + playbackSubmittedFrames
-            + " track_played_frames=" + playbackHeadFrames
-            + " track_priming_frames=" + playbackPrimingFrames
-            + " android_drain_confirmed=" + drainConfirmed
-            + " acoustic_output_verified=false"
-            + " missed_reads=" + missedReads
-            + " no_audio_file=true speaker_zero_leak_not_proven=true");
+        log("stop_request=" + why + " final_diagnostics_pending=" + workerFinishing);
+        if (!workerFinishing) reportFinalDiagnostics();
         ui.post(() -> {
             if (!active.get()) {
                 offEar.setChecked(false);
@@ -733,6 +729,43 @@ public final class MainActivity extends Activity {
             }
             refreshUi();
         });
+    }
+    private void finishWorkerDiagnostics() {
+        // The writer owns profile/counters. Publish once after it has stopped changing them.
+        reportFinalDiagnostics();
+        workerFinishing = false;
+        ui.post(this::refreshUi);
+    }
+    private void reportFinalDiagnostics() {
+        BenchOutputProfile profile = currentProfile;
+        if(profile != null) {
+            log("digital_levels " + profile.metrics());
+            log("source_windows source=" + (selfTestActive ? "GENERATED_CHIRP" : "BUILTIN_MIC")
+                + " " + profile.sourceWindowMetrics());
+        }
+        log("stop=" + (gate==null?"not_started":gate.reason())
+            + " elapsed_ms=" + (SystemClock.elapsedRealtime()-startedAt)
+            + " test_mode=" + (selfTestActive ? "OUTPUT_SELF_TEST" : "MICROPHONE_LOOP")
+            + " selected_a2dp_id=" + selectedId
+            + " last_actual_route=" + lastActualRoute
+            + " media_volume=" + manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            + "/" + manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            + " mic_frames=" + (selfTestActive || profile==null ? 0 : profile.frames())
+            + " attempted_pcm_frames=" + (profile==null ? 0 : profile.frames())
+            + " accepted_signal_frames=" + writtenFrames
+            + " loop_unsubmitted_frames=" + (selfTestActive || profile==null ? 0 : profile.frames()-writtenFrames)
+            + " write_counter_scope=" + (selfTestActive ? "RETRIES_NOT_LOSS" : "UNACCEPTED_TAIL_DISCARDED")
+            + " dropped_writes=" + droppedWrites
+            + " write_retry_zero=" + writeZeroCount
+            + " write_retry_partial=" + writePartialCount
+            + " track_submitted_frames=" + playbackSubmittedFrames
+            + " track_played_frames=" + (selfTestActive ? Long.toString(playbackHeadFrames) : "NOT_OBSERVED")
+            + " track_priming_frames=" + playbackPrimingFrames
+            + " android_drain_confirmed=" + drainConfirmed
+            + " acoustic_output_verified=false"
+            + " missed_reads=" + missedReads
+            + " missed_reads_scope=zero_return_polls_not_lost_packets"
+            + " no_audio_file=true speaker_zero_leak_not_proven=true");
     }
     private void log(String line) {
         String timestamp = String.format(Locale.US,"%d",SystemClock.elapsedRealtime());
@@ -742,7 +775,7 @@ public final class MainActivity extends Activity {
     private void refreshUi() {
         if(status==null)return;
         status.setText(report.toString());
-        startButton.setEnabled(!active.get());
+        startButton.setEnabled(!active.get() && !workerFinishing);
         if(testModes!=null) {
             testModes.setEnabled(!active.get());
             for(int i=0;i<testModes.getChildCount();i++)
