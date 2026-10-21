@@ -41,6 +41,16 @@ public final class BenchOutputProfileTest {
         check(quiet.limitedSamples()==0,"silence does not artificially limit");
         check(quiet.metrics().contains("out_pcm_rms_dbfs=-inf"),
             "no fabricated measured sound on silence");
+        BenchOutputProfile l1 = new BenchOutputProfile(BenchOutputProfile.Level.L1_MEASURE);
+        for(int i=0;i<96_000;i++) l1.process(Short.MAX_VALUE);
+        check(l1.attenuationBudget().contains("track_scalar_db=-12.0"), "quarter scalar is -12 dB");
+        check(l1.attenuationBudget().contains("nominal_post_track_cap_dbfs=-44.6"),
+            "L1 budget includes cap and scalar before unknown OS volume");
+        check(l1.metrics().contains("nominal_post_track_peak_dbfs=-44.6"),
+            "actual emitted PCM peak scaled nominally");
+        check(l1.sourceWindowMetrics().contains("source_complete_windows=20"),
+            "source diagnostics receive every processed frame");
+        check(quiet.metrics().contains("nominal_post_track_rms_dbfs=-inf"), "silent scalar stays silent");
         boolean invalidPcm=false;
         try{quiet.process(40000);}catch(IllegalArgumentException e){invalidPcm=true;}
         check(invalidPcm,"reject non-PCM16");

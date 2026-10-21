@@ -32,6 +32,7 @@ public final class BenchOutputProfile {
 
     public static final int SAMPLE_RATE = 48000;
     private final Level level;
+    private final BenchSignalWindow sourceWindow = new BenchSignalWindow();
     private long frames;
     private long limitedSamples;
     private double rawSquare;
@@ -55,6 +56,7 @@ public final class BenchOutputProfile {
     public short process(int pcm16) {
         if (pcm16 < Short.MIN_VALUE || pcm16 > Short.MAX_VALUE)
             throw new IllegalArgumentException("invalid_pcm16");
+        sourceWindow.add(pcm16);
         int boosted = pcm16 * level.gain;
         int capped = Math.max(-level.cap, Math.min(level.cap, boosted));
         if (capped != boosted) limitedSamples++;
@@ -73,7 +75,16 @@ public final class BenchOutputProfile {
         return String.format(Locale.US, "%.1f",20 * Math.log10(v / 32768.0));
     }
 
-    /** Diagnostic values are digital, BEFORE track scalar and OS/Bluetooth volume. */
+    public String sourceWindowMetrics() { return sourceWindow.metrics(); }
+
+    /** Nominal scalar arithmetic only; Android/earbud volume and acoustic transfer are unknown. */
+    public String attenuationBudget() {
+        return "track_scalar_db=" + dbfs(32768.0 * level.trackVolume)
+            + " nominal_post_track_cap_dbfs=" + dbfs(level.cap * level.trackVolume)
+            + " os_media_index_is_not_db=true acoustic_spl=UNKNOWN";
+    }
+
+    /** Original fields are pre-track; nominal post-track fields do not measure the OS output. */
     public String metrics() {
         double rawRms = frames == 0 ? 0 : Math.sqrt(rawSquare / frames);
         double outRms = frames == 0 ? 0 : Math.sqrt(outSquare / frames);
@@ -87,6 +98,9 @@ public final class BenchOutputProfile {
             + " out_pcm_peak_dbfs=" + dbfs(outPeak)
             + " limited_pct=" + String.format(Locale.US, "%.3f",
                     frames == 0 ? 0 : (100.0 * limitedSamples / frames))
+            + " nominal_post_track_rms_dbfs=" + dbfs(outRms * level.trackVolume)
+            + " nominal_post_track_peak_dbfs=" + dbfs(outPeak * level.trackVolume)
+            + " nominal_post_track_scope=scalar_estimate_pre_os_not_acoustic"
             + " pcm_frames=" + frames
             + " output_scope=pre_track_scalar_pre_os_volume_not_acoustic_spl";
     }

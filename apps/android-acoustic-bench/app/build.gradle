@@ -8,8 +8,8 @@ android {
         applicationId 'org.hearlens.acousticbench'
         minSdk 26
         targetSdk 33
-        versionCode 4
-        versionName '0.3.1-m04d61-off-ear'
+        versionCode 5
+        versionName '0.3.2-m04d62-off-ear'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
