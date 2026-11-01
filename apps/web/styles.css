@@ -150,6 +150,13 @@ h2 {
   outline-offset: 2px;
 }
 
+/* Visible only while the reader is scrolled away from incoming speech. */
+.caption-jump-latest {
+  width: 100%;
+  min-height: 44px;
+  margin: -0.35rem 0 0.75rem;
+}
+
 .actions {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
