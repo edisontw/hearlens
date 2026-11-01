@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { stopCaptionProviderSafely } from "./caption-stop.mjs";
 
 const main = readFileSync("apps/web/main.js", "utf8");
 const provider = readFileSync("apps/web/stt/providers/gemini-live-transcribe.js", "utf8");
@@ -35,10 +36,58 @@ test("abnormal socket close stops capture; explicit stop still supports final dr
 });
 
 test("fatal fix refreshes the browser's main, provider, and provider-implementation URLs", () => {
-  const version = "20261015-session-review1";
-  assert.equal(build.buildId, version);
+  const version = build.buildId;
+  assert.match(version, /^\d{8}-[a-z0-9-]+$/);
   assert.match(main, new RegExp('const BUILD_ID = "' + version + '"'));
   assert(main.includes("./stt/provider.js?v=" + version));
   assert(router.includes("./providers/gemini-live-transcribe.js?v=" + version));
   assert(html.includes("./main.js?v=" + version));
+});
+
+test("successful explicit stop leaves the provider stopped without redundant dispose", async () => {
+  let stopped = 0;
+  let disposed = 0;
+  const provider = {
+    async stop() { stopped += 1; },
+    async dispose() { disposed += 1; },
+  };
+  assert.equal(await stopCaptionProviderSafely(provider), true);
+  assert.equal(stopped, 1);
+  assert.equal(disposed, 0);
+  assert.equal(await stopCaptionProviderSafely(null), true);
+});
+
+test("failed provider stop attempts dispose and reports failure without throwing", async () => {
+  const phases = [];
+  let disposed = 0;
+  const provider = {
+    async stop() { throw new Error("WebSocket send failed"); },
+    async dispose() { disposed += 1; },
+  };
+  assert.equal(await stopCaptionProviderSafely(provider,
+    (phase, error) => phases.push([phase, error.message])), false);
+  assert.equal(disposed, 1);
+  assert.deepEqual(phases, [["stop", "WebSocket send failed"]]);
+});
+
+test("failed fallback dispose still reports both errors and never claims clean stop", async () => {
+  const phases = [];
+  const provider = {
+    async stop() { throw new Error("close failed"); },
+    async dispose() { throw new Error("dispose failed"); },
+  };
+  assert.equal(await stopCaptionProviderSafely(provider,
+    (phase, error) => phases.push([phase, error.message])), false);
+  assert.deepEqual(phases, [
+    ["stop", "close failed"], ["dispose", "dispose failed"],
+  ]);
+});
+
+test("UI stop failure is fail-closed and requires a reload, not another capture", () => {
+  assert.match(main, /const stoppingProvider = sttProvider;/);
+  assert.match(main, /await stopCaptionProviderSafely\(stoppingProvider/);
+  assert.match(main, /catch \(error\) \{\s*cleanStop = false;\s*appendSttLog\("S" \+ sessionId \+ " diagnostic-cleanup-error "/);
+  assert.match(main, /els\.start\.disabled = !cleanStop;/);
+  assert.match(main, /setStatus\(cleanStop \? "已停止" : "停止異常，請重新載入頁面"/);
+  assert.match(main, /if \(!cleanStop\) \{\s*els\.diagStt\.textContent = "停止清理未完成；請重新載入頁面再開始。";/);
 });

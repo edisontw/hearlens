@@ -1,13 +1,14 @@
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261015-session-review1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261015-session-review1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261015-session-review1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261015-session-review1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261015-session-review1";
+import { stopCaptionProviderSafely } from "./caption-stop.mjs?v=20261102-stop-cleanup1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-stop-cleanup1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-stop-cleanup1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-stop-cleanup1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-stop-cleanup1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-stop-cleanup1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261015-session-review1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-stop-cleanup1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -19,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261015-session-review1";
+} from "./transcript-window.mjs?v=20261102-stop-cleanup1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -45,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261015-session-review1";
+const BUILD_ID = "20261102-stop-cleanup1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -1183,12 +1184,21 @@ async function stopSession() {
   setStatus("停止中…");
   appendSttLog("S" + sessionId + " stop-request");
 
-  if (sttProvider) {
-    await sttProvider.stop();
-  }
+  // A failed AudioContext close or WebSocket send must not strand the UI in
+  // "停止中…" with both controls disabled. Try dispose as a fail-closed fallback.
+  const stoppingProvider = sttProvider;
   sttProvider = null;
-
-  await releaseDiagnosticCapture(null);
+  let cleanStop = await stopCaptionProviderSafely(stoppingProvider, (phase, error) => {
+    appendSttLog("S" + sessionId + " " + phase + "-cleanup-error " +
+      (error instanceof Error ? error.message : "unknown"));
+  });
+  try {
+    await releaseDiagnosticCapture(null);
+  } catch (error) {
+    cleanStop = false;
+    appendSttLog("S" + sessionId + " diagnostic-cleanup-error " +
+      (error instanceof Error ? error.message : "unknown"));
+  }
   if (sessionId !== activeSessionId) return;
 
   interimText = "";
@@ -1200,13 +1210,19 @@ async function stopSession() {
     ? "" : "字幕會顯示在這裡。"));
   els.diagMic.textContent = "未使用";
   activeSessionId = 0;
-  els.start.disabled = false;
+  // If cleanup failed, require a page reload rather than risk a second
+  // microphone capture while the old browser resource is uncertain.
+  els.start.disabled = !cleanStop;
   els.stop.disabled = true;
   if (els.quickPreset) els.quickPreset.disabled = false;
   if (els.resetPreset) els.resetPreset.disabled = false;
   setAdvancedTuningDisabled(false);
-  setStatus("已停止");
-  appendSttLog("S" + sessionId + " session-stopped");
+  if (!cleanStop) {
+    els.diagStt.textContent = "停止清理未完成；請重新載入頁面再開始。";
+  }
+  setStatus(cleanStop ? "已停止" : "停止異常，請重新載入頁面",
+    cleanStop ? "idle" : "error");
+  appendSttLog("S" + sessionId + (cleanStop ? " session-stopped" : " session-stop-failed"));
   captionStopRequested = false;
   syncCaptionRefreshTimer();
 }
