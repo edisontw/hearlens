@@ -119,3 +119,10 @@ test("diagnostic close rejection is not swallowed and startup UI requires reload
   assert.match(main, /els\.start\.disabled = !cleanupOk/);
   assert.match(main, /"字幕清理未完成，請重新載入頁面"/);
 });
+
+test("earlier diagnostic close failure remains a sticky no-retry condition", () => {
+  assert.match(main, /let diagnosticCleanupFailed = false/);
+  assert.match(main, /diagnosticCleanupFailed = true;/);
+  assert.equal((main.match(/\)\) && !diagnosticCleanupFailed;/g) ?? []).length, 2);
+  assert.match(main, /cleanupError \?\?= error/);
+});
