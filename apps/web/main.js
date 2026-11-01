@@ -174,6 +174,7 @@ let activeInputProfile = null;
 let activeCaptureSettings = null;
 let activeCaptionLatency = null;
 let captionStopRequested = false;
+let diagnosticCleanupFailed = false; // Sticky until reload if any diagnostic release rejects.
 let captionRefreshTimer = null;
 let lastInterimAt = null;
 const transcript = []; // Existing recent-history / recall, independent of clear-screen action.
@@ -914,16 +915,31 @@ async function releaseDiagnosticCapture(label = "已釋放") {
   // pagehide and startup-finalization cannot close/stop the same resource twice.
   const priorStream = stream;
   stream = null;
+  let cleanupError = null;
   for (const track of priorStream?.getTracks?.() ?? []) {
-    track.stop();
+    try {
+      track.stop();
+    } catch (error) {
+      cleanupError ??= error;
+    }
   }
 
   const priorContext = audioContext;
   audioContext = null;
   if (priorContext && priorContext.state !== "closed") {
-    await priorContext.close();
+    try {
+      await priorContext.close();
+    } catch (error) {
+      cleanupError ??= error;
+    }
   }
 
+  if (cleanupError !== null) {
+    // Even if a later retry sees no owned handles, the earlier failure
+    // must not be misclassified as clean microphone release.
+    diagnosticCleanupFailed = true;
+    throw cleanupError;
+  }
   if (label) {
     els.diagMic.textContent = label;
   }
@@ -950,12 +966,12 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
   appendSttLog("S" + expectedSessionId + " fatal-session " + code);
   const failedProvider = sttProvider;
   sttProvider = null;
-  const cleanupOk = await disposeCaptionResourcesSafely(
+  const cleanupOk = (await disposeCaptionResourcesSafely(
     failedProvider,
     () => releaseDiagnosticCapture("未使用"),
     (phase, error) => appendSttLog("S" + expectedSessionId + " " + phase +
       "-cleanup-error " + (error instanceof Error ? error.message : "unknown")),
-  );
+  )) && !diagnosticCleanupFailed;
   interimText = "";
   rawInterimText = "";
   lastInterimAt = null;
@@ -1239,12 +1255,12 @@ async function cleanupFailedStart(error) {
 
   const failedProvider = sttProvider;
   sttProvider = null;
-  const cleanupOk = await disposeCaptionResourcesSafely(
+  const cleanupOk = (await disposeCaptionResourcesSafely(
     failedProvider,
     () => releaseDiagnosticCapture("未啟動"),
     (phase, cleanupError) => appendSttLog("S" + activeSessionId + " " + phase +
       "-cleanup-error " + (cleanupError instanceof Error ? cleanupError.message : "unknown")),
-  );
+  )) && !diagnosticCleanupFailed;
   activeSessionId = 0;
   lastInterimAt = null;
   syncCaptionRefreshTimer();
