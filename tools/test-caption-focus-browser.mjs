@@ -81,6 +81,8 @@ try {
     "return-to-latest moves to the bottom");
   assert.equal(await page.locator("#caption-jump-latest").isVisible(), false,
     "return-to-latest hides when the latest caption is in view");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "caption",
+    "return-to-latest restores keyboard focus to the scrollable caption after hiding itself");
   await page.locator("#caption").evaluate(el => {
     el.textContent = "這是一段測試字幕。";
     el.dispatchEvent(new Event("scroll"));
