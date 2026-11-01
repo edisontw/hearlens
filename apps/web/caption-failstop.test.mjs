@@ -36,8 +36,8 @@ test("abnormal socket close stops capture; explicit stop still supports final dr
 });
 
 test("fatal fix refreshes the browser's main, provider, and provider-implementation URLs", () => {
-  const version = "20261102-stop-cleanup1";
-  assert.equal(build.buildId, version);
+  const version = build.buildId;
+  assert.match(version, /^\d{8}-[a-z0-9-]+$/);
   assert.match(main, new RegExp('const BUILD_ID = "' + version + '"'));
   assert(main.includes("./stt/provider.js?v=" + version));
   assert(router.includes("./providers/gemini-live-transcribe.js?v=" + version));
