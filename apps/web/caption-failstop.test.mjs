@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { stopCaptionProviderSafely } from "./caption-stop.mjs";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs";
 
 const main = readFileSync("apps/web/main.js", "utf8");
 const provider = readFileSync("apps/web/stt/providers/gemini-live-transcribe.js", "utf8");
@@ -9,19 +9,19 @@ const router = readFileSync("apps/web/stt/provider.js", "utf8");
 const html = readFileSync("apps/web/index.html", "utf8");
 const build = JSON.parse(readFileSync("apps/web/build.json", "utf8"));
 
-test("fatal transport callback transitions current caption session to an error and re-enables start", () => {
+test("fatal transport callback permits retry only when all cleanup succeeds", () => {
   assert.match(main, /onError: \(\{ message, code, fatal \}\)/);
   assert.match(main, /fatal === true/);
   assert.match(main, /code === "gemini-closed"/);
   assert.match(main, /code === "gemini-socket-error"/);
   assert.match(main, /activeSessionId = 0; \/\/ immediately reject delayed partial/);
-  assert.match(main, /await failedProvider\?\.dispose\?\.\(\)/);
-  assert.match(main, /await releaseDiagnosticCapture\("未使用"\)/);
+  assert.match(main, /const cleanupOk = await disposeCaptionResourcesSafely\(/);
+  assert.match(main, /\(\) => releaseDiagnosticCapture\("未使用"\)/);
   assert.match(main, /"字幕已暫停，請重新開始"/);
   assert.match(main, /"麥克風已中斷，請重新開始"/);
   assert.match(main, /"字幕連線中斷，請重新開始"/);
   assert.match(main, /setStatus\(reasonLabel, "error"\)/);
-  assert.match(main, /els\.start\.disabled = false/);
+  assert.match(main, /els\.start\.disabled = !cleanupOk/);
   assert.match(main, /setAdvancedTuningDisabled\(false\)/);
   assert.match(main, /sessionId !== activeSessionId/);
 });
@@ -90,4 +90,32 @@ test("UI stop failure is fail-closed and requires a reload, not another capture"
   assert.match(main, /els\.start\.disabled = !cleanStop;/);
   assert.match(main, /setStatus\(cleanStop \? "已停止" : "停止異常，請重新載入頁面"/);
   assert.match(main, /if \(!cleanStop\) \{\s*els\.diagStt\.textContent = "停止清理未完成；請重新載入頁面再開始。";/);
+});
+
+test("failed-start cleanup independently attempts both releases and blocks retry on either error", async () => {
+  const events = [];
+  const provider = { async dispose() { events.push("provider"); throw new Error("dispose rejected"); } };
+  const clean = await disposeCaptionResourcesSafely(
+    provider,
+    async () => { events.push("diagnostic"); },
+    (phase, error) => events.push(phase + ":" + error.message),
+  );
+  assert.equal(clean, false);
+  assert.deepEqual(events, ["provider", "provider:dispose rejected", "diagnostic"]);
+  assert.equal(await disposeCaptionResourcesSafely(null, async () => {}), true);
+});
+
+test("diagnostic close rejection is not swallowed and startup UI requires reload", async () => {
+  const events = [];
+  const clean = await disposeCaptionResourcesSafely(
+    { async dispose() { events.push("provider"); } },
+    async () => { events.push("diagnostic"); throw new Error("AudioContext close rejected"); },
+    (phase) => events.push(phase + "-error"),
+  );
+  assert.equal(clean, false);
+  assert.deepEqual(events, ["provider", "diagnostic", "diagnostic-error"]);
+  assert.match(main, /const cleanupOk = await cleanupFailedStart\(error\)/);
+  assert.match(main, /setStatus\(cleanupOk \? "無法啟動" : "啟動清理未完成，請重新載入頁面"/);
+  assert.match(main, /els\.start\.disabled = !cleanupOk/);
+  assert.match(main, /"字幕清理未完成，請重新載入頁面"/);
 });
