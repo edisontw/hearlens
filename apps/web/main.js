@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-cleanup-guard1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-cleanup-guard1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-cleanup-guard1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-cleanup-guard1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-cleanup-guard1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-cleanup-guard1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-caption-latest1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-caption-latest1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-caption-latest1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-caption-latest1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-caption-latest1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-caption-latest1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-cleanup-guard1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-caption-latest1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-cleanup-guard1";
+} from "./transcript-window.mjs?v=20261102-caption-latest1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-cleanup-guard1";
+const BUILD_ID = "20261102-caption-latest1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -127,6 +127,7 @@ const els = {
   tuningCopyStatus: document.querySelector("#tuning-copy-status"),
   captionFocusToggle: document.querySelector("#caption-focus-toggle"),
   caption: document.querySelector("#caption"),
+  captionJumpLatest: document.querySelector("#caption-jump-latest"),
   clearCaption: document.querySelector("#clear-caption"),
   recallPanel: document.querySelector("#recall-panel"),
   status: document.querySelector("#status"),
@@ -401,6 +402,7 @@ function applyCaptionSize(level, { persist = true } = {}) {
     button.setAttribute("aria-pressed", selected ? "true" : "false");
   }
 
+  syncCaptionJumpLatest();
   if (persist) {
     try {
       window.localStorage.setItem(CAPTION_SIZE_STORAGE_KEY, captionSizeLevel);
@@ -522,12 +524,26 @@ function recentRecognizedText(now = Date.now()) {
   return lastRecognizedText;
 }
 
+function syncCaptionJumpLatest() {
+  if (!els.captionJumpLatest) return;
+  const { scrollTop, scrollHeight, clientHeight } = els.caption;
+  const canScroll = scrollHeight > clientHeight + 2;
+  els.captionJumpLatest.hidden = !canScroll ||
+    shouldFollowCaptionScroll(scrollTop, scrollHeight, clientHeight);
+}
+
+function jumpToLatestCaption() {
+  els.caption.scrollTop = els.caption.scrollHeight;
+  syncCaptionJumpLatest();
+}
+
 function updateCaptionDisplay(text) {
   if (els.caption.textContent === text) return;
   const follow = shouldFollowCaptionScroll(
     els.caption.scrollTop, els.caption.scrollHeight, els.caption.clientHeight);
   els.caption.textContent = text;
   if (follow) els.caption.scrollTop = els.caption.scrollHeight;
+  syncCaptionJumpLatest();
 }
 
 function renderCaption() {
@@ -1307,6 +1323,9 @@ window.addEventListener("pagehide", () => interruptForPageEvent("pagehide"));
 // Deliberately NO pageshow/visibility-visible auto-restart: microphone
 // permission and cloud transcription restart require another user action.
 
+els.caption.addEventListener("scroll", syncCaptionJumpLatest, { passive: true });
+els.captionJumpLatest?.addEventListener("click", jumpToLatestCaption);
+window.addEventListener("resize", syncCaptionJumpLatest);
 els.clearCaption?.addEventListener("click", () => {
   // Clear only what the main live caption displays; leave the last-30-second
   // recall and finalized complete-session copy intact.

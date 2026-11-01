@@ -67,6 +67,24 @@ try {
     return Boolean(notice.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING);
   });
   assert(beforeStart, "privacy notice must occur before Start in document order");
+  // Long text is synthetic DOM content; do not start a microphone or provider.
+  await page.locator("#caption").evaluate(el => {
+    el.textContent = Array.from({ length: 100 }, (_, i) => "測試字幕第" + i + "行").join("\n");
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll"));
+  });
+  assert(await page.locator("#caption-jump-latest").isVisible(),
+    "return-to-latest appears when a reader scrolls up");
+  await page.locator("#caption-jump-latest").click();
+  assert(await page.locator("#caption").evaluate(el =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= 2),
+    "return-to-latest moves to the bottom");
+  assert.equal(await page.locator("#caption-jump-latest").isVisible(), false,
+    "return-to-latest hides when the latest caption is in view");
+  await page.locator("#caption").evaluate(el => {
+    el.textContent = "這是一段測試字幕。";
+    el.dispatchEvent(new Event("scroll"));
+  });
   await page.locator("#caption-focus-toggle").click();
   assert(await page.locator("#stt-privacy-notice").isVisible(), "notice survives focus mode");
   assert.equal(await page.locator("#caption-focus-toggle").getAttribute("aria-pressed"), "true");

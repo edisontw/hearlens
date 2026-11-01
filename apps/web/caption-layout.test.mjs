@@ -66,3 +66,13 @@ test("responsive asset version has browser cache bust and no hearing playback", 
   assert.match(main, /captionScreenWakeLock[.]start[(][)]/);
   assert.doesNotMatch(main, /\bnew\s+AudioTrack\s*\(/);
 });
+
+test("a reader scrolled up in long captions can explicitly return to the latest line", () => {
+  assert.match(html, /id="caption-jump-latest"[^>]*hidden>回到最新字幕<\/button>/);
+  assert.match(css, /\.caption-jump-latest \{[^}]*min-height: 44px/);
+  assert.match(main, /function syncCaptionJumpLatest\(\)/);
+  assert.match(main, /shouldFollowCaptionScroll\(scrollTop, scrollHeight, clientHeight\)/);
+  assert.match(main, /els\.caption\.addEventListener\("scroll", syncCaptionJumpLatest/);
+  assert.match(main, /els\.captionJumpLatest\?\.addEventListener\("click", jumpToLatestCaption\)/);
+  assert.match(main, /if \(follow\) els\.caption\.scrollTop = els\.caption\.scrollHeight;\s*syncCaptionJumpLatest\(\)/);
+});
