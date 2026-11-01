@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely } from "./caption-stop.mjs?v=20261102-recall-focus1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-recall-focus1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-recall-focus1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-recall-focus1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-recall-focus1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-recall-focus1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-cleanup-guard1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-cleanup-guard1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-cleanup-guard1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-cleanup-guard1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-cleanup-guard1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-cleanup-guard1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-recall-focus1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-cleanup-guard1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-recall-focus1";
+} from "./transcript-window.mjs?v=20261102-cleanup-guard1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-recall-focus1";
+const BUILD_ID = "20261102-cleanup-guard1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -174,6 +174,7 @@ let activeInputProfile = null;
 let activeCaptureSettings = null;
 let activeCaptionLatency = null;
 let captionStopRequested = false;
+let diagnosticCleanupFailed = false; // Sticky until reload if any diagnostic release rejects.
 let captionRefreshTimer = null;
 let lastInterimAt = null;
 const transcript = []; // Existing recent-history / recall, independent of clear-screen action.
@@ -914,16 +915,31 @@ async function releaseDiagnosticCapture(label = "已釋放") {
   // pagehide and startup-finalization cannot close/stop the same resource twice.
   const priorStream = stream;
   stream = null;
+  let cleanupError = null;
   for (const track of priorStream?.getTracks?.() ?? []) {
-    track.stop();
+    try {
+      track.stop();
+    } catch (error) {
+      cleanupError ??= error;
+    }
   }
 
   const priorContext = audioContext;
   audioContext = null;
   if (priorContext && priorContext.state !== "closed") {
-    await priorContext.close();
+    try {
+      await priorContext.close();
+    } catch (error) {
+      cleanupError ??= error;
+    }
   }
 
+  if (cleanupError !== null) {
+    // Even if a later retry sees no owned handles, the earlier failure
+    // must not be misclassified as clean microphone release.
+    diagnosticCleanupFailed = true;
+    throw cleanupError;
+  }
   if (label) {
     els.diagMic.textContent = label;
   }
@@ -950,34 +966,32 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
   appendSttLog("S" + expectedSessionId + " fatal-session " + code);
   const failedProvider = sttProvider;
   sttProvider = null;
-  try {
-    await failedProvider?.dispose?.();
-  } catch (error) {
-    appendSttLog("S" + expectedSessionId + " dispose-error " +
-      (error instanceof Error ? error.message : "unknown"));
-  }
-  try {
-    await releaseDiagnosticCapture("未使用");
-  } catch (error) {
-    appendSttLog("S" + expectedSessionId + " capture-cleanup-error " +
-      (error instanceof Error ? error.message : "unknown"));
-  } finally {
-    interimText = "";
-    rawInterimText = "";
-    lastInterimAt = null;
-    trimTranscript();
-    updateCaptionDisplay(
-      visibleDisplayTranscript() || (captionManuallyCleared
-        ? "" : "字幕已中斷，請重新開始。"));
-    els.diagStt.textContent = message;
-    els.start.disabled = false;
-    els.stop.disabled = true;
-    if (els.quickPreset) els.quickPreset.disabled = false;
-    if (els.resetPreset) els.resetPreset.disabled = false;
-    setAdvancedTuningDisabled(false);
-    appendSttLog("S" + expectedSessionId + " fatal-cleanup-complete");
-    syncCaptionRefreshTimer();
-  }
+  const cleanupOk = (await disposeCaptionResourcesSafely(
+    failedProvider,
+    () => releaseDiagnosticCapture("未使用"),
+    (phase, error) => appendSttLog("S" + expectedSessionId + " " + phase +
+      "-cleanup-error " + (error instanceof Error ? error.message : "unknown")),
+  )) && !diagnosticCleanupFailed;
+  interimText = "";
+  rawInterimText = "";
+  lastInterimAt = null;
+  trimTranscript();
+  updateCaptionDisplay(
+    visibleDisplayTranscript() || (captionManuallyCleared
+      ? "" : "字幕已中斷，請重新開始。"));
+  els.diagStt.textContent = cleanupOk
+    ? message : "字幕資源清理未完成；請重新載入頁面。";
+  // A rejected dispose/AudioContext close leaves the old capture uncertain.
+  // Do not allow another Start until a full page reload.
+  els.start.disabled = !cleanupOk;
+  els.stop.disabled = true;
+  if (els.quickPreset) els.quickPreset.disabled = false;
+  if (els.resetPreset) els.resetPreset.disabled = false;
+  setAdvancedTuningDisabled(false);
+  if (!cleanupOk) setStatus("字幕清理未完成，請重新載入頁面", "error");
+  appendSttLog("S" + expectedSessionId +
+    (cleanupOk ? " fatal-cleanup-complete" : " fatal-cleanup-failed"));
+  syncCaptionRefreshTimer();
 }
 
 function requireActiveCaptionSession(sessionId) {
@@ -1239,17 +1253,18 @@ async function cleanupFailedStart(error) {
       (error instanceof Error ? error.message : "unknown"),
   );
 
-  try {
-    await sttProvider?.dispose?.();
-  } catch {
-    // Ignore cleanup errors.
-  }
+  const failedProvider = sttProvider;
   sttProvider = null;
-
-  await releaseDiagnosticCapture("未啟動");
+  const cleanupOk = (await disposeCaptionResourcesSafely(
+    failedProvider,
+    () => releaseDiagnosticCapture("未啟動"),
+    (phase, cleanupError) => appendSttLog("S" + activeSessionId + " " + phase +
+      "-cleanup-error " + (cleanupError instanceof Error ? cleanupError.message : "unknown")),
+  )) && !diagnosticCleanupFailed;
   activeSessionId = 0;
   lastInterimAt = null;
   syncCaptionRefreshTimer();
+  return cleanupOk;
 }
 
 els.start.addEventListener("click", async () => {
@@ -1261,11 +1276,12 @@ els.start.addEventListener("click", async () => {
     // the interruption state or a newly started foreground session.
     if (expectedSessionId <= sessionCounter &&
         expectedSessionId !== activeSessionId) return;
-    await cleanupFailedStart(error);
-    setStatus("無法啟動", "error");
-    els.caption.textContent =
-      error instanceof Error ? error.message : "無法啟動麥克風。";
-    els.start.disabled = false;
+    const cleanupOk = await cleanupFailedStart(error);
+    setStatus(cleanupOk ? "無法啟動" : "啟動清理未完成，請重新載入頁面", "error");
+    els.caption.textContent = cleanupOk
+      ? (error instanceof Error ? error.message : "無法啟動麥克風。")
+      : "啟動失敗且麥克風資源清理未完成，請重新載入頁面。";
+    els.start.disabled = !cleanupOk;
     els.stop.disabled = true;
     if (els.quickPreset) els.quickPreset.disabled = false;
     if (els.resetPreset) els.resetPreset.disabled = false;

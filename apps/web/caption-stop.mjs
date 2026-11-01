@@ -19,3 +19,26 @@ export async function stopCaptionProviderSafely(provider, onError = () => {}) {
     return false;
   }
 }
+
+/**
+ * Both failed startup and unexpected transport interruption must release
+ * provider and diagnostic resources independently. A cleanup rejection means
+ * the browser's microphone state is uncertain: caller must block Start until
+ * reload. This function does not grant any hearing-output permission.
+ */
+export async function disposeCaptionResourcesSafely(provider, releaseDiagnostic, onError = () => {}) {
+  let clean = true;
+  try {
+    await provider?.dispose?.();
+  } catch (error) {
+    clean = false;
+    onError("provider", error);
+  }
+  try {
+    await releaseDiagnostic();
+  } catch (error) {
+    clean = false;
+    onError("diagnostic", error);
+  }
+  return clean;
+}
