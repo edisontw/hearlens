@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261102-cleanup-guard1" />
+    <link rel="stylesheet" href="./styles.css?v=20261102-caption-latest1" />
   </head>
   <body>
     <main class="shell">
@@ -36,6 +36,7 @@
         <div id="caption" class="caption" tabindex="0"
           role="log" aria-label="即時字幕，內容過長時可在框內捲動"
           aria-live="polite" aria-atomic="true" aria-relevant="text">字幕會顯示在這裡。</div>
+        <button id="caption-jump-latest" class="secondary caption-jump-latest" type="button" hidden>回到最新字幕</button>
 
         <div class="actions">
           <button id="start" class="primary" type="button" aria-describedby="stt-privacy-notice">開始聆聽</button>
@@ -279,6 +280,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261102-cleanup-guard1"></script>
+    <script type="module" src="./main.js?v=20261102-caption-latest1"></script>
   </body>
 </html>
