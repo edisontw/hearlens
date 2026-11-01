@@ -53,7 +53,7 @@ or transcription upload is requested by this software change.
 
 ## Conditional lane B — Detectable AIR31 output (one short session)
 
-Only after Priority 1 passes and the trial's measurability is reviewed:
+Only after the D6.2 software-readiness review passes and the trial's measurability is established:
 
 1. Output-only known six-chirp source, no Moto microphone or iPhone source; AIR31 off ears.
 2. Use fixed near-mic geometry and existing output limits. Check live recording visibility first.
