@@ -118,8 +118,12 @@ try {
 
   // Open the ordinary 30-second recall and switch to memory-only session review.
   // Empty-session state is tested without triggering the microphone.
+  assert.equal(await page.locator("#recall").getAttribute("aria-expanded"), "false");
   await page.locator("#recall").click();
   assert(await page.locator("#recall-panel").isVisible());
+  assert.equal(await page.locator("#recall").getAttribute("aria-expanded"), "true");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "close-recall",
+    "opening review moves keyboard focus into the visible panel");
   assert.equal(await page.locator("#recall-recent").getAttribute("aria-pressed"), "true");
   assert.equal(await page.locator("#recall-complete").getAttribute("aria-pressed"), "false");
   await page.locator("#recall-complete").click();
@@ -135,6 +139,9 @@ try {
   assert.equal(await page.locator("#recall-list").getAttribute("aria-live"), "polite");
   await page.locator("#close-recall").click();
   assert.equal(await page.locator("#recall-panel").isVisible(), false);
+  assert.equal(await page.locator("#recall").getAttribute("aria-expanded"), "false");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "recall",
+    "closing review restores focus to its visible trigger");
 
   // Verify query-configured alternatives before any microphone action.
   for (const { mode, expected, excluded } of [
