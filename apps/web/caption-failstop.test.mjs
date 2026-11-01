@@ -15,7 +15,7 @@ test("fatal transport callback permits retry only when all cleanup succeeds", ()
   assert.match(main, /code === "gemini-closed"/);
   assert.match(main, /code === "gemini-socket-error"/);
   assert.match(main, /activeSessionId = 0; \/\/ immediately reject delayed partial/);
-  assert.match(main, /const cleanupOk = await disposeCaptionResourcesSafely\(/);
+  assert.match(main, /const cleanupOk = \(await disposeCaptionResourcesSafely\(/);
   assert.match(main, /\(\) => releaseDiagnosticCapture\("未使用"\)/);
   assert.match(main, /"字幕已暫停，請重新開始"/);
   assert.match(main, /"麥克風已中斷，請重新開始"/);
