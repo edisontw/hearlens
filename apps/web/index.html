@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261102-stop-cleanup1" />
+    <link rel="stylesheet" href="./styles.css?v=20261102-recall-focus1" />
   </head>
   <body>
     <main class="shell">
@@ -45,7 +45,8 @@
         <p id="screen-awake-status" class="wake-lock-hint" aria-live="polite">開始聆聽時會嘗試保持螢幕開啟（可能增加耗電）。</p>
 
         <div class="actions secondary-actions">
-          <button id="recall" class="secondary" type="button">剛剛說什麼？</button>
+          <button id="recall" class="secondary" type="button"
+            aria-controls="recall-panel" aria-expanded="false">剛剛說什麼？</button>
           <div class="caption-size-control" role="group" aria-label="字幕大小">
             <span>字幕大小</span>
             <button class="size-option selected" type="button" data-caption-size="normal" aria-pressed="true">一般</button>
@@ -70,7 +71,7 @@
         </p>
       </section>
 
-      <section id="recall-panel" class="panel recall-panel" hidden>
+      <section id="recall-panel" class="panel recall-panel" aria-label="字幕回顧" hidden>
         <div class="status-row">
           <div>
             <h2>剛剛說什麼？</h2>
@@ -278,6 +279,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261102-stop-cleanup1"></script>
+    <script type="module" src="./main.js?v=20261102-recall-focus1"></script>
   </body>
 </html>
