@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely } from "./caption-stop.mjs?v=20261102-stop-cleanup1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-stop-cleanup1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-stop-cleanup1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-stop-cleanup1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-stop-cleanup1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-stop-cleanup1";
+import { stopCaptionProviderSafely } from "./caption-stop.mjs?v=20261102-recall-focus1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-recall-focus1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-recall-focus1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-recall-focus1";
+import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-recall-focus1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-recall-focus1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-stop-cleanup1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-recall-focus1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-stop-cleanup1";
+} from "./transcript-window.mjs?v=20261102-recall-focus1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-stop-cleanup1";
+const BUILD_ID = "20261102-recall-focus1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -673,9 +673,12 @@ function showRecall() {
   reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
   lastFullReviewSignature = "";
   els.recallPanel.hidden = false;
+  els.recall.setAttribute("aria-expanded", "true");
   renderRecall();
   syncCaptionRefreshTimer();
   els.recallPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  // Announce the newly opened review to keyboard and screen-reader users.
+  els.closeRecall.focus({ preventScroll: true });
 }
 
 function chooseRecallView(mode) {
@@ -1306,6 +1309,9 @@ els.recallComplete?.addEventListener("click", () => chooseRecallView("session"))
 els.recallLoadEarlier?.addEventListener("click", loadEarlierSessionCaptions);
 els.closeRecall.addEventListener("click", () => {
   els.recallPanel.hidden = true;
+  els.recall.setAttribute("aria-expanded", "false");
+  // Never leave keyboard focus on a button inside a hidden panel.
+  els.recall.focus();
   syncCaptionRefreshTimer();
   if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
 });
