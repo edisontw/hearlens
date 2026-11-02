@@ -116,6 +116,30 @@ async function withFakeWebSocket(run) {
   }
 }
 
+test("stop after an already-closed Gemini socket retires queued captions", async () => {
+  await withFakeWebSocket(async ({ provider, socket, errors }) => {
+    const finals = [], states = [];
+    provider.onFinal = event => finals.push(event.text);
+    provider.onStatus = event => states.push(event.state);
+    provider.listeningReady = true;
+
+    // The transport can close while stop() is releasing microphone resources.
+    socket.readyState = FakeTransportSocket.CLOSED;
+    await provider.stop();
+    assert.equal(provider.socket, null, "closed socket must be retired");
+    assert.equal(provider.stopping, false);
+    assert.deepEqual(states, ["stopped"]);
+
+    // A queued callback from that socket must not change stopped captions.
+    socket.emit("message", { data: JSON.stringify({
+      serverContent: { inputTranscription: { text: "late after stop" } },
+    }) });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, []);
+    assert.deepEqual(errors, [], "normal stop must not report a fatal error");
+  });
+});
+
 test("mid-session Gemini close immediately stops capture and reports one fatal error", async () => {
   await withFakeWebSocket(async ({ provider, socket, errors }) => {
     let tracksStopped = 0;
