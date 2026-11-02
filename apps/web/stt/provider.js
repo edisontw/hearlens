@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261102-gemini-token-timeout1";
+} from "./providers/browser-speech.js?v=20261102-gemini-dispose-stale1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261102-gemini-token-timeout1";
+  "./providers/gemini-live-transcribe.js?v=20261102-gemini-dispose-stale1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261102-gemini-token-timeout1";
+  "./providers/google-cloud-streaming.js?v=20261102-gemini-dispose-stale1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
