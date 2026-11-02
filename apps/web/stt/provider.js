@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261102-browser-permission-failstop1";
+} from "./providers/browser-speech.js?v=20261102-gemini-stale-frame1";
 import { GeminiLiveTranscribeProvider } from
   "./providers/gemini-live-transcribe.js?v=20261102-gemini-stale-frame1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261102-browser-permission-failstop1";
+  "./providers/google-cloud-streaming.js?v=20261102-gemini-stale-frame1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
