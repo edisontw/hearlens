@@ -96,6 +96,45 @@ try {
   assert.equal(await page.locator("#status").innerText(), "已取消啟動");
   assert.deepEqual(errors, [], "cancellation must not cause page exceptions");
   console.log("PASS: permission cancellation, late track stop and retry isolation");
+  
+  // An explicitly selected but unavailable optional STT backend must fail
+  // before requesting microphone permission, not show a fake listening state.
+  const unsupportedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    await unsupportedContext.addInitScript(() => {
+      window.__unexpectedMicRequests = 0;
+      Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: undefined });
+      Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: undefined });
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: () => {
+          window.__unexpectedMicRequests += 1;
+          return Promise.reject(new Error("unsupported backend must not open mic"));
+        },
+      });
+    });
+    const unsupportedPage = await unsupportedContext.newPage();
+    const unsupportedErrors = [];
+    unsupportedPage.on("pageerror", error => unsupportedErrors.push(error.message));
+    await unsupportedPage.route("**/*", route =>
+      route.request().url().startsWith(origin + "/")
+        ? route.continue()
+        : route.abort());
+    await unsupportedPage.goto(origin + "/index.html?stt=browser", { waitUntil: "networkidle" });
+    await unsupportedPage.locator("#start").click();
+    await unsupportedPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "無法啟動");
+    assert.match(await unsupportedPage.locator("#caption").innerText(),
+      /不支援 Browser 語音辨識/);
+    assert.equal(await unsupportedPage.evaluate(() => window.__unexpectedMicRequests), 0,
+      "unsupported browser STT must not request microphone permission");
+    assert.equal(await unsupportedPage.locator("#start").isEnabled(), true);
+    assert.equal(await unsupportedPage.locator("#stop").isDisabled(), true);
+    assert.deepEqual(unsupportedErrors, []);
+    console.log("PASS: unsupported browser STT fails before mic permission without false listening");
+  } finally {
+    await unsupportedContext.close();
+  }
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
