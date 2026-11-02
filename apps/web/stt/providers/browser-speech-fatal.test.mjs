@@ -65,3 +65,26 @@ test("transient no-speech still retries, but stop ignores late aborted error", a
     assert.equal(f.timers.size, 0);
   } finally { f.restore(); }
 });
+
+test("synchronous recognition start failure is terminal, not an endless retry loop", async () => {
+  const f = fakeSpeech();
+  try {
+    let attempts = 0;
+    globalThis.window.SpeechRecognition = class {
+      start() { attempts += 1; throw new Error("synthetic start rejection"); }
+      abort() { this.onend?.(); }
+    };
+    const errors = [];
+    const provider = new BrowserSpeechProvider({ onError: event => errors.push(event) });
+    await provider.start();
+    assert.equal(attempts, 1);
+    assert.equal(provider.active, false, "failed recognizer must not remain active");
+    assert.equal(f.timers.size, 0, "no repeating 800-ms restart timer");
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].code, "start-failed");
+    assert.equal(errors[0].fatal, true);
+    assert.match(errors[0].message, /瀏覽器語音辨識無法啟動/);
+    await provider.dispose();
+    assert.equal(f.timers.size, 0);
+  } finally { f.restore(); }
+});

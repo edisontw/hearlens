@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261103-caption-restart-history1";
+} from "./providers/browser-speech.js?v=20261103-browser-start-failclosed1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261103-caption-restart-history1";
+  "./providers/gemini-live-transcribe.js?v=20261103-browser-start-failclosed1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261103-caption-restart-history1";
+  "./providers/google-cloud-streaming.js?v=20261103-browser-start-failclosed1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
