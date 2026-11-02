@@ -150,3 +150,109 @@ test("dispose while fetching Gemini token prevents delayed WebSocket/capture sta
   assert.equal(socketStarts, 0);
   assert.equal(provider.active, false);
 });
+
+test("stalled Gemini token request aborts after timeout and allows a clean manual retry", async () => {
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const timers = new Map();
+  let nextId = 1;
+  let requestSignal;
+  globalThis.window = {
+    location: { href: "https://edisontw.github.io/hearlens/" },
+    setTimeout(fn) { const id = nextId++; timers.set(id, fn); return id; },
+    clearTimeout(id) { timers.delete(id); },
+  };
+  globalThis.fetch = (_url, options) => {
+    requestSignal = options.signal;
+    return new Promise((_resolve, reject) => {
+      requestSignal.addEventListener("abort", () => {
+        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      }, { once: true });
+    });
+  };
+  try {
+    const provider = new GeminiLiveTranscribeProvider({
+      tokenUrl: "https://example.test/token",
+    });
+    const starting = provider.start();
+    assert.equal(timers.size, 1, "token request has one bounded timeout");
+    assert.equal(requestSignal.aborted, false);
+    [...timers.values()][0]();
+    await assert.rejects(starting, /token request timed out/i);
+    assert.equal(requestSignal.aborted, true);
+    assert.equal(provider.active, false);
+    assert.equal(provider.socket, null);
+    assert.equal(provider.stream, null);
+    assert.equal(provider.tokenAbortController, null);
+    assert.equal(timers.size, 0, "timeout is cleared after failure");
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("disposing during Gemini token fetch aborts pending network request without opening capture", async () => {
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const timers = new Map();
+  let nextId = 1;
+  let requestSignal;
+  globalThis.window = {
+    location: { href: "https://edisontw.github.io/hearlens/" },
+    setTimeout(fn) { const id = nextId++; timers.set(id, fn); return id; },
+    clearTimeout(id) { timers.delete(id); },
+  };
+  globalThis.fetch = (_url, options) => {
+    requestSignal = options.signal;
+    return new Promise((_resolve, reject) => {
+      requestSignal.addEventListener("abort", () => {
+        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      }, { once: true });
+    });
+  };
+  try {
+    const provider = new GeminiLiveTranscribeProvider({
+      tokenUrl: "https://example.test/token",
+    });
+    const starting = provider.start();
+    await provider.dispose();
+    await assert.rejects(starting, /startup cancelled/i);
+    assert.equal(requestSignal.aborted, true);
+    assert.equal(provider.active, false);
+    assert.equal(provider.socket, null);
+    assert.equal(provider.tokenAbortController, null);
+    assert.equal(timers.size, 0);
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("successful Gemini token response clears the pending timeout", async () => {
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const timers = new Map();
+  let nextId = 1;
+  globalThis.window = {
+    location: { href: "https://edisontw.github.io/hearlens/" },
+    setTimeout(fn) { const id = nextId++; timers.set(id, fn); return id; },
+    clearTimeout(id) { timers.delete(id); },
+  };
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.signal.aborted, false);
+    return new Response(JSON.stringify({ token: "synthetic-ephemeral-token" }), {
+      status: 200, headers: { "content-type": "application/json" },
+    });
+  };
+  try {
+    const provider = new GeminiLiveTranscribeProvider({
+      tokenUrl: "https://example.test/token",
+    });
+    assert.equal(await provider.fetchToken(), "synthetic-ephemeral-token");
+    assert.equal(provider.tokenAbortController, null);
+    assert.equal(timers.size, 0);
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+  }
+});
