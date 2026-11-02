@@ -231,3 +231,40 @@ test("delayed Gemini Blob decode is discarded when its socket is retired", async
     assert.deepEqual(finals, [], "post-decode socket identity must be checked");
   });
 });
+
+test("dispose immediately retires Gemini socket while AudioContext cleanup is pending", async () => {
+  await withFakeWebSocket(async ({ provider, socket }) => {
+    const finals = [], partials = [];
+    provider.onFinal = event => finals.push(event.text);
+    provider.onPartial = event => partials.push(event.text);
+    let finishClose;
+    provider.audioContext = {
+      state: "running",
+      close: () => new Promise(resolve => { finishClose = resolve; }),
+    };
+    let finishDecode;
+    class PendingBlob extends Blob {
+      text() { return new Promise(resolve => { finishDecode = resolve; }); }
+    }
+    socket.emit("message", { data: new PendingBlob(["pending"]) });
+    assert.equal(typeof finishDecode, "function");
+
+    const disposing = provider.dispose();
+    assert.equal(typeof finishClose, "function");
+    assert.equal(provider.socket, null, "dispose must retire transport before awaiting cleanup");
+
+    await provider.handleMessage({ data: JSON.stringify({
+      serverContent: { inputTranscription: { text: "late final" } },
+    }) }, socket);
+    finishDecode(JSON.stringify({
+      serverContent: { interimInputTranscription: { text: "delayed partial" } },
+    }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, [], "late final must be discarded");
+    assert.deepEqual(partials, [], "pending Blob decode must be discarded");
+
+    finishClose();
+    await disposing;
+    assert.equal(socket.readyState, FakeTransportSocket.CLOSED);
+  });
+});

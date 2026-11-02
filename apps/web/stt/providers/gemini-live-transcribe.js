@@ -773,15 +773,18 @@ export class GeminiLiveTranscribeProvider {
     }
     this.listeningReady = false;
     this.stopping = true;
+    // Retire the transport before asynchronous AudioContext.close(). Late
+    // messages (including pending Blob decodes) must not update captions
+    // after pagehide/dispose, unlike the intentional Stop drain.
+    const socket = this.socket;
+    this.socket = null;
     await this.shutdownCapture();
 
     try {
-      this.socket?.close(1000, "dispose");
+      socket?.close(1000, "dispose");
     } catch {
       // Ignore close errors.
     }
-
-    this.socket = null;
     this.clearSetupWaiters();
     this.clearStopDrainTimer();
     if (this.stopResolver) {
