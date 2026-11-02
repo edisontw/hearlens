@@ -4,6 +4,7 @@ This page is the current work order. [Historical roadmap](./ROADMAP_HISTORY_2026
 preserves earlier completion details and superseded instructions; its unchecked boxes are **not** new work orders.
 [Evidence review and decision gates](./M04D62_DIAGNOSTICS_AND_PROGRESS_RESET_2026-10-22.md).
 [Hourly delivery policy](./CONTINUOUS_DELIVERY_PLAN_2026-11-02.md).
+[First 12-round delivery review](./DELIVERY_REVIEW_ROUND12_2026-11-02.md) (merged outcomes, avoidable work and next evidence-gated slices).
 
 ## Product and equipment commitments
 
@@ -28,9 +29,9 @@ preserves earlier completion details and superseded instructions; its unchecked 
 
 The [hourly continuous-delivery plan](./CONTINUOUS_DELIVERY_PLAN_2026-11-02.md) defines the current priority and evidence gates. **M01 caption-first usability is the primary delivery lane (~60%)**, M04 measurable Bluetooth feasibility is conditional (~25%), and M03 offline research/safety regressions are parallel (~15%). Verified safety, privacy or CI regressions override the percentages.
 
-- **Next M01 slice:** inspect Start/Stop, interruption recovery, focus/large-text and transcript review against existing tests; fix only a demonstrated gap. The formal 24-run recognition matrix remains deferred.
-- **Next M04 slice:** review existing D6.2 evidence and off-ear output measurability before requesting any new recording. If physical evidence is required, permit only the single bounded output-only check described below; do not let this block M01.
-- **Next M03 slice:** targeted offline left/right, CAMFIT/WDRC or limiter regressions; no uncalibrated live playback.
+- **Next M01 slice:** audit primary Gemini 3.5 Transcribe Live/MN4 token startup, expiry, network interruption and actionable manual recovery. #96–#103/#105 already cover several Stop, review and optional-provider failures; fix only a new reproducible gap. The formal 24-run recognition matrix remains deferred.
+- **Next M03 slice:** investigate one concrete offline left/right, CAMFIT/WDRC or final digital-limiter numerical/fail-closed defect; add deterministic regression only if the current suite misses it. No uncalibrated live playback.
+- **Next M04 slice (conditional):** #104 provides an offline six-chirp presence screen, **not** measured AIR31 output. Review existing D6.2 evidence and any available original WAV first. Without earbud-specific acoustic evidence, park the physical gate and continue M01/M03; no recurring recording request.
 - **Hourly workflow:** fresh `main` SHA and CI/Pages review → one testable change → branch/PR → verified CI → safe merge → verify `main`; every 12 rounds reassess delivered value. No artificial docs-only commits or repeated SW1–SW4 tests.
 
 ## Primary lane A — M01 everyday caption acceptance
