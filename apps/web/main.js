@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-caption-focusfollow1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-caption-focusfollow1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-caption-focusfollow1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-caption-focusfollow1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-caption-focusfollow1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-caption-focusfollow1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-google-proxy-failstop1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-google-proxy-failstop1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-google-proxy-failstop1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-google-proxy-failstop1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-google-proxy-failstop1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-google-proxy-failstop1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-caption-focusfollow1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-google-proxy-failstop1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-caption-focusfollow1";
+} from "./transcript-window.mjs?v=20261102-google-proxy-failstop1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-caption-focusfollow1";
+const BUILD_ID = "20261102-google-proxy-failstop1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -1160,9 +1160,10 @@ async function startSession() {
       if (sessionId !== activeSessionId) return;
       els.diagStt.textContent = message;
       appendSttLog("S" + sessionId + " provider-error " + (code || message));
-      if (fatal === true && (code === "gemini-closed" ||
-          code === "gemini-socket-error" || code === "mic-ended" ||
-          code === "mic-muted")) {
+      // Fatal means the selected STT provider can no longer transcribe.
+      // Do not leave Google proxy failures (or future providers) displaying
+      // "正在聆聽" while their transport has already closed.
+      if (fatal === true) {
         void failClosedCaptionSession(sessionId, message, code);
       }
     },
