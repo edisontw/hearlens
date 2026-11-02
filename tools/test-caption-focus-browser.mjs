@@ -84,6 +84,28 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement?.id), "caption",
     "return-to-latest restores keyboard focus to the scrollable caption after hiding itself");
 
+  // Focus mode changes caption viewport height. Leaving focus must not strand
+  // someone who was following the newest line above the new scroll bottom.
+  await page.locator("#caption-focus-toggle").click();
+  assert(await page.locator("#caption").evaluate(el =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= 2),
+    "entering focus keeps the newest caption visible");
+  await page.locator("#caption-focus-toggle").click();
+  assert(await page.locator("#caption").evaluate(el =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= 2),
+    "leaving focus keeps the newest caption visible");
+  await page.locator("#caption").evaluate(el => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll"));
+  });
+  await page.locator("#caption-focus-toggle").click();
+  await page.locator("#caption-focus-toggle").click();
+  assert.equal(await page.locator("#caption").evaluate(el => el.scrollTop), 0,
+    "focus toggle does not jump a reader deliberately reviewing older captions");
+  assert(await page.locator("#caption-jump-latest").isVisible(),
+    "manual reread keeps return-to-latest available across focus toggles");
+  await page.locator("#caption-jump-latest").click();
+
   // A reader at the latest line must stay there when the font grows.
   // A reader deliberately at the top must not be dragged to new speech.
   await page.locator('[data-caption-size="xlarge"]').click();
@@ -136,8 +158,16 @@ try {
 
   await page.setViewportSize({ width: 844, height: 390 });
   const landscapeRegular = await page.locator("#caption").evaluate(el => el.getBoundingClientRect().height);
+  await page.locator("#caption").evaluate(el => {
+    el.textContent = Array.from({ length: 100 }, (_, i) => "橫向字幕第" + i + "行").join("\n");
+    el.scrollTop = el.scrollHeight;
+    el.dispatchEvent(new Event("scroll"));
+  });
   await page.locator("#caption-focus-toggle").click();
   const landscapeFocus = await page.locator("#caption").evaluate(el => el.getBoundingClientRect().height);
+  assert(await page.locator("#caption").evaluate(el =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= 2),
+    "landscape focus keeps the newest long-caption line visible");
   assert(landscapeFocus > landscapeRegular,
     "focus mode must enlarge the landscape caption viewport");
   assert(await page.locator("#start").isVisible());
@@ -147,6 +177,10 @@ try {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   assert(landscapeOverflow <= 2, "landscape focus must not cause horizontal overflow");
+  await page.locator("#caption-focus-toggle").click();
+  assert(await page.locator("#caption").evaluate(el =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= 2),
+    "leaving landscape focus preserves latest-caption following");
 
   // Deliberately do not request mic permission. Clear the currently visible
   // synthetic caption and verify the display action responds in the browser.
