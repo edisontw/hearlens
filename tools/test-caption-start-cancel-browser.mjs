@@ -132,6 +132,23 @@ try {
     assert.equal(await unsupportedPage.locator("#stop").isDisabled(), true);
     assert.deepEqual(unsupportedErrors, []);
     console.log("PASS: unsupported browser STT fails before mic permission without false listening");
+
+    // AUTO must disclose the effective backend, and unsupported AUTO/unknown
+    // choices must never ask for microphone permission.
+    await unsupportedPage.goto(origin + "/index.html?stt=auto", { waitUntil: "networkidle" });
+    assert.match(await unsupportedPage.locator("#stt-privacy-notice").innerText(), /Google Gemini/);
+    await unsupportedPage.goto(origin + "/index.html?stt=auto&token=%20", { waitUntil: "networkidle" });
+    assert.match(await unsupportedPage.locator("#stt-privacy-notice").innerText(), /瀏覽器/);
+    await unsupportedPage.locator("#start").click();
+    await unsupportedPage.waitForFunction(() => document.querySelector("#status")?.textContent === "無法啟動");
+    assert.equal(await unsupportedPage.evaluate(() => window.__unexpectedMicRequests), 0);
+    await unsupportedPage.goto(origin + "/index.html?stt=not-a-provider", { waitUntil: "networkidle" });
+    await unsupportedPage.locator("#start").click();
+    await unsupportedPage.waitForFunction(() => document.querySelector("#status")?.textContent === "無法啟動");
+    assert.match(await unsupportedPage.locator("#caption").innerText(), /不支援的語音辨識選項/);
+    assert.equal(await unsupportedPage.evaluate(() => window.__unexpectedMicRequests), 0);
+    assert.deepEqual(unsupportedErrors, []);
+    console.log("PASS: AUTO disclosure and unknown provider fail before mic permission");
   } finally {
     await unsupportedContext.close();
   }
