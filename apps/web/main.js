@@ -8,7 +8,7 @@ import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-browser-permission-failstop1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-gemini-stale-frame1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
