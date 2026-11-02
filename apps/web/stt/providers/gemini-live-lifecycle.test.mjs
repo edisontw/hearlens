@@ -317,3 +317,31 @@ test("dispose during CONNECTING rejects promptly and closes a late-opened socket
     globalThis.WebSocket = previousWebSocket;
   }
 });
+
+test("rejected Gemini Blob frame decode fails closed and preserves manual recovery", async () => {
+  const track = fakeTrack();
+  await withCapture(track, async ({ provider, errors }) => {
+    let closes = 0;
+    const socket = { close() { closes += 1; } };
+    provider.socket = socket;
+    const frame = new Blob(['{"serverContent":{}}']);
+    Object.defineProperty(frame, "text", {
+      value: async () => { throw new Error("synthetic Blob read failure"); },
+    });
+
+    await provider.handleMessage({ data: frame }, socket);
+    assert.equal(provider.active, false, "decode failure must end false listening");
+    assert.equal(provider.listeningReady, false);
+    assert.equal(provider.stream, null, "mic stream must be released");
+    assert.equal(track.stops, 1);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].fatal, true);
+    assert.equal(errors[0].code, "gemini-frame-decode");
+    assert.match(errors[0].message, /重新開始/);
+
+    await provider.handleMessage({ data: frame }, socket);
+    assert.equal(errors.length, 1, "repeated failed frames must not duplicate fatal errors");
+    await provider.dispose();
+    assert.equal(closes, 1, "dispose closes the retired socket");
+  });
+});

@@ -349,7 +349,21 @@ export class GeminiLiveTranscribeProvider {
   async handleMessage(event, socket = this.socket) {
     // Events from a retired WebSocket must not enter a later caption session.
     if (socket !== this.socket) return;
-    const text = await decodeWebSocketData(event.data);
+    let text;
+    try {
+      text = await decodeWebSocketData(event.data);
+    } catch {
+      // A failed asynchronous Blob read must not leave the UI claiming to
+      // listen while incoming captions can no longer be decoded.
+      if (socket === this.socket) {
+        this.handleFatalCaptureState(
+          "gemini-frame-decode",
+          "Gemini 字幕資料讀取失敗，請重新開始字幕。",
+          "frame-decode-failed",
+        );
+      }
+      return;
+    }
     // Blob decoding may finish after stop/dispose or a manual restart.
     if (socket !== this.socket) return;
     // Decoding may finish after the connection has already faulted.
