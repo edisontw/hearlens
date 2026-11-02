@@ -9,6 +9,7 @@ const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
 const TARGET_CHUNK_SAMPLES = 1_600;
 const OPEN_TIMEOUT_MS = 8_000;
+const TOKEN_TIMEOUT_MS = 8_000;
 const SETUP_TIMEOUT_MS = 8_000;
 const STOP_TIMEOUT_MS = 5_000;
 const STOP_DRAIN_GRACE_MS = 1_000;
@@ -113,6 +114,7 @@ export class GeminiLiveTranscribeProvider {
     this.fatalTransportHandled = false;
     this.listeningReady = false;
     this.startEpoch = 0;
+    this.tokenAbortController = null;
     this.captureTrack = null;
     this.captureTrackHandlers = null;
     this.captureMuteTimer = null;
@@ -189,29 +191,55 @@ export class GeminiLiveTranscribeProvider {
     const url = normalizeTokenUrl(this.tokenUrl);
     this.debug("token-request", new URL(url).origin);
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      cache: "no-store",
-    });
+    // A stalled broker must not leave the foreground UI in "啟動中…".
+    // The same controller also cancels this request on pagehide/dispose.
+    const controller = new AbortController();
+    this.tokenAbortController = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, TOKEN_TIMEOUT_MS);
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      throw new Error(
-        "Gemini token request failed (" +
-          response.status +
-          ")" +
-          (detail ? ": " + detail.slice(0, 160) : ""),
-      );
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(
+          "Gemini token request failed (" +
+            response.status +
+            ")" +
+            (detail ? ": " + detail.slice(0, 160) : ""),
+        );
+      }
+
+      const payload = await response.json();
+      if (!payload.token || typeof payload.token !== "string") {
+        throw new Error("Gemini token response did not include a token.");
+      }
+
+      this.debug("token-ready");
+      return payload.token;
+    } catch (error) {
+      if (timedOut) {
+        throw new Error("取得 Gemini 字幕連線憑證逾時，請檢查網路後重新開始。");
+      }
+      if (controller.signal.aborted) {
+        throw new Error("Caption startup cancelled.");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+      if (this.tokenAbortController === controller) {
+        this.tokenAbortController = null;
+      }
     }
-
-    const payload = await response.json();
-    if (!payload.token || typeof payload.token !== "string") {
-      throw new Error("Gemini token response did not include a token.");
-    }
-
-    this.debug("token-ready");
-    return payload.token;
   }
 
   async openSocket(token) {
@@ -676,6 +704,7 @@ export class GeminiLiveTranscribeProvider {
   async stop() {
     this.debug("provider-stop");
     this.startEpoch += 1;
+    this.tokenAbortController?.abort();
     this.active = false;
     this.listeningReady = false;
     this.stopping = true;
@@ -736,6 +765,7 @@ export class GeminiLiveTranscribeProvider {
   async dispose() {
     this.debug("provider-dispose");
     this.startEpoch += 1;
+    this.tokenAbortController?.abort();
     this.active = false;
     if (this.setupRejecter) {
       this.setupRejecter(new Error("Caption startup cancelled."));
