@@ -214,6 +214,15 @@ try {
     await historyPage.locator("#recall-complete").click();
     assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
     assert.equal(await historyPage.locator("#copy-complete-transcript").isEnabled(), true);
+    assert.equal(await historyPage.locator("#download-complete-transcript").isEnabled(), true);
+    const downloadEvent = historyPage.waitForEvent("download");
+    await historyPage.locator("#download-complete-transcript").click();
+    const transcriptDownload = await downloadEvent;
+    assert.match(transcriptDownload.suggestedFilename(), /^hearlens-transcript-\d{4}-\d{2}-\d{2}\.txt$/);
+    const savedText = await readFile(await transcriptDownload.path(), "utf8");
+    assert.equal(savedText.replace(/^\uFEFF/, ""), "上一段完整字幕",
+      "explicit download must contain finalized text only");
+    assert.match(await historyPage.locator("#recall-copy-status").innerText(), /已要求下載完整字幕/);
 
     // Changing capture presets or applying tuning reloads the page. Dismissing
     // the loss warning must retain the memory-only transcript and restore the
@@ -262,6 +271,7 @@ try {
     assert.doesNotMatch(await historyPage.locator("#caption").innerText(), /上一段完整字幕/);
     assert.doesNotMatch(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
     assert.equal(await historyPage.locator("#copy-complete-transcript").isDisabled(), true);
+    assert.equal(await historyPage.locator("#download-complete-transcript").isDisabled(), true);
     await historyPage.locator("#stop").click();
     await historyPage.waitForFunction(() =>
       document.querySelector("#status")?.textContent === "已停止");

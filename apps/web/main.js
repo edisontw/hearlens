@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-settings-transcript-guard1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-settings-transcript-guard1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-settings-transcript-guard1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-settings-transcript-guard1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-settings-transcript-guard1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-settings-transcript-guard1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-transcript-download1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-transcript-download1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-transcript-download1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-transcript-download1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-transcript-download1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-transcript-download1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-settings-transcript-guard1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-transcript-download1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-settings-transcript-guard1";
+} from "./transcript-window.mjs?v=20261103-transcript-download1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-settings-transcript-guard1";
+const BUILD_ID = "20261103-transcript-download1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -108,6 +108,7 @@ const els = {
   closeRecall: document.querySelector("#close-recall"),
   copyRecentTranscript: document.querySelector("#copy-recent-transcript"),
   copyCompleteTranscript: document.querySelector("#copy-complete-transcript"),
+  downloadCompleteTranscript: document.querySelector("#download-complete-transcript"),
   recallList: document.querySelector("#recall-list"),
   recallMeta: document.querySelector("#recall-meta"),
   recallCopyStatus: document.querySelector("#recall-copy-status"),
@@ -324,7 +325,7 @@ function setAdvancedTuningDisabled(disabled) {
 // make the loss explicit before discarding finalized captions on reload.
 function confirmSettingsReload() {
   if (sessionFinals.length === 0) return true;
-  if (window.confirm("更改收音設定會重新載入頁面並清除本次尚未儲存的字幕。請先使用「複製完整字幕」保留內容。確定繼續？")) {
+  if (window.confirm("更改收音設定會重新載入頁面並清除本次尚未儲存的字幕。請先使用「複製完整字幕」或「下載本次完整字幕」保留內容。確定繼續？")) {
     return true;
   }
   // A cancelled <select> change must reflect the still-active preset.
@@ -760,9 +761,9 @@ function loadEarlierSessionCaptions() {
 }
 
 function syncCompleteTranscriptCopyButton() {
-  if (els.copyCompleteTranscript) {
-    els.copyCompleteTranscript.disabled = sessionFinals.length === 0;
-  }
+  const empty = sessionFinals.length === 0;
+  if (els.copyCompleteTranscript) els.copyCompleteTranscript.disabled = empty;
+  if (els.downloadCompleteTranscript) els.downloadCompleteTranscript.disabled = empty;
 }
 
 async function copyCompleteTranscript() {
@@ -783,6 +784,37 @@ async function copyCompleteTranscript() {
     if (els.recallCopyStatus) {
       els.recallCopyStatus.textContent = "瀏覽器禁止自動複製，尚未儲存字幕";
     }
+  }
+}
+
+// Explicit local text export for browsers that deny clipboard access.
+// Never save or transmit captions without a user-initiated click.
+function downloadCompleteTranscript() {
+  const text = completeSessionTranscriptText(sessionFinals);
+  if (!text) {
+    if (els.recallCopyStatus) els.recallCopyStatus.textContent = "本次尚無已確認的字幕";
+    return;
+  }
+  let objectUrl = null;
+  let link = null;
+  try {
+    const blob = new Blob(["\uFEFF", text], { type: "text/plain;charset=utf-8" });
+    objectUrl = URL.createObjectURL(blob);
+    link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = "hearlens-transcript-" + new Date().toISOString().slice(0, 10) + ".txt";
+    document.body.append(link);
+    link.click();
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "已要求下載完整字幕；請確認瀏覽器下載結果並妥善保管文字檔。";
+    }
+  } catch {
+    if (els.recallCopyStatus) {
+      els.recallCopyStatus.textContent = "瀏覽器無法下載字幕；可改用複製完整字幕。";
+    }
+  } finally {
+    link?.remove();
+    if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 }
 
@@ -1506,6 +1538,7 @@ els.copyRecentTranscript?.addEventListener("click", () => {
 els.copyCompleteTranscript?.addEventListener("click", () => {
   void copyCompleteTranscript();
 });
+els.downloadCompleteTranscript?.addEventListener("click", downloadCompleteTranscript);
 syncCompleteTranscriptCopyButton();
 for (const button of els.captionSizeButtons) {
   button.addEventListener("click", () => {
