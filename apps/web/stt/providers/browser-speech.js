@@ -193,21 +193,16 @@ export class BrowserSpeechProvider {
         "start-throw",
         error instanceof Error ? error.message : "unknown",
       );
+      // A synchronous start() rejection is not a running recognition
+      // segment. Retrying every 800 ms can loop indefinitely while the UI
+      // incorrectly claims to be listening. Release via fatal UI cleanup.
+      this.active = false;
       this.onError({
         providerId: this.id,
         code: "start-failed",
-        message:
-          error instanceof Error
-            ? error.message
-            : "SpeechRecognition start failed.",
+        message: "瀏覽器語音辨識無法啟動，請改用預設 Gemini 字幕或重新整理後重試。",
+        fatal: true,
       });
-
-      if (this.active) {
-        this.restartTimer = window.setTimeout(() => {
-          this.restartTimer = null;
-          this.startSegment();
-        }, 800);
-      }
     }
   }
 
