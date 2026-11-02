@@ -256,3 +256,64 @@ test("successful Gemini token response clears the pending timeout", async () => 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("dispose during CONNECTING rejects promptly and closes a late-opened socket", async () => {
+  const previousWindow = globalThis.window;
+  const previousWebSocket = globalThis.WebSocket;
+  const timers = new Map();
+  let nextId = 1;
+  let socket;
+  class ConnectingSocket {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSED = 3;
+    constructor() {
+      socket = this;
+      this.readyState = ConnectingSocket.CONNECTING;
+      this.handlers = new Map();
+      this.closeAttempts = 0;
+    }
+    addEventListener(event, callback) {
+      const callbacks = this.handlers.get(event) || [];
+      callbacks.push(callback);
+      this.handlers.set(event, callbacks);
+    }
+    emit(event) {
+      for (const callback of this.handlers.get(event) || []) callback({});
+    }
+    close() {
+      this.closeAttempts += 1;
+      if (this.readyState === ConnectingSocket.CONNECTING) {
+        throw new Error("cannot close while connecting");
+      }
+      this.readyState = ConnectingSocket.CLOSED;
+    }
+  }
+  globalThis.window = {
+    setTimeout(fn) { const id = nextId++; timers.set(id, fn); return id; },
+    clearTimeout(id) { timers.delete(id); },
+  };
+  globalThis.WebSocket = ConnectingSocket;
+  try {
+    const provider = new GeminiLiveTranscribeProvider();
+    provider.fetchToken = async () => "synthetic-token";
+    const starting = provider.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.ok(socket, "WebSocket is connecting");
+    assert.equal(timers.size, 1);
+    await provider.dispose();
+    await assert.rejects(starting, /cancelled/i);
+    assert.equal(timers.size, 0, "cancel clears the connection timeout");
+    assert.equal(provider.socket, null);
+    socket.readyState = ConnectingSocket.OPEN;
+    socket.emit("open");
+    assert.equal(socket.readyState, ConnectingSocket.CLOSED,
+      "late open is closed even if close(CONNECTING) failed");
+    assert.equal(provider.stream, null);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.WebSocket = previousWebSocket;
+  }
+});
