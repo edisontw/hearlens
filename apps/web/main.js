@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-gemini-open-cancel1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-gemini-open-cancel1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-gemini-open-cancel1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-gemini-open-cancel1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-gemini-open-cancel1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-gemini-open-cancel1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-browser-unsupported1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-browser-unsupported1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-browser-unsupported1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-browser-unsupported1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-browser-unsupported1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-browser-unsupported1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-gemini-open-cancel1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-browser-unsupported1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-gemini-open-cancel1";
+} from "./transcript-window.mjs?v=20261102-browser-unsupported1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-gemini-open-cancel1";
+const BUILD_ID = "20261102-browser-unsupported1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -1050,6 +1050,13 @@ async function startSession() {
     throw new Error("請切回此頁面，再開始字幕。");
   }
 
+  // Unsupported optional browser STT must not request microphone permission
+  // or claim to be listening when no recognition engine can start.
+  if (runtimeSttConfig.provider === "browser-speech" &&
+      !describeSttCapabilities().browserSpeech) {
+    throw new Error("此瀏覽器不支援 Browser 語音辨識；請改用預設 Gemini 字幕或支援的瀏覽器。");
+  }
+
   const sessionId = ++sessionCounter;
   activeSessionId = sessionId;
   captionStopRequested = false;
@@ -1224,9 +1231,9 @@ async function startSession() {
       throw error;
     }
   } else {
-    els.diagStt.textContent =
-      "此瀏覽器沒有免費 Browser STT；麥克風診斷仍可使用";
-    appendSttLog("S" + sessionId + " no-browser-stt");
+    // Recognition availability can change between preflight and provider
+    // creation. Never enter the listening state without a real provider.
+    throw new Error("此瀏覽器不支援 Browser 語音辨識；請改用預設 Gemini 字幕或支援的瀏覽器。");
   }
 
   requireActiveCaptionSession(sessionId);
