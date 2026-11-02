@@ -41,6 +41,7 @@ test("fatal fix refreshes the browser's main, provider, and provider-implementat
   assert.match(main, new RegExp('const BUILD_ID = "' + version + '"'));
   assert(main.includes("./stt/provider.js?v=" + version));
   assert(router.includes("./providers/gemini-live-transcribe.js?v=" + version));
+  assert(router.includes("./providers/google-cloud-streaming.js?v=" + version));
   assert(html.includes("./main.js?v=" + version));
 });
 
