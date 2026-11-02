@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-browser-stale-segment1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-browser-stale-segment1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-browser-stale-segment1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-browser-stale-segment1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-browser-stale-segment1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-browser-stale-segment1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-defer-stale-build1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-defer-stale-build1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-defer-stale-build1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-defer-stale-build1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-defer-stale-build1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-defer-stale-build1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-browser-stale-segment1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-defer-stale-build1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-browser-stale-segment1";
+} from "./transcript-window.mjs?v=20261103-defer-stale-build1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-browser-stale-segment1";
+const BUILD_ID = "20261103-defer-stale-build1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -436,6 +436,17 @@ async function ensureLatestBuild() {
 
     const latest = await response.json();
     if (!latest?.buildId || latest.buildId === BUILD_ID) return;
+
+    // The build check starts on page load, but a slow response may arrive
+    // after the user starts or finishes a caption session. Never discard a
+    // live microphone session or an in-memory transcript for an auto-update.
+    if (sessionCounter > 0 || activeSessionId || captionStartupPending || captionStopRequested) {
+      appendSttLog("stale-build deferred until manual reload latest=" + latest.buildId);
+      if (els.diagBuild) {
+        els.diagBuild.textContent = BUILD_ID + "（有新版；請完成對話後手動重新整理）";
+      }
+      return;
+    }
 
     appendSttLog("stale-build latest=" + latest.buildId);
     setStatus("偵測到新版，重新載入中…");

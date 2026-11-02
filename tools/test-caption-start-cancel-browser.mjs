@@ -301,6 +301,76 @@ try {
   } finally {
     await failedStartContext.close();
   }
+
+  // A delayed build.json response must not reload after caption startup
+  // begins: reload would discard in-memory text and the permission prompt.
+  const buildContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    await buildContext.addInitScript(() => {
+      window.__pendingBuildMic = [];
+      window.__buildMicStops = 0;
+      Object.defineProperty(window, "SpeechRecognition", {
+        configurable: true, value: class FakeSpeechRecognition {},
+      });
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: () => new Promise(resolve => {
+          const track = { kind: "audio", stop() { window.__buildMicStops += 1; } };
+          window.__pendingBuildMic.push(() => resolve({
+            getTracks: () => [track], getAudioTracks: () => [track],
+          }));
+        }),
+      });
+    });
+    const buildPage = await buildContext.newPage();
+    const buildErrors = [];
+    buildPage.on("pageerror", error => buildErrors.push(error.message));
+    let releaseBuild;
+    const heldBuild = new Promise(resolve => { releaseBuild = resolve; });
+    let markIntercepted;
+    const intercepted = new Promise(resolve => { markIntercepted = resolve; });
+    let markFulfilled;
+    const fulfilled = new Promise(resolve => { markFulfilled = resolve; });
+    await buildPage.route("**/*", async route => {
+      const url = route.request().url();
+      if (url.startsWith(origin + "/build.json")) {
+        markIntercepted();
+        await heldBuild;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ buildId: "synthetic-newer-build" }),
+        });
+        markFulfilled();
+        return;
+      }
+      return url.startsWith(origin + "/") ? route.continue() : route.abort();
+    });
+    await buildPage.goto(origin + "/index.html?stt=browser", { waitUntil: "domcontentloaded" });
+    await intercepted;
+    let unexpectedNavigations = 0;
+    buildPage.on("framenavigated", frame => {
+      if (frame === buildPage.mainFrame()) unexpectedNavigations += 1;
+    });
+    await buildPage.locator("#start").click();
+    await buildPage.waitForFunction(() => window.__pendingBuildMic.length === 1);
+    releaseBuild();
+    await fulfilled;
+    await buildPage.waitForFunction(() =>
+      document.querySelector("#diag-build")?.textContent?.includes("有新版"));
+    assert.equal(unexpectedNavigations, 0, "stale build must not reload during caption startup");
+    assert.equal(await buildPage.locator("#status").innerText(), "啟動中…");
+    assert.equal(await buildPage.locator("#stop").innerText(), "取消啟動");
+    await buildPage.locator("#stop").click();
+    await buildPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "已取消啟動");
+    await buildPage.evaluate(() => window.__pendingBuildMic.shift()());
+    await buildPage.waitForFunction(() => window.__buildMicStops === 1);
+    assert.deepEqual(buildErrors, []);
+    console.log("PASS: late build update defers reload and preserves pending caption cancellation");
+  } finally {
+    await buildContext.close();
+  }
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
