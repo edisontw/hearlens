@@ -68,3 +68,5 @@ jobs:
         run: python -m unittest discover -s tools -p 'test_m04_acoustic_wav.py' -v
       - name: M04 mono microphone chirp smoke synthetic controls (NO PLAYBACK)
         run: python -m unittest discover -s tools -p 'test_m04_mono_smoke.py' -v
+      - name: M04-D6.2 off-ear six-chirp presence synthetic controls (NO PLAYBACK)
+        run: python -m unittest discover -s tools -p 'test_m04_d62_offear_presence.py' -v
