@@ -77,6 +77,31 @@ test("overlap, retransmission, reordering and wrong initial timestamp are all fa
   const stream=createOfflineTimedWDRC(config());
   assert.throws(()=>stream.push({startSample:256,samples:tone(256)}),/missing-samples/);
 });
+test("throwing packet metadata fails closed and discards queued synthetic PCM",()=>{
+  const valid={startSample:1024,samples:tone(256)};
+  const badPackets=[
+    Object.defineProperty({...valid},"startSample",{enumerable:true,get(){throw new Error("bad start getter");}}),
+    Object.defineProperty({...valid},"samples",{enumerable:true,get(){throw new Error("bad samples getter");}}),
+    new Proxy({...valid},{ownKeys(){throw new Error("bad ownKeys");}}),
+    new Proxy({...valid},{getOwnPropertyDescriptor(){throw new Error("bad descriptor");}}),
+  ];
+  for(const packet of badPackets){
+    const stream=createOfflineTimedWDRC(config());
+    stream.push({startSample:0,samples:tone(1024)});
+    assert(stream.diagnostics.frames>0);
+    assert.throws(()=>stream.push(packet),/malformed-packet/);
+    assert.equal(stream.diagnostics.faultReason,"malformed-packet");
+    assert.equal(stream.diagnostics.faultCount,1);
+    assert.equal(stream.diagnostics.expectedSample,1024);
+    assert.equal(stream.diagnostics.frames,0,"queued DSP state must be discarded");
+    assert.throws(()=>stream.push({startSample:1024,samples:tone(256)}),/reset required/);
+    stream.reset();
+    const input=tone(1200);
+    assert.deepEqual(concat([stream.push({startSample:0,samples:input}),stream.finish()]),
+      renderOfflineWDRC({...config(),samples:input}).samples);
+  }
+});
+
 test("logical capture-clock detects underrun and regression, not wall-clock scheduling",()=>{
   const stream=createOfflineTimedWDRC(config(),{deadlineSlackSamples:256});
   assert.equal(DEFAULT_DEADLINE_SLACK_SAMPLES,256);
