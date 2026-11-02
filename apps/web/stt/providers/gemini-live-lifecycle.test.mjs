@@ -178,7 +178,7 @@ test("stalled Gemini token request aborts after timeout and allows a clean manua
     assert.equal(timers.size, 1, "token request has one bounded timeout");
     assert.equal(requestSignal.aborted, false);
     [...timers.values()][0]();
-    await assert.rejects(starting, /token request timed out/i);
+    await assert.rejects(starting, /Gemini 字幕連線憑證逾時/);
     assert.equal(requestSignal.aborted, true);
     assert.equal(provider.active, false);
     assert.equal(provider.socket, null);
