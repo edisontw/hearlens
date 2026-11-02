@@ -798,7 +798,7 @@ function downloadCompleteTranscript() {
   let objectUrl = null;
   let link = null;
   try {
-    const blob = new Blob(["\\uFEFF", text], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob(["\uFEFF", text], { type: "text/plain;charset=utf-8" });
     objectUrl = URL.createObjectURL(blob);
     link = document.createElement("a");
     link.href = objectUrl;
