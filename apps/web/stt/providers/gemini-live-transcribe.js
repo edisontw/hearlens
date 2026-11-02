@@ -138,6 +138,13 @@ export class GeminiLiveTranscribeProvider {
     this.active = false;
     this.listeningReady = false;
     this.debug(detail, code);
+    // A socket error after OPEN but before setupComplete may not deliver a
+    // close event promptly. Reject setup now rather than leaving Start
+    // waiting for its 8-second timer (or a missing close callback).
+    if (this.setupRejecter) {
+      this.setupRejecter(new Error("Gemini Live connection failed before setup completed."));
+      this.clearSetupWaiters();
+    }
     void this.shutdownCapture().catch((error) => {
       this.debug("capture-cleanup-failed",
         error instanceof Error ? error.message : "unknown");
