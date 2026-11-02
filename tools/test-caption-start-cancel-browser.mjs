@@ -152,6 +152,105 @@ try {
   } finally {
     await unsupportedContext.close();
   }
+
+  // A failed or cancelled restart must not destroy the last confirmed
+  // conversation. A successful restart still creates a fresh transcript.
+  const historyContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    await historyContext.addInitScript(() => {
+      window.__historyMicMode = "grant";
+      window.__pendingHistoryMic = [];
+      window.__recognizers = [];
+      Object.defineProperty(window, "AudioContext", { configurable: true, value: undefined });
+      Object.defineProperty(window, "webkitAudioContext", { configurable: true, value: undefined });
+      class FakeSpeechRecognition {
+        start() {
+          window.__recognizers.push(this);
+          this.onstart?.();
+        }
+        stop() { this.onend?.(); }
+        abort() { this.onend?.(); }
+      }
+      Object.defineProperty(window, "SpeechRecognition", {
+        configurable: true, value: FakeSpeechRecognition,
+      });
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: () => {
+          const mockStream = {
+            getTracks: () => [{ kind: "audio", label: "Synthetic microphone", stop() {} }],
+            getAudioTracks: () => [{ kind: "audio", label: "Synthetic microphone", stop() {} }],
+          };
+          if (window.__historyMicMode === "reject") {
+            return Promise.reject(new Error("synthetic permission failure"));
+          }
+          if (window.__historyMicMode === "pending") {
+            return new Promise(resolve => window.__pendingHistoryMic.push(() => resolve(mockStream)));
+          }
+          return Promise.resolve(mockStream);
+        },
+      });
+    });
+    const historyPage = await historyContext.newPage();
+    const historyErrors = [];
+    historyPage.on("pageerror", error => historyErrors.push(error.message));
+    await historyPage.route("**/*", route =>
+      route.request().url().startsWith(origin + "/")
+        ? route.continue()
+        : route.abort());
+    await historyPage.goto(origin + "/index.html?stt=browser", { waitUntil: "networkidle" });
+    await historyPage.locator("#start").click();
+    await historyPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "正在聆聽");
+    await historyPage.evaluate(() => {
+      const final = [{ transcript: "上一段完整字幕" }];
+      final.isFinal = true;
+      window.__recognizers.at(-1).onresult({ resultIndex: 0, results: [final] });
+    });
+    await historyPage.locator("#stop").click();
+    await historyPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "已停止");
+    await historyPage.locator("#recall").click();
+    await historyPage.locator("#recall-complete").click();
+    assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
+    assert.equal(await historyPage.locator("#copy-complete-transcript").isEnabled(), true);
+
+    await historyPage.evaluate(() => { window.__historyMicMode = "reject"; });
+    await historyPage.locator("#start").click();
+    await historyPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "無法啟動");
+    assert.match(await historyPage.locator("#caption").innerText(), /上一段完整字幕/);
+    assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
+    assert.equal(await historyPage.locator("#copy-complete-transcript").isEnabled(), true);
+
+    await historyPage.evaluate(() => { window.__historyMicMode = "pending"; });
+    await historyPage.locator("#start").click();
+    await historyPage.waitForFunction(() => window.__pendingHistoryMic.length === 1);
+    assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
+    assert.equal(await historyPage.locator("#copy-complete-transcript").isEnabled(), true,
+      "previous complete transcript must remain copyable during pending restart");
+    await historyPage.locator("#stop").click();
+    await historyPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "已取消啟動");
+    await historyPage.evaluate(() => window.__pendingHistoryMic.shift()());
+    assert.match(await historyPage.locator("#caption").innerText(), /上一段完整字幕/);
+    assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
+
+    await historyPage.evaluate(() => { window.__historyMicMode = "grant"; });
+    await historyPage.locator("#start").click();
+    await historyPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "正在聆聽");
+    assert.doesNotMatch(await historyPage.locator("#caption").innerText(), /上一段完整字幕/);
+    assert.doesNotMatch(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
+    assert.equal(await historyPage.locator("#copy-complete-transcript").isDisabled(), true);
+    await historyPage.locator("#stop").click();
+    await historyPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent === "已停止");
+    assert.deepEqual(historyErrors, []);
+    console.log("PASS: failed/cancelled restart retains previous finals; successful restart resets");
+  } finally {
+    await historyContext.close();
+  }
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
