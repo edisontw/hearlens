@@ -301,8 +301,44 @@ export class GeminiLiveTranscribeProvider {
       }, { once: true });
     });
 
+    // WebSocket delivers frames in order, but decoding a Blob is asynchronous.
+    // Serialize decoding per socket so a later final cannot overtake an earlier
+    // frame. Keep the backlog bounded if a browser Blob read stalls.
+    const pendingFrames = [];
+    let processingFrames = false;
     socket.addEventListener("message", (event) => {
-      void this.handleMessage(event, socket);
+      if (this.socket !== socket || this.fatalTransportHandled) return;
+      if (pendingFrames.length >= 128) {
+        pendingFrames.length = 0;
+        this.handleFatalCaptureState(
+          "gemini-frame-backlog",
+          "Gemini 字幕資料處理延遲，請重新開始字幕。",
+          "frame-backlog",
+        );
+        return;
+      }
+      pendingFrames.push(event);
+      if (processingFrames) return;
+      processingFrames = true;
+      void (async () => {
+        try {
+          while (pendingFrames.length && this.socket === socket &&
+                 !this.fatalTransportHandled) {
+            await this.handleMessage(pendingFrames.shift(), socket);
+          }
+        } catch {
+          if (this.socket === socket) {
+            this.handleFatalCaptureState(
+              "gemini-frame-handler",
+              "Gemini 字幕資料處理失敗，請重新開始字幕。",
+              "frame-handler-failed",
+            );
+          }
+        } finally {
+          pendingFrames.length = 0;
+          processingFrames = false;
+        }
+      })();
     });
     socket.addEventListener("close", (event) => {
       if (this.socket !== socket) return;
