@@ -170,6 +170,6 @@ test("pending microphone permission exposes cancel and fail-closed cleanup", () 
   assert(main.includes("captionStartupPending = true;"));
   assert(main.includes('els.stop.textContent = "取消啟動";'));
   assert(main.includes("async function cancelStartupSession()"));
-  assert(main.includes('if (captionStartupPending) {\\n    void cancelStartupSession();'));
+  assert(main.includes('if (captionStartupPending) {\n    void cancelStartupSession();'));
   assert(main.includes('若瀏覽器仍顯示麥克風權限提示'));
 });
