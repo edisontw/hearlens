@@ -228,7 +228,7 @@ export class GeminiLiveTranscribeProvider {
       return payload.token;
     } catch (error) {
       if (timedOut) {
-        throw new Error("Gemini token request timed out. Check network and retry.");
+        throw new Error("取得 Gemini 字幕連線憑證逾時，請檢查網路後重新開始。");
       }
       if (controller.signal.aborted) {
         throw new Error("Caption startup cancelled.");
