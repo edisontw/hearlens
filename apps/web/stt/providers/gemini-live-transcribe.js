@@ -115,6 +115,7 @@ export class GeminiLiveTranscribeProvider {
     this.listeningReady = false;
     this.startEpoch = 0;
     this.tokenAbortController = null;
+    this.socketOpenRejecter = null;
     this.captureTrack = null;
     this.captureTrackHandlers = null;
     this.captureMuteTimer = null;
@@ -257,34 +258,46 @@ export class GeminiLiveTranscribeProvider {
     this.socket = socket;
 
     await new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        if (this.socketOpenRejecter === cancelOpen) {
+          this.socketOpenRejecter = null;
+        }
+        if (error) reject(error);
+        else resolve();
+      };
+      // CONNECTING WebSockets may reject close(); cancelling the pending
+      // promise must not wait for the full connection timeout.
+      const cancelOpen = () => finish(new Error("Caption startup cancelled."));
+      this.socketOpenRejecter = cancelOpen;
       const timeout = window.setTimeout(() => {
-        reject(new Error("Timed out connecting to Gemini Live."));
+        finish(new Error("Timed out connecting to Gemini Live."));
       }, OPEN_TIMEOUT_MS);
 
-      socket.addEventListener(
-        "open",
-        () => {
-          window.clearTimeout(timeout);
-          this.debug("ws-open");
-          resolve();
-        },
-        { once: true },
-      );
+      socket.addEventListener("open", () => {
+        // If the browser finishes connecting after cancellation or timeout,
+        // close that retired socket rather than leaving an orphan transport.
+        if (this.socket !== socket || !this.active || this.stopping) {
+          try { socket.close(1000, "cancelled"); } catch {
+            // The stale socket is never allowed to resume capture.
+          }
+          finish(new Error("Caption startup cancelled."));
+          return;
+        }
+        this.debug("ws-open");
+        finish();
+      }, { once: true });
 
-      socket.addEventListener(
-        "error",
-        () => {
-          window.clearTimeout(timeout);
-          reject(new Error("Could not connect to Gemini Live."));
-          this.handleUnexpectedTransportFailure(
-            socket, "gemini-socket-error", "Gemini Live connection error.");
-        },
-        { once: true },
-      );
-      // A background-page dispose may close a CONNECTING socket.
+      socket.addEventListener("error", () => {
+        finish(new Error("Could not connect to Gemini Live."));
+        this.handleUnexpectedTransportFailure(
+          socket, "gemini-socket-error", "Gemini Live connection error.");
+      }, { once: true });
       socket.addEventListener("close", () => {
-        window.clearTimeout(timeout);
-        reject(new Error("Gemini Live closed during connection."));
+        finish(new Error("Gemini Live closed during connection."));
       }, { once: true });
     });
 
@@ -712,6 +725,7 @@ export class GeminiLiveTranscribeProvider {
     this.debug("provider-stop");
     this.startEpoch += 1;
     this.tokenAbortController?.abort();
+    this.socketOpenRejecter?.();
     this.active = false;
     this.listeningReady = false;
     this.stopping = true;
@@ -781,6 +795,7 @@ export class GeminiLiveTranscribeProvider {
     this.debug("provider-dispose");
     this.startEpoch += 1;
     this.tokenAbortController?.abort();
+    this.socketOpenRejecter?.();
     this.active = false;
     if (this.setupRejecter) {
       this.setupRejecter(new Error("Caption startup cancelled."));
