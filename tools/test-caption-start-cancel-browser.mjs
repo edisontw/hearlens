@@ -251,6 +251,56 @@ try {
   } finally {
     await historyContext.close();
   }
+
+  // A browser recognizer whose start() throws must fail closed once.
+  // Without this guard the previous implementation retried forever at
+  // 800-ms intervals while the screen could falsely claim to be listening.
+  const failedStartContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    await failedStartContext.addInitScript(() => {
+      window.__failedStartAttempts = 0;
+      Object.defineProperty(window, "AudioContext", { configurable: true, value: undefined });
+      Object.defineProperty(window, "webkitAudioContext", { configurable: true, value: undefined });
+      class BrokenRecognition {
+        start() {
+          window.__failedStartAttempts += 1;
+          throw new Error("synthetic recognition startup rejection");
+        }
+        abort() { this.onend?.(); }
+      }
+      Object.defineProperty(window, "SpeechRecognition", {
+        configurable: true, value: BrokenRecognition,
+      });
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: async () => {
+          const track = { kind: "audio", label: "Synthetic microphone", stop() {} };
+          return { getTracks: () => [track], getAudioTracks: () => [track] };
+        },
+      });
+    });
+    const failedPage = await failedStartContext.newPage();
+    const failedErrors = [];
+    failedPage.on("pageerror", error => failedErrors.push(error.message));
+    await failedPage.route("**/*", route =>
+      route.request().url().startsWith(origin + "/")
+        ? route.continue()
+        : route.abort());
+    await failedPage.goto(origin + "/index.html?stt=browser", { waitUntil: "networkidle" });
+    await failedPage.locator("#start").click();
+    await failedPage.waitForFunction(() =>
+      document.querySelector("#status")?.textContent?.includes("瀏覽器語音辨識啟動失敗"));
+    assert.equal(await failedPage.locator("#start").isEnabled(), true);
+    assert.equal(await failedPage.locator("#stop").isDisabled(), true);
+    assert.equal(await failedPage.evaluate(() => window.__failedStartAttempts), 1);
+    await failedPage.waitForTimeout(950);
+    assert.equal(await failedPage.evaluate(() => window.__failedStartAttempts), 1,
+      "terminal start failure must not schedule an 800-ms retry");
+    assert.deepEqual(failedErrors, []);
+    console.log("PASS: throwing Browser STT start fails closed without phantom listening/retry");
+  } finally {
+    await failedStartContext.close();
+  }
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
