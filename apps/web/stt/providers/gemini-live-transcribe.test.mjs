@@ -182,6 +182,23 @@ test("mid-session WebSocket error fails closed even before subsequent close even
   });
 });
 
+test("Gemini socket error during setup immediately rejects startup without a false listening alert", async () => {
+  await withFakeWebSocket(async ({ provider, socket, errors }) => {
+    const setup = provider.waitForSetup();
+    assert.equal(typeof provider.setupRejecter, "function");
+    socket.emit("error");
+    await assert.rejects(setup, /connection failed before setup completed/);
+    assert.equal(provider.setupRejecter, null);
+    assert.equal(provider.setupResolver, null);
+    assert.equal(provider.active, false);
+    assert.equal(provider.listeningReady, false);
+    assert.deepEqual(errors, [], "pre-listening failure belongs to start(), not onError");
+    socket.readyState = FakeTransportSocket.CLOSED;
+    socket.emit("close", { code: 1006 });
+    assert.deepEqual(errors, [], "late close cannot duplicate a fatal alert");
+  });
+});
+
 test("deliberate user stop or pre-listening failure is not a spurious mid-session alert", async () => {
   await withFakeWebSocket(async ({ provider, socket, errors }) => {
     provider.stopping = true;
