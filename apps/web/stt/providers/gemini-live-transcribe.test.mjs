@@ -309,3 +309,62 @@ test("dispose immediately retires Gemini socket while AudioContext cleanup is pe
     assert.equal(socket.readyState, FakeTransportSocket.CLOSED);
   });
 });
+
+test("Gemini WebSocket frames retain arrival order across delayed Blob decoding", async () => {
+  await withFakeWebSocket(async ({ provider, socket }) => {
+    const finals = [];
+    provider.onFinal = event => finals.push(event.text);
+    let releaseDecode;
+    class DelayedBlob extends Blob {
+      text() { return new Promise(resolve => { releaseDecode = resolve; }); }
+    }
+
+    socket.emit("message", { data: new DelayedBlob(["first"]) });
+    assert.equal(typeof releaseDecode, "function");
+    socket.emit("message", { data: JSON.stringify({
+      serverContent: { inputTranscription: { text: "第二段" } },
+    }) });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, [],
+      "a later final must not overtake an earlier undecoded frame");
+
+    releaseDecode(JSON.stringify({
+      serverContent: { inputTranscription: { text: "第一段" } },
+    }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, ["第一段", "第二段"]);
+    await provider.dispose();
+  });
+});
+
+test("stalled Gemini Blob decoding bounds queued frames and fails closed once", async () => {
+  await withFakeWebSocket(async ({ provider, socket, errors }) => {
+    const finals = [];
+    provider.onFinal = event => finals.push(event.text);
+    provider.listeningReady = true;
+    let releaseDecode;
+    class DelayedBlob extends Blob {
+      text() { return new Promise(resolve => { releaseDecode = resolve; }); }
+    }
+    socket.emit("message", { data: new DelayedBlob(["stalled"]) });
+    assert.equal(typeof releaseDecode, "function");
+
+    for (let i = 0; i < 129; i += 1) {
+      socket.emit("message", { data: JSON.stringify({
+        serverContent: { inputTranscription: { text: "queued " + i } },
+      }) });
+    }
+    assert.equal(provider.active, false);
+    assert.equal(provider.listeningReady, false);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].code, "gemini-frame-backlog");
+    assert.match(errors[0].message, /重新開始/);
+
+    releaseDecode(JSON.stringify({
+      serverContent: { inputTranscription: { text: "stale after backlog" } },
+    }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, [], "no queued or delayed captions may escape after failure");
+    await provider.dispose();
+  });
+});
