@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-caption-restart-history1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-caption-restart-history1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-caption-restart-history1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-caption-restart-history1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-caption-restart-history1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-caption-restart-history1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-browser-start-failclosed1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-browser-start-failclosed1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-browser-start-failclosed1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-browser-start-failclosed1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-browser-start-failclosed1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-browser-start-failclosed1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-caption-restart-history1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-browser-start-failclosed1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-caption-restart-history1";
+} from "./transcript-window.mjs?v=20261103-browser-start-failclosed1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-caption-restart-history1";
+const BUILD_ID = "20261103-browser-start-failclosed1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -1001,7 +1001,9 @@ async function failClosedCaptionSession(expectedSessionId, message, code) {
           ? "無法使用麥克風，請檢查裝置與權限"
           : code === "language-not-supported"
             ? "此瀏覽器不支援所選語音辨識語言"
-            : "字幕連線中斷，請重新開始";
+            : code === "start-failed"
+              ? "瀏覽器語音辨識啟動失敗，請改用預設 Gemini 字幕"
+              : "字幕連線中斷，請重新開始";
   setStatus(reasonLabel, "error");
   appendSttLog("S" + expectedSessionId + " fatal-session " + code);
   const failedProvider = sttProvider;
