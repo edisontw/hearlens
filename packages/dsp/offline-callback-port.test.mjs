@@ -178,3 +178,18 @@ test("M03L invalid route, missing per-chunk observation or malformed clock fail 
   assert.throws(()=>p.process({startSample:0,samples:new Float32Array(1024),clockSample:NaN,observedRoute}),/clock-or-dsp-fault/);
   assert.equal(p.diagnostics.candidateSamples,0);
 });
+
+test("M03L throwing callback metadata accessors latch fault before any candidate output",()=>{
+  for(const field of ["startSample","samples","clockSample","observedRoute"]){
+    const p=armed(createOfflineMockHearingPort(cfg()));
+    const packet={startSample:0,samples:new Float32Array(1024),clockSample:1024,observedRoute};
+    Object.defineProperty(packet,field,{get(){throw new Error("malformed callback accessor");}});
+    assert.throws(()=>p.process(packet),/offline callback port fault: malformed-mock-callback/);
+    assert.equal(p.diagnostics.faulted,true);
+    assert.equal(p.diagnostics.faultReason,"malformed-mock-callback");
+    assert.equal(p.diagnostics.syntheticCandidateAuthorized,false);
+    assert.equal(p.diagnostics.candidateSamples,0);
+    assert.equal(p.diagnostics.callbacks,0);
+    assert.throws(()=>p.process({startSample:0,samples:new Float32Array(1024),clockSample:1024,observedRoute}),/reset required/);
+  }
+});
