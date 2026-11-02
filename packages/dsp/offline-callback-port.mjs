@@ -72,7 +72,14 @@ export function createOfflineMockHearingPort(dspConfig, {
     requireClean();
     if(!packet || typeof packet!=="object" || Array.isArray(packet))
       return latch("malformed-mock-callback");
-    const {startSample,samples,clockSample,observedRoute}=packet;
+    // Accessor-backed or proxied callback metadata can throw while reading a
+    // field. Treat that as a latched fault rather than leaving the mock gate armed.
+    let startSample,samples,clockSample,observedRoute;
+    try {
+      ({startSample,samples,clockSample,observedRoute}=packet);
+    } catch {
+      return latch("malformed-mock-callback");
+    }
     // "syntheticCandidateAuthorized" is ONLY an offline policy flag.
     if(!route.diagnostics.syntheticOutputAuthorized)return latch("no-mock-authorization");
     try {
