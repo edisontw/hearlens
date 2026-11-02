@@ -95,7 +95,7 @@ test("full-session copy is explicit, disabled without finals, and reset at each 
   assert.match(main, /completeSessionTranscriptText\(sessionFinals\)/);
   assert.match(main, /sessionFinals\.push\(item\);\s*syncCompleteTranscriptCopyButton\(\)/);
   assert.match(main, /sessionFinals\.length = 0;\s*syncCompleteTranscriptCopyButton\(\)/);
-  assert.match(main, /copyCompleteTranscript\.disabled = sessionFinals\.length === 0/);
+  assert.match(main, /copyCompleteTranscript[.]disabled = empty/);
   assert.match(main, /navigator\.clipboard\.writeText\(text\)/);
   assert.match(main, /els\.copyCompleteTranscript\?\.addEventListener\("click"/);
   assert.match(html, /id="download-complete-transcript"[^>]*disabled/);
