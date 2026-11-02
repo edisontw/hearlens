@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-stt-preflight1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-stt-preflight1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-stt-preflight1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-stt-preflight1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-stt-preflight1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-stt-preflight1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-caption-restart-history1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-caption-restart-history1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-caption-restart-history1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-caption-restart-history1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-caption-restart-history1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-caption-restart-history1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-stt-preflight1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-caption-restart-history1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-stt-preflight1";
+} from "./transcript-window.mjs?v=20261103-caption-restart-history1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-stt-preflight1";
+const BUILD_ID = "20261103-caption-restart-history1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -1072,21 +1072,9 @@ async function startSession() {
   activeCaptureSettings = null;
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
   renderCaptionLatencyTelemetry();
-  sessionFinals.length = 0;
-  syncCompleteTranscriptCopyButton();
-  reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
-  lastFullReviewSignature = "";
-  if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
-  if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
-  transcript.length = 0;
-  displayFinals.length = 0;
-  lastDisplayFinal = null;
-  captionManuallyCleared = false;
-  lastRecognizedText = "";
-  lastRecognizedAt = 0;
-  interimText = "";
-  rawInterimText = "";
-  lastInterimAt = null;
+  // Keep the preceding finalized conversation available for review/copy
+  // while permission, token or socket startup is still uncertain.
+  // Only a confirmed new STT start commits the new transcript boundary.
   syncCaptionRefreshTimer();
   appendSttLog("S" + sessionId + " session-start");
 
@@ -1141,6 +1129,47 @@ async function startSession() {
   await new Promise((resolve) => window.setTimeout(resolve, 250));
   requireActiveCaptionSession(sessionId);
 
+  // Some providers may emit text before their start() promise settles.
+  // Stage those events instead of mixing a failed attempt with the old
+  // complete-session history; replay in order only after startup succeeds.
+  const pendingCaptionEvents = [];
+  const handleCaptionPartial = ({ text, timestamp }) => {
+    if (sessionId !== activeSessionId) return;
+    if (captionStartupPending) {
+      pendingCaptionEvents.push({ kind: "partial", text, timestamp });
+      return;
+    }
+    if (text?.trim()) {
+      markFirstPartial(activeCaptionLatency, timestamp);
+      renderCaptionLatencyTelemetry();
+    }
+    rawInterimText = text;
+    interimText = toTaiwanTraditional(text);
+    if (interimText.trim()) captionManuallyCleared = false;
+    lastInterimAt = interimText.trim() ? Date.now() : null;
+    if (interimText.trim()) {
+      rememberRecognizedText(interimText, timestamp);
+    }
+    renderCaption();
+  };
+  const handleCaptionFinal = ({ text, timestamp }) => {
+    if (sessionId !== activeSessionId) return;
+    if (captionStartupPending) {
+      pendingCaptionEvents.push({ kind: "final", text, timestamp });
+      return;
+    }
+    if (text?.trim()) {
+      markFirstFinal(activeCaptionLatency, timestamp);
+      renderCaptionLatencyTelemetry();
+    }
+    const displayText = toTaiwanTraditional(text);
+    rawInterimText = "";
+    interimText = "";
+    lastInterimAt = null;
+    rememberRecognizedText(displayText, timestamp);
+    addFinalTranscript(displayText, text);
+  };
+
   sttProvider = createSttProvider({
     provider: runtimeSttConfig.provider,
     tokenUrl: runtimeSttConfig.tokenUrl,
@@ -1150,34 +1179,8 @@ async function startSession() {
     captureMode: runtimeSttConfig.captureMode,
     normalizationConfig: runtimeSttConfig.normalizationConfig,
     language: "zh-TW",
-    onPartial: ({ text, timestamp }) => {
-      if (sessionId !== activeSessionId) return;
-      if (text?.trim()) {
-        markFirstPartial(activeCaptionLatency, timestamp);
-        renderCaptionLatencyTelemetry();
-      }
-      rawInterimText = text;
-      interimText = toTaiwanTraditional(text);
-      if (interimText.trim()) captionManuallyCleared = false;
-      lastInterimAt = interimText.trim() ? Date.now() : null;
-      if (interimText.trim()) {
-        rememberRecognizedText(interimText, timestamp);
-      }
-      renderCaption();
-    },
-    onFinal: ({ text, timestamp }) => {
-      if (sessionId !== activeSessionId) return;
-      if (text?.trim()) {
-        markFirstFinal(activeCaptionLatency, timestamp);
-        renderCaptionLatencyTelemetry();
-      }
-      const displayText = toTaiwanTraditional(text);
-      rawInterimText = "";
-      interimText = "";
-      lastInterimAt = null;
-      rememberRecognizedText(displayText, timestamp);
-      addFinalTranscript(displayText, text);
-    },
+    onPartial: handleCaptionPartial,
+    onFinal: handleCaptionFinal,
     onStatus: ({ label, state }) => {
       if (sessionId !== activeSessionId) return;
       els.diagStt.textContent = label;
@@ -1244,7 +1247,29 @@ async function startSession() {
   }
 
   requireActiveCaptionSession(sessionId);
+  // Commit a fresh conversation only when the new recognizer is live.
+  // A rejected permission/token/socket attempt leaves old finals intact.
+  sessionFinals.length = 0;
+  syncCompleteTranscriptCopyButton();
+  reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
+  lastFullReviewSignature = "";
+  if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
+  if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
+  transcript.length = 0;
+  displayFinals.length = 0;
+  lastDisplayFinal = null;
+  captionManuallyCleared = false;
+  lastRecognizedText = "";
+  lastRecognizedAt = 0;
+  interimText = "";
+  rawInterimText = "";
+  lastInterimAt = null;
   captionStartupPending = false;
+  // Preserve final/partial ordering for callbacks delivered during start().
+  for (const event of pendingCaptionEvents) {
+    if (event.kind === "final") handleCaptionFinal(event);
+    else handleCaptionPartial(event);
+  }
   els.stop.textContent = "停止聆聽";
   setStatus("正在聆聽", "listening");
   void captionScreenWakeLock.start();
@@ -1384,9 +1409,12 @@ els.start.addEventListener("click", async () => {
         expectedSessionId !== activeSessionId) return;
     const cleanupOk = await cleanupFailedStart(error);
     setStatus(cleanupOk ? "無法啟動" : "啟動清理未完成，請重新載入頁面", "error");
-    els.caption.textContent = cleanupOk
+    const failureMessage = cleanupOk
       ? (error instanceof Error ? error.message : "無法啟動麥克風。")
       : "啟動失敗且麥克風資源清理未完成，請重新載入頁面。";
+    els.diagStt.textContent = failureMessage;
+    updateCaptionDisplay(visibleDisplayTranscript() ||
+      (captionManuallyCleared ? "" : failureMessage));
     els.start.disabled = !cleanupOk;
     els.stop.disabled = true;
     if (els.quickPreset) els.quickPreset.disabled = false;
