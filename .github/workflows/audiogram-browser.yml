@@ -15,6 +15,7 @@ on:
       - "packages/audiogram/audiogram.mjs"
       - "tools/test-audiogram-browser.mjs"
       - "tools/test-caption-focus-browser.mjs"
+      - "tools/test-caption-start-cancel-browser.mjs"
       - ".github/workflows/audiogram-browser.yml"
   push:
     branches: [main]
@@ -31,6 +32,7 @@ on:
       - "packages/audiogram/audiogram.mjs"
       - "tools/test-audiogram-browser.mjs"
       - "tools/test-caption-focus-browser.mjs"
+      - "tools/test-caption-start-cancel-browser.mjs"
       - ".github/workflows/audiogram-browser.yml"
   workflow_dispatch:
 
@@ -58,3 +60,4 @@ jobs:
         run: |
           node tools/test-audiogram-browser.mjs
           node tools/test-caption-focus-browser.mjs
+          node tools/test-caption-start-cancel-browser.mjs

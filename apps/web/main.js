@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-gemini-closed-stop1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-gemini-closed-stop1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-gemini-closed-stop1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-gemini-closed-stop1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-gemini-closed-stop1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-gemini-closed-stop1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-cancel-pending-mic1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-cancel-pending-mic1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-cancel-pending-mic1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-cancel-pending-mic1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-cancel-pending-mic1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-cancel-pending-mic1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-gemini-closed-stop1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-cancel-pending-mic1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-gemini-closed-stop1";
+} from "./transcript-window.mjs?v=20261102-cancel-pending-mic1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-gemini-closed-stop1";
+const BUILD_ID = "20261102-cancel-pending-mic1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -182,6 +182,7 @@ let activeInputProfile = null;
 let activeCaptureSettings = null;
 let activeCaptionLatency = null;
 let captionStopRequested = false;
+let captionStartupPending = false;
 let diagnosticCleanupFailed = false; // Sticky until reload if any diagnostic release rejects.
 let captionRefreshTimer = null;
 let lastInterimAt = null;
@@ -980,6 +981,8 @@ async function releaseDiagnosticCapture(label = "已釋放") {
 // "listening" or retain the microphone after the WebSocket has died.
 async function failClosedCaptionSession(expectedSessionId, message, code) {
   if (expectedSessionId !== activeSessionId) return;
+  captionStartupPending = false;
+  els.stop.textContent = "停止聆聽";
   captionScreenWakeLock.stop();
   activeSessionId = 0; // immediately reject delayed partial/final/status callbacks
   els.start.disabled = true;
@@ -1050,6 +1053,7 @@ async function startSession() {
   const sessionId = ++sessionCounter;
   activeSessionId = sessionId;
   captionStopRequested = false;
+  captionStartupPending = true;
   activeInputProfile = null;
   activeCaptureSettings = null;
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
@@ -1074,7 +1078,10 @@ async function startSession() {
 
   setStatus("啟動中…");
   els.start.disabled = true;
-  els.stop.disabled = true;
+  // A pending browser permission prompt cannot be aborted. A late grant
+  // is stopped by the existing session/epoch guard after cancellation.
+  els.stop.textContent = "取消啟動";
+  els.stop.disabled = false;
   if (els.quickPreset) els.quickPreset.disabled = true;
   if (els.resetPreset) els.resetPreset.disabled = true;
   setAdvancedTuningDisabled(true);
@@ -1223,10 +1230,56 @@ async function startSession() {
   }
 
   requireActiveCaptionSession(sessionId);
+  captionStartupPending = false;
+  els.stop.textContent = "停止聆聽";
   setStatus("正在聆聽", "listening");
   void captionScreenWakeLock.start();
   els.stop.disabled = false;
   renderCaption();
+}
+
+async function cancelStartupSession() {
+  const sessionId = activeSessionId;
+  if (!sessionId || !captionStartupPending || captionStopRequested) return;
+  // Invalidate before awaiting cleanup. A late permission grant is rejected
+  // and its stream stopped by startSession()/provider.startCapture() guards.
+  captionStartupPending = false;
+  captionStopRequested = true;
+  activeSessionId = 0;
+  captionScreenWakeLock.stop();
+  els.start.disabled = true;
+  els.stop.disabled = true;
+  els.stop.textContent = "停止聆聽";
+  setStatus("正在取消啟動…");
+  appendSttLog("S" + sessionId + " startup-cancel-request");
+
+  const pendingProvider = sttProvider;
+  sttProvider = null;
+  const cleanupOk = (await disposeCaptionResourcesSafely(
+    pendingProvider,
+    () => releaseDiagnosticCapture("未啟動"),
+    (phase, error) => appendSttLog("S" + sessionId + " " + phase +
+      "-cleanup-error " + (error instanceof Error ? error.message : "unknown")),
+  )) && !diagnosticCleanupFailed;
+
+  interimText = "";
+  rawInterimText = "";
+  lastInterimAt = null;
+  updateCaptionDisplay(visibleDisplayTranscript() || "字幕會顯示在這裡。");
+  els.diagStt.textContent = cleanupOk
+    ? "已取消啟動；若瀏覽器仍顯示麥克風權限提示，請先關閉提示。"
+    : "啟動清理未完成；請重新載入頁面。";
+  els.start.disabled = !cleanupOk;
+  els.stop.disabled = true;
+  if (els.quickPreset) els.quickPreset.disabled = false;
+  if (els.resetPreset) els.resetPreset.disabled = false;
+  setAdvancedTuningDisabled(false);
+  setStatus(cleanupOk ? "已取消啟動" : "啟動清理未完成，請重新載入頁面",
+    cleanupOk ? "idle" : "error");
+  appendSttLog("S" + sessionId +
+    (cleanupOk ? " startup-cancelled" : " startup-cancel-cleanup-failed"));
+  captionStopRequested = false;
+  syncCaptionRefreshTimer();
 }
 
 async function stopSession() {
@@ -1282,6 +1335,8 @@ async function stopSession() {
 }
 
 async function cleanupFailedStart(error) {
+  captionStartupPending = false;
+  els.stop.textContent = "停止聆聽";
   captionScreenWakeLock.stop();
   appendSttLog(
     "S" +
@@ -1327,7 +1382,11 @@ els.start.addEventListener("click", async () => {
 });
 
 els.stop.addEventListener("click", () => {
-  void stopSession();
+  if (captionStartupPending) {
+    void cancelStartupSession();
+  } else {
+    void stopSession();
+  }
 });
 
 function interruptForPageEvent(eventType) {
