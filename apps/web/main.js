@@ -1253,7 +1253,6 @@ async function startSession() {
   syncCompleteTranscriptCopyButton();
   reviewVisibleCount = SESSION_REVIEW_PAGE_SIZE;
   lastFullReviewSignature = "";
-  if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
   if (els.recallCopyStatus) els.recallCopyStatus.textContent = "";
   transcript.length = 0;
   displayFinals.length = 0;
@@ -1270,6 +1269,8 @@ async function startSession() {
     if (event.kind === "final") handleCaptionFinal(event);
     else handleCaptionPartial(event);
   }
+  // Recent and complete review must both reflect the committed session.
+  if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
   els.stop.textContent = "停止聆聽";
   setStatus("正在聆聽", "listening");
   void captionScreenWakeLock.start();
