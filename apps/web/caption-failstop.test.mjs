@@ -124,7 +124,8 @@ test("diagnostic close rejection is not swallowed and startup UI requires reload
 test("earlier diagnostic close failure remains a sticky no-retry condition", () => {
   assert.match(main, /let diagnosticCleanupFailed = false/);
   assert.match(main, /diagnosticCleanupFailed = true;/);
-  assert.equal((main.match(/\)\) && !diagnosticCleanupFailed;/g) ?? []).length, 2);
+  // Fatal interruption, failed Start, and explicit startup Cancel all keep the sticky guard.
+  assert.equal((main.match(/\)\) && !diagnosticCleanupFailed;/g) ?? []).length, 3);
   assert.match(main, /cleanupError \?\?= error/);
 });
 
