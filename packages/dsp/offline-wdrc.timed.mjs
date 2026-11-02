@@ -48,12 +48,19 @@ export function createOfflineTimedWDRC(config, { deadlineSlackSamples = DEFAULT_
   }
   function push(packet) {
     requireActive();
-    if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
-      Object.keys(packet).length !== 2 ||
-      !Object.hasOwn(packet,"startSample") || !Object.hasOwn(packet,"samples")) {
+    // Callback packets may be accessor-backed or proxied. Shape inspection
+    // and field reads must fail-stop together, before any DSP state changes.
+    let startSample, samples;
+    try {
+      if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
+        Object.keys(packet).length !== 2 ||
+        !Object.hasOwn(packet,"startSample") || !Object.hasOwn(packet,"samples")) {
+        throw new TypeError("malformed packet shape");
+      }
+      ({ startSample, samples } = packet);
+    } catch {
       throw fail("malformed-packet");
     }
-    const { startSample, samples } = packet;
     if (!safeSampleInteger(startSample)) throw fail("invalid-timestamp");
     if (!(samples instanceof Float32Array) || samples.length < 1 ||
         samples.length > STREAM_MAX_CHUNK_SAMPLES) throw fail("invalid-chunk");
