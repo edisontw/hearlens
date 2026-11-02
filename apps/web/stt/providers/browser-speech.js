@@ -1,3 +1,14 @@
+const TERMINAL_RECOGNITION_ERRORS = new Set([
+  "not-allowed", "service-not-allowed", "audio-capture", "language-not-supported",
+]);
+
+const RECOGNITION_ERROR_GUIDANCE = Object.freeze({
+  "not-allowed": "麥克風權限遭拒，請在瀏覽器設定中允許麥克風後手動重新開始。",
+  "service-not-allowed": "瀏覽器不允許語音辨識服務，請檢查瀏覽器設定後手動重新開始。",
+  "audio-capture": "無法使用麥克風，請檢查裝置與權限後手動重新開始。",
+  "language-not-supported": "此瀏覽器不支援所選的語音辨識語言。",
+});
+
 export function browserSpeechSupported() {
   return Boolean(
     window.SpeechRecognition || window.webkitSpeechRecognition,
@@ -109,16 +120,25 @@ export class BrowserSpeechProvider {
     };
 
     recognition.onerror = (event) => {
-      this.debug("error", event.error || "unknown");
-
-      if (!this.active && event.error === "aborted") {
-        return;
+      // Ignore late errors from stopped or superseded recognizers.
+      if (!this.active || this.recognition !== recognition) return;
+      const code = event.error || "unknown";
+      this.debug("error", code);
+      const fatal = TERMINAL_RECOGNITION_ERRORS.has(code);
+      if (fatal) {
+        // Permission/device/language failures cannot be fixed by automatic
+        // segment restart. Stop retrying before the UI releases capture.
+        this.active = false;
+        if (this.restartTimer !== null) {
+          window.clearTimeout(this.restartTimer);
+          this.restartTimer = null;
+        }
       }
-
       this.onError({
         providerId: this.id,
-        code: event.error || "unknown",
-        message: "SpeechRecognition error: " + (event.error || "unknown"),
+        code,
+        message: RECOGNITION_ERROR_GUIDANCE[code] || "SpeechRecognition error: " + code,
+        fatal,
       });
     };
 
