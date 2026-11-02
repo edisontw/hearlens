@@ -187,3 +187,47 @@ test("late decoded frames are discarded after fatal transport failure", async ()
     assert.deepEqual(finals, []);
   });
 });
+
+test("retired Gemini socket frames cannot contaminate a new listening session", async () => {
+  await withFakeWebSocket(async ({ provider, socket }) => {
+    const finals = [];
+    provider.onFinal = (event) => finals.push(event.text);
+    socket.emit("message", { data: JSON.stringify({
+      serverContent: { inputTranscription: { text: "current session" } },
+    }) });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, ["current session"], "current socket still delivers captions");
+
+    const nextSocket = { readyState: FakeTransportSocket.OPEN };
+    provider.socket = nextSocket;
+    socket.emit("message", { data: JSON.stringify({
+      serverContent: { inputTranscription: { text: "retired session" } },
+    }) });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, ["current session"], "old socket frame must be discarded");
+
+    await provider.handleMessage({ data: JSON.stringify({
+      serverContent: { inputTranscription: { text: "new session" } },
+    }) }, nextSocket);
+    assert.deepEqual(finals, ["current session", "new session"]);
+  });
+});
+
+test("delayed Gemini Blob decode is discarded when its socket is retired", async () => {
+  await withFakeWebSocket(async ({ provider, socket }) => {
+    const finals = [];
+    provider.onFinal = (event) => finals.push(event.text);
+    let releaseDecode;
+    class DelayedBlob extends Blob {
+      text() { return new Promise(resolve => { releaseDecode = resolve; }); }
+    }
+    socket.emit("message", { data: new DelayedBlob(["delayed"]) });
+    assert.equal(typeof releaseDecode, "function");
+    provider.socket = { readyState: FakeTransportSocket.OPEN };
+    releaseDecode(JSON.stringify({
+      serverContent: { inputTranscription: { text: "delayed stale final" } },
+    }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(finals, [], "post-decode socket identity must be checked");
+  });
+});
