@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { createCaptionFocusMode } from "./caption-focus.mjs";
 
-function fixture() {
+function fixture(onLayoutChange) {
   const classes = new Set();
   const attributes = new Map();
   let click = null;
@@ -24,7 +24,7 @@ function fixture() {
       click = handler;
     },
   };
-  const focus = createCaptionFocusMode({ body, button });
+  const focus = createCaptionFocusMode({ body, button, onLayoutChange });
   return { focus, button, attributes, click: () => click() };
 }
 
@@ -51,6 +51,23 @@ test("explicit focus setter is idempotent and input requirements fail closed", (
   assert.throws(() => createCaptionFocusMode({ body: {}, button: ui.button }));
 });
 
+test("focus layout callback wraps presentation toggles without altering the toggle API", () => {
+  const phases = [];
+  const ui = fixture(apply => {
+    phases.push("before");
+    apply();
+    phases.push("after");
+  });
+  assert.deepEqual(phases, ["before", "after"], "initial layout remains off");
+  ui.click();
+  assert.equal(ui.focus.enabled(), true);
+  ui.click();
+  assert.equal(ui.focus.enabled(), false);
+  assert.deepEqual(phases, [
+    "before", "after", "before", "after", "before", "after",
+  ]);
+});
+
 test("focus mode hides only secondary content, preserves essential caption controls", () => {
   const css = readFileSync("apps/web/styles.css", "utf8");
   const html = readFileSync("apps/web/index.html", "utf8");
@@ -65,7 +82,7 @@ test("focus mode hides only secondary content, preserves essential caption contr
     assert(html.includes('id="' + name + '"'), name);
     assert.doesNotMatch(css, new RegExp("body\\.caption-focus-mode\\s+#" + name + "\\s*\\{[^}]*display: none"));
   }
-  assert.match(main, /createCaptionFocusMode\(\{ body: document\.body, button: els\.captionFocusToggle \}\)/);
+  assert.match(main, /createCaptionFocusMode\(\{[\s\S]*?onLayoutChange: applyChange => \{[\s\S]*?preserveCaptionScrollOnLayoutChange\(els\.caption, applyChange\)/);
   assert.doesNotMatch(readFileSync("apps/web/caption-focus.mjs", "utf8"),
     /AudioContext|AudioTrack|AudioWorklet|navigator\.mediaDevices|fetch\(|localStorage|sessionStorage|\.play\(/);
 });

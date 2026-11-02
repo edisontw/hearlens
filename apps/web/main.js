@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-caption-sizefollow1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-caption-sizefollow1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-caption-sizefollow1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-caption-sizefollow1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-caption-sizefollow1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-caption-sizefollow1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-caption-focusfollow1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-caption-focusfollow1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-caption-focusfollow1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-caption-focusfollow1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-caption-focusfollow1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-caption-focusfollow1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-caption-sizefollow1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-caption-focusfollow1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-caption-sizefollow1";
+} from "./transcript-window.mjs?v=20261102-caption-focusfollow1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-caption-sizefollow1";
+const BUILD_ID = "20261102-caption-focusfollow1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -159,7 +159,14 @@ if (els.sttPrivacyNotice) {
 }
 
 // Presentation only: no microphone, STT, audio or persistence privileges.
-createCaptionFocusMode({ body: document.body, button: els.captionFocusToggle });
+createCaptionFocusMode({
+  body: document.body,
+  button: els.captionFocusToggle,
+  onLayoutChange: applyChange => {
+    preserveCaptionScrollOnLayoutChange(els.caption, applyChange);
+    syncCaptionJumpLatest();
+  },
+});
 
 let stream = null;
 let audioContext = null;
