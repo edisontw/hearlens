@@ -83,6 +83,24 @@ try {
     "return-to-latest hides when the latest caption is in view");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "caption",
     "return-to-latest restores keyboard focus to the scrollable caption after hiding itself");
+
+  // A reader at the latest line must stay there when the font grows.
+  // A reader deliberately at the top must not be dragged to new speech.
+  await page.locator('[data-caption-size="xlarge"]').click();
+  assert(await page.locator("#caption").evaluate(el =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= 2),
+    "increasing caption size preserves latest-line following");
+  await page.locator("#caption").evaluate(el => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll"));
+  });
+  await page.locator('[data-caption-size="normal"]').click();
+  assert.equal(await page.locator("#caption").evaluate(el => el.scrollTop), 0,
+    "changing font while rereading preserves the older reading position");
+  assert(await page.locator("#caption-jump-latest").isVisible(),
+    "return-to-latest stays available after font changes while rereading");
+  await page.locator("#caption-jump-latest").click();
+
   await page.locator("#caption").evaluate(el => {
     el.textContent = "這是一段測試字幕。";
     el.dispatchEvent(new Event("scroll"));

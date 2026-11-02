@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-caption-jumpfocus1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-caption-jumpfocus1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-caption-jumpfocus1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-caption-jumpfocus1";
-import { shouldFollowCaptionScroll } from "./caption-scroll.mjs?v=20261102-caption-jumpfocus1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-caption-jumpfocus1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261102-caption-sizefollow1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261102-caption-sizefollow1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261102-caption-sizefollow1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261102-caption-sizefollow1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261102-caption-sizefollow1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261102-caption-sizefollow1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-caption-jumpfocus1";
+import { createSttProvider, describeSttCapabilities } from "./stt/provider.js?v=20261102-caption-sizefollow1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261102-caption-jumpfocus1";
+} from "./transcript-window.mjs?v=20261102-caption-sizefollow1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261102-caption-jumpfocus1";
+const BUILD_ID = "20261102-caption-sizefollow1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -390,11 +390,15 @@ function readStoredCaptionSize() {
 }
 
 function applyCaptionSize(level, { persist = true } = {}) {
-  captionSizeLevel = normalizeCaptionSizeLevel(level);
-  document.documentElement.style.setProperty(
-    "--caption-size",
-    captionSizePixels(captionSizeLevel) + "px",
-  );
+  // A larger font changes the scroll range even when no new caption arrives.
+  // Stay on the latest line only if the reader was already following it.
+  preserveCaptionScrollOnLayoutChange(els.caption, () => {
+    captionSizeLevel = normalizeCaptionSizeLevel(level);
+    document.documentElement.style.setProperty(
+      "--caption-size",
+      captionSizePixels(captionSizeLevel) + "px",
+    );
+  });
 
   for (const button of els.captionSizeButtons) {
     const selected = button.dataset.captionSize === captionSizeLevel;
