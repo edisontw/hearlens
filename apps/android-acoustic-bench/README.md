@@ -42,6 +42,36 @@ Final counters appear after audio-thread cleanup. Start stays disabled until tha
 L1 cap after nominal 0.25 scalar is approximately **−44.6 dBFS**, before system media volume.
 Quiet whole-file RMS alone cannot diagnose microphone failure or identify a chirp above noise.
 
+## B1 offline acoustic-presence screen (no new recording requested)
+
+The repository contains **summaries and hashes**, not the original D4–D6.2 owner WAVs.
+Prior D5 `on4_l1.wav` showed 24/24 **iPhone** source landmarks but no separable
+AIR31-specific output. D6/D6.1 software route, accepted frames and playback-head
+drain cannot establish earbud acoustic presence. The current D6.2 self-test
+has **six 160-ms chirps spaced 800 ms**, not the old iPhone 24 × 40-ms pattern.
+
+For any **already available** D6.1/D6.2 Realtek output-only 48-kHz mono PCM16 WAV:
+
+```sh
+python tools/m04_d62_offear_presence.py existing_offear.wav --json presence.json
+# If an independent, same-geometry no-output WAV already exists:
+python tools/m04_d62_offear_presence.py existing_offear.wav --control existing_silence.wav --json presence.json
+```
+
+The read-only tool uses the generated-chirp waveform, 60-Hz-hum rejection,
+six-event 800-ms timing, within-record off-phase controls, and an optional
+**independent silence** comparison. Its output is `NO_RELIABLE_SIX_EVENT_PATTERN`,
+`CANDIDATE_NEEDS_INDEPENDENT_SILENCE_CONTROL`,
+`INCONCLUSIVE_PATTERN_ALSO_IN_CONTROL`, or
+`PATTERN_SEPARATED_FROM_CONTROL_SOURCE_NOT_PROVEN`. The latter **still cannot
+exclude phone-speaker leakage or prove AIR31 source identity**. A negative result
+does not prove earbud silence. There is no automatic gain adjustment, output,
+latency estimate, SPL, route authorization, or requirement to upload voice audio.
+
+Until a recognizable output-only recording exists, classify physical presence
+**UNVERIFIED / NOT_MEASURABLE_AT_CURRENT_SETTINGS**, and continue M01 work.
+Do not infer latency by subtracting independently recorded WAV timestamps.
+
 ## Build
 
 GitHub Actions **Android M04 Off-Ear Acoustic Bench**, artifact `hearlens-m04d62-offear-bench-debug`,
