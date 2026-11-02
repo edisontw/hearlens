@@ -215,6 +215,25 @@ try {
     assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
     assert.equal(await historyPage.locator("#copy-complete-transcript").isEnabled(), true);
 
+    // Changing capture presets or applying tuning reloads the page. Dismissing
+    // the loss warning must retain the memory-only transcript and restore the
+    // selected preset; no synthetic microphone is opened by this check.
+    const settingsDialogs = [];
+    historyPage.on("dialog", async dialog => {
+      settingsDialogs.push(dialog.message());
+      await dialog.dismiss();
+    });
+    const historyUrl = historyPage.url();
+    await historyPage.locator("#quick-preset").selectOption("far-noisy");
+    assert.equal(historyPage.url(), historyUrl);
+    assert.equal(await historyPage.locator("#quick-preset").inputValue(), "auto");
+    await historyPage.evaluate(() => document.querySelector("#apply-tuning").click());
+    assert.equal(historyPage.url(), historyUrl);
+    assert.equal(settingsDialogs.length, 2);
+    assert(settingsDialogs.every(message => message.includes("複製完整字幕")));
+    assert.match(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
+    assert.equal(await historyPage.locator("#copy-complete-transcript").isEnabled(), true);
+
     await historyPage.evaluate(() => { window.__historyMicMode = "reject"; });
     await historyPage.locator("#start").click();
     await historyPage.waitForFunction(() =>
