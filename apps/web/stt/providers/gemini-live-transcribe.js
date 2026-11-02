@@ -713,7 +713,15 @@ export class GeminiLiveTranscribeProvider {
 
     const socket = this.socket;
     if (!socket || socket.readyState === WebSocket.CLOSED) {
+      // A closed transport may still have queued message callbacks. Retire
+      // its identity before allowing another caption session to start.
+      this.socket = null;
       this.stopping = false;
+      this.onStatus({
+        state: "stopped",
+        providerId: this.id,
+        label: this.label,
+      });
       this.debug("provider-stopped");
       return;
     }
