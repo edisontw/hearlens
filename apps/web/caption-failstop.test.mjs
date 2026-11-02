@@ -124,7 +124,8 @@ test("diagnostic close rejection is not swallowed and startup UI requires reload
 test("earlier diagnostic close failure remains a sticky no-retry condition", () => {
   assert.match(main, /let diagnosticCleanupFailed = false/);
   assert.match(main, /diagnosticCleanupFailed = true;/);
-  assert.equal((main.match(/\)\) && !diagnosticCleanupFailed;/g) ?? []).length, 2);
+  // Fatal interruption, failed Start, and explicit startup Cancel all keep the sticky guard.
+  assert.equal((main.match(/\)\) && !diagnosticCleanupFailed;/g) ?? []).length, 3);
   assert.match(main, /cleanupError \?\?= error/);
 });
 
@@ -164,4 +165,12 @@ test("Google proxy close during explicit stop or from stale socket is not fatal"
   provider.handleUnexpectedProxyClose({}, { code: 1006 });
   assert.equal(errors.length, 0);
   assert.equal(provider.active, true);
+});
+
+test("pending microphone permission exposes cancel and fail-closed cleanup", () => {
+  assert(main.includes("captionStartupPending = true;"));
+  assert(main.includes('els.stop.textContent = "取消啟動";'));
+  assert(main.includes("async function cancelStartupSession()"));
+  assert(main.includes('if (captionStartupPending) {\n    void cancelStartupSession();'));
+  assert(main.includes('若瀏覽器仍顯示麥克風權限提示'));
 });
