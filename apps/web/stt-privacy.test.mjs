@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { captionSttPrivacyNotice } from "./stt-privacy.mjs";
+import { resolveSttProviderId } from "./stt/provider.js";
 
 test("pre-start privacy notice identifies the true configured provider", () => {
   const gemini = captionSttPrivacyNotice("gemini-live-transcribe");
@@ -40,4 +41,18 @@ test("notice is visible before Start and associated with the accessibility tree"
 test("disclosure module is presentation-only and never triggers capture", () => {
   const module = readFileSync("apps/web/stt-privacy.mjs", "utf8");
   assert.doesNotMatch(module, /navigator\.mediaDevices|AudioContext|AudioTrack|fetch\(|new WebSocket|sessionStorage|localStorage/);
+});
+
+
+test("AUTO resolves before microphone permission and names the actual cloud provider", () => {
+  const token = "https://example.test/token";
+  assert.equal(resolveSttProviderId("auto", token), "gemini-live-transcribe");
+  assert.equal(resolveSttProviderId("auto", ""), "browser-speech");
+  assert.equal(resolveSttProviderId("google-cloud-streaming", token), "google-cloud-streaming");
+  assert.equal(resolveSttProviderId("unknown", token), "unknown");
+  assert.match(captionSttPrivacyNotice(resolveSttProviderId("auto", token)), /Google Gemini/);
+  assert.match(captionSttPrivacyNotice(resolveSttProviderId("auto", "")), /瀏覽器/);
+  const main = readFileSync("apps/web/main.js", "utf8");
+  assert.match(main, /provider: resolveSttProviderId\(provider, tokenUrl\)/);
+  assert(main.indexOf("不支援的語音辨識選項") < main.indexOf("const diagnosticStream = await navigator.mediaDevices.getUserMedia"));
 });

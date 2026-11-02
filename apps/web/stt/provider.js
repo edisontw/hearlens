@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261102-browser-unsupported1";
+} from "./providers/browser-speech.js?v=20261103-stt-preflight1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261102-browser-unsupported1";
+  "./providers/gemini-live-transcribe.js?v=20261103-stt-preflight1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261102-browser-unsupported1";
+  "./providers/google-cloud-streaming.js?v=20261103-stt-preflight1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
@@ -13,6 +13,14 @@ export const STT_PROVIDER_IDS = Object.freeze({
   GEMINI: "gemini-live-transcribe",
   GOOGLE: "google-cloud-streaming",
 });
+
+// Resolve AUTO once so pre-capture disclosure and provider construction agree.
+// Unknown IDs are left intact for an actionable preflight error in the UI.
+export function resolveSttProviderId(provider = STT_PROVIDER_IDS.AUTO, tokenUrl = "") {
+  return provider === STT_PROVIDER_IDS.AUTO
+    ? tokenUrl ? STT_PROVIDER_IDS.GEMINI : STT_PROVIDER_IDS.BROWSER
+    : provider;
+}
 
 export function describeSttCapabilities() {
   return {
@@ -38,12 +46,7 @@ export function createSttProvider({
   onError,
   onDebug,
 } = {}) {
-  const requested =
-    provider === STT_PROVIDER_IDS.AUTO
-      ? tokenUrl
-        ? STT_PROVIDER_IDS.GEMINI
-        : STT_PROVIDER_IDS.BROWSER
-      : provider;
+  const requested = resolveSttProviderId(provider, tokenUrl);
 
   if (requested === STT_PROVIDER_IDS.BROWSER) {
     if (!browserSpeechSupported()) {
