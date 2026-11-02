@@ -3,9 +3,9 @@ import {
   browserSpeechSupported,
 } from "./providers/browser-speech.js?v=20261005-adaptive1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261102-caption-focusfollow1";
+  "./providers/gemini-live-transcribe.js?v=20261102-google-proxy-failstop1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261005-adaptive1";
+  "./providers/google-cloud-streaming.js?v=20261102-google-proxy-failstop1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",

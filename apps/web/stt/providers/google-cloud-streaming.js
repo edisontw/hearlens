@@ -116,27 +116,36 @@ export class GoogleCloudStreamingProvider {
     });
 
     socket.addEventListener("message", (event) => this.handleSocketMessage(event));
-    socket.addEventListener("close", (event) => {
-      this.debug("ws-close", "code=" + event.code);
+    socket.addEventListener("close", (event) =>
+      this.handleUnexpectedProxyClose(socket, event));
+  }
 
-      if (this.readyRejecter) {
-        this.readyRejecter(new Error("Google STT proxy closed before ready."));
-        this.clearReadyWaiters();
-      }
+  // A closed proxy cannot keep the UI in "listening" with an orphaned mic.
+  // Ignore delayed closes from sockets already replaced or disposed.
+  handleUnexpectedProxyClose(socket, event) {
+    if (this.socket !== socket) return;
+    this.debug("ws-close", "code=" + event.code);
 
-      if (this.stopResolver) {
-        this.stopResolver();
-        this.stopResolver = null;
-      }
+    if (this.readyRejecter) {
+      this.readyRejecter(new Error("Google STT proxy closed before ready."));
+      this.clearReadyWaiters();
+    }
 
-      if (this.active && !this.stopping) {
-        this.onError({
-          providerId: this.id,
-          code: "proxy-closed",
-          message: "Google STT proxy connection closed.",
-        });
-      }
-    });
+    if (this.stopResolver) {
+      this.stopResolver();
+      this.stopResolver = null;
+    }
+
+    if (this.active && !this.stopping) {
+      this.active = false; // stop submitting PCM before asynchronous UI cleanup
+      this.proxyReady = false;
+      this.onError({
+        providerId: this.id,
+        code: "proxy-closed",
+        message: "Google STT proxy connection closed.",
+        fatal: true,
+      });
+    }
   }
 
   handleSocketMessage(event) {

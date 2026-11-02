@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs";
+import { GoogleCloudStreamingProvider } from "./stt/providers/google-cloud-streaming.js";
 
 const main = readFileSync("apps/web/main.js", "utf8");
 const provider = readFileSync("apps/web/stt/providers/gemini-live-transcribe.js", "utf8");
@@ -12,8 +13,7 @@ const build = JSON.parse(readFileSync("apps/web/build.json", "utf8"));
 test("fatal transport callback permits retry only when all cleanup succeeds", () => {
   assert.match(main, /onError: \(\{ message, code, fatal \}\)/);
   assert.match(main, /fatal === true/);
-  assert.match(main, /code === "gemini-closed"/);
-  assert.match(main, /code === "gemini-socket-error"/);
+  assert.match(main, /if \(fatal === true\) \{\s*void failClosedCaptionSession\(sessionId, message, code\);/);
   assert.match(main, /activeSessionId = 0; \/\/ immediately reject delayed partial/);
   assert.match(main, /const cleanupOk = \(await disposeCaptionResourcesSafely\(/);
   assert.match(main, /\(\) => releaseDiagnosticCapture\("未使用"\)/);
@@ -41,6 +41,7 @@ test("fatal fix refreshes the browser's main, provider, and provider-implementat
   assert.match(main, new RegExp('const BUILD_ID = "' + version + '"'));
   assert(main.includes("./stt/provider.js?v=" + version));
   assert(router.includes("./providers/gemini-live-transcribe.js?v=" + version));
+  assert(router.includes("./providers/google-cloud-streaming.js?v=" + version));
   assert(html.includes("./main.js?v=" + version));
 });
 
@@ -125,4 +126,42 @@ test("earlier diagnostic close failure remains a sticky no-retry condition", () 
   assert.match(main, /diagnosticCleanupFailed = true;/);
   assert.equal((main.match(/\)\) && !diagnosticCleanupFailed;/g) ?? []).length, 2);
   assert.match(main, /cleanupError \?\?= error/);
+});
+
+test("unexpected Google proxy close stops PCM and signals fatal UI cleanup exactly once", () => {
+  const errors = [];
+  const provider = new GoogleCloudStreamingProvider({ onError: (event) => errors.push(event) });
+  const socket = {};
+  provider.socket = socket;
+  provider.active = true;
+  provider.proxyReady = true;
+
+  provider.handleUnexpectedProxyClose(socket, { code: 1006 });
+  assert.equal(provider.active, false);
+  assert.equal(provider.proxyReady, false);
+  assert.deepEqual(errors, [{
+    providerId: "google-cloud-streaming",
+    code: "proxy-closed",
+    message: "Google STT proxy connection closed.",
+    fatal: true,
+  }]);
+
+  provider.handleUnexpectedProxyClose(socket, { code: 1006 });
+  assert.equal(errors.length, 1, "duplicate close cannot trigger a second cleanup");
+});
+
+test("Google proxy close during explicit stop or from stale socket is not fatal", () => {
+  const errors = [];
+  const provider = new GoogleCloudStreamingProvider({ onError: (event) => errors.push(event) });
+  const socket = {};
+  provider.socket = socket;
+  provider.active = true;
+  provider.stopping = true;
+  provider.handleUnexpectedProxyClose(socket, { code: 1000 });
+  assert.equal(errors.length, 0);
+
+  provider.stopping = false;
+  provider.handleUnexpectedProxyClose({}, { code: 1006 });
+  assert.equal(errors.length, 0);
+  assert.equal(provider.active, true);
 });
