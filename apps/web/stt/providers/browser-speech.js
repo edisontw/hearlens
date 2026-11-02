@@ -70,6 +70,8 @@ export class BrowserSpeechProvider {
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
+      // A superseded recognizer must not announce a new listening session.
+      if (!this.active || this.recognition !== recognition) return;
       this.debug("start");
       this.onStatus({
         state: "listening",
@@ -87,6 +89,9 @@ export class BrowserSpeechProvider {
     recognition.onnomatch = () => this.debug("nomatch");
 
     recognition.onresult = (event) => {
+      // Android may deliver a result after a segment has ended/restarted.
+      // Preserve the active segment's partials and final-only history.
+      if (this.recognition !== recognition) return;
       let interim = "";
       let finalCount = 0;
 
@@ -143,11 +148,14 @@ export class BrowserSpeechProvider {
     };
 
     recognition.onend = () => {
-      this.debug("end");
-
-      if (this.recognition === recognition) {
-        this.recognition = null;
+      // Duplicate/late end events must not clear the new segment's interim,
+      // resolve its Stop, or schedule an extra competing recognizer.
+      if (this.recognition !== recognition) {
+        this.debug("stale-end-ignored");
+        return;
       }
+      this.debug("end");
+      this.recognition = null;
 
       this.onPartial({
         text: "",

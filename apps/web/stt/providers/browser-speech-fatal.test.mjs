@@ -88,3 +88,52 @@ test("synchronous recognition start failure is terminal, not an endless retry lo
     assert.equal(f.timers.size, 0);
   } finally { f.restore(); }
 });
+
+test("stale segment callbacks cannot erase current captions or start duplicate recognizers", async () => {
+  const f = fakeSpeech();
+  try {
+    const partials = [];
+    const finals = [];
+    const provider = new BrowserSpeechProvider({
+      onPartial: event => partials.push(event.text),
+      onFinal: event => finals.push(event.text),
+    });
+    await provider.start();
+    const oldSegment = f.instances[0];
+    oldSegment.onend();
+    assert.equal(f.timers.size, 1, "normal segment end schedules one restart");
+    const [key, restart] = f.timers.entries().next().value;
+    f.timers.delete(key);
+    restart();
+    const currentSegment = f.instances[1];
+    assert.equal(provider.recognition, currentSegment);
+
+    currentSegment.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "新段落暫存" }, isFinal: false }],
+    });
+    assert.equal(partials.at(-1), "新段落暫存");
+    const partialCount = partials.length;
+
+    // The retired recognizer can deliver a delayed final, start or duplicate
+    // end after its replacement is already active. None belongs to the new
+    // conversation segment or should start a third recognizer.
+    oldSegment.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "過期結果" }, isFinal: true }],
+    });
+    oldSegment.onstart();
+    oldSegment.onend();
+    assert.equal(finals.length, 0, "stale final must not enter history");
+    assert.equal(partials.length, partialCount, "stale end must not erase current interim");
+    assert.equal(f.timers.size, 0, "stale end must not schedule another restart");
+    assert.equal(provider.recognition, currentSegment);
+
+    currentSegment.onresult({
+      resultIndex: 0,
+      results: [{ 0: { transcript: "新段落已確認" }, isFinal: true }],
+    });
+    assert.deepEqual(finals, ["新段落已確認"]);
+    await provider.dispose();
+  } finally { f.restore(); }
+});
