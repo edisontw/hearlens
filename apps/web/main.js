@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-defer-stale-build1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-defer-stale-build1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-defer-stale-build1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-defer-stale-build1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-defer-stale-build1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-defer-stale-build1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-settings-transcript-guard1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-settings-transcript-guard1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-settings-transcript-guard1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-settings-transcript-guard1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-settings-transcript-guard1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-settings-transcript-guard1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-defer-stale-build1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-settings-transcript-guard1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-defer-stale-build1";
+} from "./transcript-window.mjs?v=20261103-settings-transcript-guard1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-defer-stale-build1";
+const BUILD_ID = "20261103-settings-transcript-guard1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -320,7 +320,20 @@ function setAdvancedTuningDisabled(disabled) {
   }
 }
 
+// Settings apply via page navigation. A completed conversation is memory-only;
+// make the loss explicit before discarding finalized captions on reload.
+function confirmSettingsReload() {
+  if (sessionFinals.length === 0) return true;
+  if (window.confirm("更改收音設定會重新載入頁面並清除本次尚未儲存的字幕。請先使用「複製完整字幕」保留內容。確定繼續？")) {
+    return true;
+  }
+  // A cancelled <select> change must reflect the still-active preset.
+  renderPresetUi();
+  return false;
+}
+
 function applyAdvancedTuning() {
+  if (!confirmSettingsReload()) return;
   const url = new URL(window.location.href);
   url.searchParams.delete("gain");
   url.searchParams.delete("_build");
@@ -370,6 +383,7 @@ async function copyAdvancedTuningLink() {
 }
 
 function applyQuickPreset(preset) {
+  if (!confirmSettingsReload()) return;
   const url = new URL(window.location.href);
   url.searchParams.delete("gain");
   url.searchParams.delete("capture");
