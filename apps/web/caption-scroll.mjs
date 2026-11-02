@@ -12,3 +12,19 @@ export function shouldFollowCaptionScroll(
       thresholdPx < 0) return false;
   return scrollHeight - scrollTop - clientHeight <= thresholdPx;
 }
+
+/**
+ * Preserve the live/latest reading position when a presentation-only change
+ * (such as caption font size) alters scrollHeight. A reader who intentionally
+ * scrolled up keeps their current position instead of being forced to the end.
+ */
+export function preserveCaptionScrollOnLayoutChange(caption, applyChange) {
+  if (!caption || typeof applyChange !== "function") {
+    throw new TypeError("Caption and layout callback are required.");
+  }
+  const follow = shouldFollowCaptionScroll(
+    caption.scrollTop, caption.scrollHeight, caption.clientHeight);
+  applyChange();
+  if (follow) caption.scrollTop = caption.scrollHeight;
+  return follow;
+}
