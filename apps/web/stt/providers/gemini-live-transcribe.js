@@ -254,7 +254,7 @@ export class GeminiLiveTranscribeProvider {
     });
 
     socket.addEventListener("message", (event) => {
-      void this.handleMessage(event);
+      void this.handleMessage(event, socket);
     });
     socket.addEventListener("close", (event) => {
       if (this.socket !== socket) return;
@@ -298,8 +298,12 @@ export class GeminiLiveTranscribeProvider {
     }, STOP_DRAIN_GRACE_MS);
   }
 
-  async handleMessage(event) {
+  async handleMessage(event, socket = this.socket) {
+    // Events from a retired WebSocket must not enter a later caption session.
+    if (socket !== this.socket) return;
     const text = await decodeWebSocketData(event.data);
+    // Blob decoding may finish after stop/dispose or a manual restart.
+    if (socket !== this.socket) return;
     // Decoding may finish after the connection has already faulted.
     if (this.fatalTransportHandled && !this.stopping) return;
     if (!text) {
