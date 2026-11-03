@@ -11,7 +11,8 @@ export function recentTranscriptItems(
   return items.filter((item) => {
     const time = Number(item?.time);
     const text = String(item?.text || "").trim();
-    return text && Number.isFinite(time) && safeNow - time <= safeWindow;
+    const age = safeNow - time;
+    return Boolean(text) && Number.isFinite(time) && age >= 0 && age <= safeWindow;
   });
 }
 
