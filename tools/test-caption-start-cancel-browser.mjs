@@ -272,6 +272,32 @@ try {
     assert.doesNotMatch(await historyPage.locator("#recall-list").innerText(), /上一段完整字幕/);
     assert.equal(await historyPage.locator("#copy-complete-transcript").isDisabled(), true);
     assert.equal(await historyPage.locator("#download-complete-transcript").isDisabled(), true);
+    // A user paging back through a long conversation must not lose the
+    // earliest loaded sentence as more finalized captions arrive live.
+    // All speech here is synthetic Browser STT; no microphone/audio output.
+    await historyPage.evaluate(() => {
+      for (let i = 1; i <= 125; i += 1) {
+        const final = [{ transcript: "第" + String(i).padStart(3, "0") + "段" }];
+        final.isFinal = true;
+        window.__recognizers.at(-1).onresult({ resultIndex: 0, results: [final] });
+      }
+    });
+    await historyPage.locator("#recall-complete").click();
+    await historyPage.locator("#recall-load-earlier").click();
+    assert.equal(await historyPage.locator("#recall-list .recall-item-text").first().innerText(),
+      "第006段", "older page should begin with the sixth finalized segment");
+    await historyPage.evaluate(() => {
+      for (let i = 126; i <= 130; i += 1) {
+        const final = [{ transcript: "第" + String(i).padStart(3, "0") + "段" }];
+        final.isFinal = true;
+        window.__recognizers.at(-1).onresult({ resultIndex: 0, results: [final] });
+      }
+    });
+    assert.equal(await historyPage.locator("#recall-list .recall-item-text").first().innerText(),
+      "第006段", "new finals must not evict an earlier page being read");
+    assert.equal(await historyPage.locator("#recall-list .recall-item-text").last().innerText(),
+      "第130段", "new finalized captions remain visible at the end");
+
     await historyPage.locator("#stop").click();
     await historyPage.waitForFunction(() =>
       document.querySelector("#status")?.textContent === "已停止");
