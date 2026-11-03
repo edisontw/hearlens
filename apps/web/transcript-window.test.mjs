@@ -26,6 +26,24 @@ test("recent transcript keeps only non-empty items inside the rolling window", (
   ]);
 });
 
+test("future-dated finalized captions stay out of live and recall windows", () => {
+  const now = 100_000;
+  const items = [
+    { text: "有效字幕", time: now - 100 },
+    { text: "未來字幕", time: now + 1 },
+    { text: "過期字幕", time: now - 30_001 },
+  ];
+  const before = JSON.stringify(items);
+  assert.deepEqual(recentTranscriptItems(items, now), [items[0]]);
+  assert.equal(currentCaptionText(items, "", null, now), "有效字幕");
+  assert.equal(retainedCaptionText(items, null, "", null, now), "有效字幕");
+  assert.equal(JSON.stringify(items), before);
+  assert.deepEqual(recentTranscriptItems([{ text: "未來字幕", time: now + 1 }], now), []);
+  assert.deepEqual(recentTranscriptItems([{ text: "當下字幕", time: now }], now, 0), [
+    { text: "當下字幕", time: now },
+  ]);
+});
+
 test("recent transcript text preserves segment boundaries", () => {
   assert.equal(
     recentTranscriptText([
