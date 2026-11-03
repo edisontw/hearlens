@@ -1,14 +1,14 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-transcript-download1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-transcript-download1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-transcript-download1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-transcript-download1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-transcript-download1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-transcript-download1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-review-anchor1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-review-anchor1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-review-anchor1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-review-anchor1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-review-anchor1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-review-anchor1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-transcript-download1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-review-anchor1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +20,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-transcript-download1";
+} from "./transcript-window.mjs?v=20261103-review-anchor1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -46,7 +46,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-transcript-download1";
+const BUILD_ID = "20261103-review-anchor1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -611,6 +611,13 @@ function addFinalTranscript(text, rawText = text) {
   displayFinals.push(item);
   lastDisplayFinal = item;
   captionManuallyCleared = false;
+  // If someone loaded older session captions, keep that oldest sentence in
+  // the review window as new finals arrive; otherwise each append silently
+  // evicts a sentence from the top while they are reading it.
+  if (recallView === "session" && els.recallPanel && !els.recallPanel.hidden &&
+      reviewVisibleCount > SESSION_REVIEW_PAGE_SIZE) {
+    reviewVisibleCount += 1;
+  }
   sessionFinals.push(item);
   syncCompleteTranscriptCopyButton();
   rememberRecognizedText(clean, now);
