@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261104-android-voice1" />
+    <link rel="stylesheet" href="./styles.css?v=20261104-android-auto-ui2" />
   </head>
   <body>
     <main class="shell">
@@ -58,12 +58,13 @@
         </div>
 
         <div class="quick-profile" aria-label="快速收音設定">
-          <label for="quick-preset">收音模式</label>
-          <select id="quick-preset">
+          <strong id="quick-preset-title" class="quick-preset-title">收音模式</strong>
+          <select id="quick-preset" aria-labelledby="quick-preset-title">
             <option value="auto">自動（建議）</option>
             <option value="far-noisy">遠距離／吵雜</option>
             <option value="custom" disabled>工程覆寫</option>
           </select>
+          <output id="android-preset-status" class="android-preset-status" aria-labelledby="quick-preset-title" hidden>自動（建議）</output>
           <button id="reset-preset" class="text-button" type="button">恢復自動</button>
           <span id="preset-hint"></span>
         </div>
@@ -284,6 +285,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261104-android-voice1"></script>
+    <script type="module" src="./main.js?v=20261104-android-auto-ui2"></script>
   </body>
 </html>

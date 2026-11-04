@@ -29,11 +29,13 @@ export function resolveQuickPreset({
   platform = "",
 } = {}) {
   const requestedPreset = normalizeQuickPreset(presetValue);
+  const android = isAndroidPlatform({ userAgent, platform });
+  // Android Auto and legacy Far both request the same voice capture. Treat
+  // ?preset=far-noisy as Auto in the consumer UI while preserving its voice path.
+  const effectivePreset = android && requestedPreset === QUICK_PRESETS.FAR_NOISY
+    ? QUICK_PRESETS.AUTO : requestedPreset;
   const presetCaptureMode =
-    requestedPreset === QUICK_PRESETS.FAR_NOISY ||
-    isAndroidPlatform({ userAgent, platform })
-      ? "voice"
-      : "raw";
+    requestedPreset === QUICK_PRESETS.FAR_NOISY || android ? "voice" : "raw";
 
   if (captureOverridePresent || tuningOverridePresent) {
     return {
@@ -45,7 +47,7 @@ export function resolveQuickPreset({
   }
 
   return {
-    preset: requestedPreset,
+    preset: effectivePreset,
     captureMode: presetCaptureMode,
   };
 }

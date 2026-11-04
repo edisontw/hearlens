@@ -118,3 +118,30 @@ test("Android tuning override keeps voice unless capture is explicitly overridde
     captureMode: "voice",
   });
 });
+
+test("Android legacy Far link is shown as Auto without changing Voice capture", () => {
+  assert.deepEqual(resolveQuickPreset({
+    presetValue: "far-noisy",
+    userAgent: "Mozilla/5.0 (Linux; Android 13; moto g62) AppleWebKit/537.36",
+  }), {
+    preset: QUICK_PRESETS.AUTO,
+    captureMode: "voice",
+  });
+  assert.deepEqual(resolveQuickPreset({
+    presetValue: "far-noisy",
+    platform: "Android",
+  }), {
+    preset: QUICK_PRESETS.AUTO,
+    captureMode: "voice",
+  });
+  // Explicit research tuning still takes precedence over the legacy preset.
+  assert.deepEqual(resolveQuickPreset({
+    presetValue: "far-noisy",
+    userAgent: "Android 13",
+    captureOverridePresent: true,
+    captureValue: "raw",
+  }), {
+    preset: QUICK_PRESETS.CUSTOM,
+    captureMode: "raw",
+  });
+});

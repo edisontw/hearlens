@@ -50,5 +50,16 @@ every request. Auto was not an acoustic scene classifier.
 - A true scene-aware Auto would require a separate, evidence-gated design
   and cross-device outcome benchmarks. This patch does **not** implement one.
 
+## Android single-mode consumer UI (2026-11-04 follow-up)
+
+The first patch still displayed Auto and Far/Noisy as separate choices on Android,
+although both captured Voice audio. The follow-up hides that duplicate choice
+on Android and displays a static Auto status for general users. On iPhone/iPad
+and desktop the two meaningful presets remain visible, preserving raw Auto and
+voice Far capture. Android links using `?preset=far-noisy` keep Voice capture
+but resolve to the Auto label; explicit research `?capture=raw` remains Custom
+and exposes a manual reset button. No hearing output or automatic capture
+transition was introduced.
+
 This is caption-only code. It does not change hearing amplification, output
 routing, Bluetooth latency, calibration or the safety hard gates.

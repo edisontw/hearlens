@@ -396,8 +396,23 @@ details > summary {
   border-radius: 14px;
 }
 
-.quick-profile label {
+.quick-profile label,
+.quick-profile .quick-preset-title {
   font-weight: 700;
+}
+
+.quick-profile .android-preset-status {
+  display: block;
+  grid-column: auto;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.quick-profile select[hidden],
+.quick-profile .android-preset-status[hidden],
+.quick-profile #reset-preset[hidden] {
+  display: none;
 }
 
 .quick-profile select {
