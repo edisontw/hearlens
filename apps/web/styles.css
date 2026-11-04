@@ -186,6 +186,18 @@ h2 {
 }
 
 
+.caption-health-hint {
+  margin: 0.5rem 0;
+  padding-left: 0.7rem;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+.caption-health-hint[hidden] {
+  display: none;
+}
+
 .wake-lock-hint {
   margin: 0.55rem 0 0;
   color: var(--muted);
