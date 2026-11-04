@@ -6,6 +6,14 @@ export const QUICK_PRESETS = Object.freeze({
   CUSTOM: "custom",
 });
 
+// The default is a platform policy, not an automatic acoustic scene classifier.
+// Existing field evidence favors Android's OS voice-processing capture path;
+// leave non-Android devices on their previous raw baseline.
+export function isAndroidPlatform({ userAgent = "", platform = "" } = {}) {
+  return /\bAndroid\b/i.test(String(userAgent)) ||
+    /^android$/i.test(String(platform).trim());
+}
+
 export function normalizeQuickPreset(value) {
   return String(value || "").trim().toLowerCase() === QUICK_PRESETS.FAR_NOISY
     ? QUICK_PRESETS.FAR_NOISY
@@ -17,10 +25,15 @@ export function resolveQuickPreset({
   captureOverridePresent = false,
   captureValue = "",
   tuningOverridePresent = false,
+  userAgent = "",
+  platform = "",
 } = {}) {
   const requestedPreset = normalizeQuickPreset(presetValue);
   const presetCaptureMode =
-    requestedPreset === QUICK_PRESETS.FAR_NOISY ? "voice" : "raw";
+    requestedPreset === QUICK_PRESETS.FAR_NOISY ||
+    isAndroidPlatform({ userAgent, platform })
+      ? "voice"
+      : "raw";
 
   if (captureOverridePresent || tuningOverridePresent) {
     return {
