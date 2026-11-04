@@ -62,20 +62,20 @@ try {
     assert.equal(await androidPage.locator("#android-preset-status").isVisible(), true);
     assert.match(await androidPage.locator("#android-preset-status").innerText(), /自動/);
     assert.equal(await androidPage.locator("#reset-preset").isVisible(), false);
-    assert.match(await androidPage.locator("#diag-runtime").innerText(), /preset=auto \/ capture=voice/);
+    assert.match(await androidPage.locator("#diag-runtime").textContent(), /preset=auto \/ capture=voice/);
 
     await androidPage.goto(origin + "/index.html?preset=far-noisy", { waitUntil: "networkidle" });
-    assert.match(await androidPage.locator("#diag-runtime").innerText(), /preset=auto \/ capture=voice/);
+    assert.match(await androidPage.locator("#diag-runtime").textContent(), /preset=auto \/ capture=voice/);
     assert.equal(await androidPage.locator("#quick-preset").isVisible(), false);
     assert.match(await androidPage.locator("#android-preset-status").innerText(), /自動/);
 
     await androidPage.goto(origin + "/index.html?capture=raw", { waitUntil: "networkidle" });
-    assert.match(await androidPage.locator("#diag-runtime").innerText(), /preset=custom \/ capture=raw/);
+    assert.match(await androidPage.locator("#diag-runtime").textContent(), /preset=custom \/ capture=raw/);
     assert.match(await androidPage.locator("#android-preset-status").innerText(), /工程覆寫/);
     assert.equal(await androidPage.locator("#reset-preset").isVisible(), true);
     await androidPage.locator("#reset-preset").click();
     await androidPage.waitForURL(url => !url.searchParams.has("capture"));
-    assert.match(await androidPage.locator("#diag-runtime").innerText(), /preset=auto \/ capture=voice/);
+    assert.match(await androidPage.locator("#diag-runtime").textContent(), /preset=auto \/ capture=voice/);
     assert.equal(await androidPage.locator("#reset-preset").isVisible(), false);
     assert.deepEqual(androidErrors, []);
     console.log("PASS: Android Auto is the only consumer preset, legacy Far and raw override remain compatible");
@@ -94,10 +94,10 @@ try {
     await iphonePage.goto(origin + "/index.html", { waitUntil: "networkidle" });
     assert.equal(await iphonePage.locator("#quick-preset").isVisible(), true);
     assert.equal(await iphonePage.locator("#android-preset-status").isVisible(), false);
-    assert.match(await iphonePage.locator("#diag-runtime").innerText(), /preset=auto \/ capture=raw/);
+    assert.match(await iphonePage.locator("#diag-runtime").textContent(), /preset=auto \/ capture=raw/);
     await iphonePage.locator("#quick-preset").selectOption("far-noisy");
     await iphonePage.waitForURL(url => url.searchParams.get("preset") === "far-noisy");
-    assert.match(await iphonePage.locator("#diag-runtime").innerText(), /capture=voice/);
+    assert.match(await iphonePage.locator("#diag-runtime").textContent(), /capture=voice/);
     console.log("PASS: iPhone Auto/raw and Far/voice remain independently selectable");
   } finally {
     await iphoneContext.close();
