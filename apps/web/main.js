@@ -1,14 +1,15 @@
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261103-review-anchor1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261103-review-anchor1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261103-review-anchor1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261103-review-anchor1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261103-review-anchor1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261103-review-anchor1";
+import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261104-android-voice1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261104-android-voice1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261104-android-voice1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261104-android-voice1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261104-android-voice1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261104-android-voice1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261104-android-voice1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261103-review-anchor1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261104-android-voice1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -20,7 +21,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261103-review-anchor1";
+} from "./transcript-window.mjs?v=20261104-android-voice1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -39,14 +40,14 @@ import {
 import {
   QUICK_PRESETS,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261008-stop-flush1";
+} from "./stt/providers/quick-presets.mjs?v=20261104-android-voice1";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261103-review-anchor1";
+const BUILD_ID = "20261104-android-voice1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -78,6 +79,8 @@ function readRuntimeSttConfig() {
     captureOverridePresent,
     captureValue: params.get("capture"),
     tuningOverridePresent: tuningProfile.enabled || fixedGainRequested,
+    userAgent: navigator.userAgent || "",
+    platform: navigator.userAgentData?.platform || navigator.platform || "",
   });
 
   const tokenUrl = (params.get("token") || DEFAULT_GEMINI_TOKEN_URL).trim();
@@ -116,6 +119,7 @@ const els = {
   quickPreset: document.querySelector("#quick-preset"),
   resetPreset: document.querySelector("#reset-preset"),
   presetHint: document.querySelector("#preset-hint"),
+  captionHealthHint: document.querySelector("#caption-health-hint"),
   advancedTuningFieldset: document.querySelector("#advanced-tuning-fieldset"),
   tuningTarget: document.querySelector("#tuning-target"),
   tuningMinGain: document.querySelector("#tuning-min-gain"),
@@ -183,6 +187,7 @@ let activeSessionId = 0;
 let activeInputProfile = null;
 let activeCaptureSettings = null;
 let activeCaptionLatency = null;
+const captionNoTextMonitor = createCaptionNoTextMonitor();
 let captionStopRequested = false;
 let captionStartupPending = false;
 let diagnosticCleanupFailed = false; // Sticky until reload if any diagnostic release rejects.
@@ -270,10 +275,12 @@ function renderPresetUi() {
   if (els.presetHint) {
     els.presetHint.textContent =
       runtimeSttConfig.preset === QUICK_PRESETS.FAR_NOISY
-        ? "遠距離／吵雜：使用已在 iPhone 與 HTC U23 測試中改善辨識的 voice capture。"
+        ? "遠距離／吵雜：固定使用 voice 收音；Android 上可能與自動模式相同。"
         : runtimeSttConfig.preset === QUICK_PRESETS.CUSTOM
           ? "目前使用工程參數覆寫；按「恢復自動」可回到標準設定。"
-          : "自動：使用 raw capture；目前仍是一般情境的標準設定。";
+          : runtimeSttConfig.captureMode === "voice"
+            ? "自動：Android 優先使用 voice 收音以提高字幕可靠性；目前不會依環境即時切換。"
+            : "自動：此平台延續 raw 收音設定；目前不會依環境即時切換。";
   }
 }
 
@@ -504,6 +511,10 @@ function appendSttLog(message) {
   }
 }
 
+function clearCaptionHealthHint() {
+  if (els.captionHealthHint) els.captionHealthHint.hidden = true;
+}
+
 function trimTranscript(now = Date.now()) {
   while (transcript.length && now - transcript[0].time > ROLLING_WINDOW_MS) {
     transcript.shift();
@@ -545,6 +556,14 @@ function refreshCaptionWindow() {
     const text = visibleDisplayTranscript() || (captionManuallyCleared
       ? "" : "字幕會顯示在這裡。");
     updateCaptionDisplay(text);
+  }
+  // Advisory only: avoid a warning for quiet rooms or short interactions.
+  // Never restart capture or change cloud STT policy without user action.
+  if (activeSessionId && !captionStopRequested && !captionStartupPending &&
+      captionNoTextMonitor.shouldWarn(now)) {
+    if (els.captionHealthHint) els.captionHealthHint.hidden = false;
+    appendSttLog("S" + activeSessionId +
+      " caption-no-text-warning audio-sent speech-active no-transcript");
   }
   if (els.recallPanel && !els.recallPanel.hidden) renderRecall();
   syncCaptionRefreshTimer();
@@ -1046,6 +1065,7 @@ async function releaseDiagnosticCapture(label = "已釋放") {
 // "listening" or retain the microphone after the WebSocket has died.
 async function failClosedCaptionSession(expectedSessionId, message, code) {
   if (expectedSessionId !== activeSessionId) return;
+  clearCaptionHealthHint();
   captionStartupPending = false;
   els.stop.textContent = "停止聆聽";
   captionScreenWakeLock.stop();
@@ -1137,6 +1157,8 @@ async function startSession() {
   activeInputProfile = null;
   activeCaptureSettings = null;
   activeCaptionLatency = createCaptionLatencyTelemetry(Date.now());
+  captionNoTextMonitor.reset();
+  clearCaptionHealthHint();
   renderCaptionLatencyTelemetry();
   // Keep the preceding finalized conversation available for review/copy
   // while permission, token or socket startup is still uncertain.
@@ -1201,6 +1223,10 @@ async function startSession() {
   const pendingCaptionEvents = [];
   const handleCaptionPartial = ({ text, timestamp }) => {
     if (sessionId !== activeSessionId) return;
+    if (text?.trim()) {
+      captionNoTextMonitor.onRecognizedText(text);
+      clearCaptionHealthHint();
+    }
     if (captionStartupPending) {
       pendingCaptionEvents.push({ kind: "partial", text, timestamp });
       return;
@@ -1220,6 +1246,10 @@ async function startSession() {
   };
   const handleCaptionFinal = ({ text, timestamp }) => {
     if (sessionId !== activeSessionId) return;
+    if (text?.trim()) {
+      captionNoTextMonitor.onRecognizedText(text);
+      clearCaptionHealthHint();
+    }
     if (captionStartupPending) {
       pendingCaptionEvents.push({ kind: "final", text, timestamp });
       return;
@@ -1267,8 +1297,10 @@ async function startSession() {
       if (sessionId !== activeSessionId) return;
       if (event === "audio-first-chunk") {
         markFirstAudioChunk(activeCaptionLatency, timestamp);
+        captionNoTextMonitor.onAudioSent(timestamp ?? Date.now());
         renderCaptionLatencyTelemetry();
       }
+      if (event === "audio-level") captionNoTextMonitor.onAudioLevel(detail);
       if (event === "input-profile" && detail) {
         try {
           activeInputProfile = JSON.parse(detail);
@@ -1351,6 +1383,7 @@ async function cancelStartupSession() {
   // and its stream stopped by startSession()/provider.startCapture() guards.
   captionStartupPending = false;
   captionStopRequested = true;
+  clearCaptionHealthHint();
   activeSessionId = 0;
   captionScreenWakeLock.stop();
   els.start.disabled = true;
@@ -1391,6 +1424,7 @@ async function cancelStartupSession() {
 async function stopSession() {
   const sessionId = activeSessionId;
   if (!sessionId || captionStopRequested) return;
+  clearCaptionHealthHint();
   captionScreenWakeLock.stop();
   captionStopRequested = true;
   els.stop.disabled = true;
@@ -1441,6 +1475,7 @@ async function stopSession() {
 }
 
 async function cleanupFailedStart(error) {
+  clearCaptionHealthHint();
   captionStartupPending = false;
   els.stop.textContent = "停止聆聽";
   captionScreenWakeLock.stop();

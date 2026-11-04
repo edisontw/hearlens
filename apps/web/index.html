@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261103-review-anchor1" />
+    <link rel="stylesheet" href="./styles.css?v=20261104-android-voice1" />
   </head>
   <body>
     <main class="shell">
@@ -36,6 +36,7 @@
         <div id="caption" class="caption" tabindex="0"
           role="log" aria-label="即時字幕，內容過長時可在框內捲動"
           aria-live="polite" aria-atomic="true" aria-relevant="text">字幕會顯示在這裡。</div>
+        <p id="caption-health-hint" class="caption-health-hint" role="status" hidden>已持續收到語音，但還沒有字幕。若正在交談，請停止後重新開始；若仍無法辨識，可在「研究／裝置資訊」查看收音設定與記錄。</p>
         <button id="caption-jump-latest" class="secondary caption-jump-latest" type="button" hidden>回到最新字幕</button>
 
         <div class="actions">
@@ -256,7 +257,7 @@
               在第二支手機開啟測試音檔
             </a>
             <span>只在播放用的第二支手機開啟；辨識用手機不要播放此音檔。</span>
-            <span>一般使用請直接選上方「遠距離／吵雜」；<code>?capture=...</code> 僅保留作工程覆寫。</span>
+            <span>一般使用請先選「自動」。Android 預設使用 Voice；Raw 僅保留於進階工程設定。</span>
           </div>
 
           <div class="report-actions">
@@ -283,6 +284,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261103-review-anchor1"></script>
+    <script type="module" src="./main.js?v=20261104-android-voice1"></script>
   </body>
 </html>
