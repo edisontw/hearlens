@@ -275,7 +275,7 @@ function renderPresetUi() {
   if (els.presetHint) {
     els.presetHint.textContent =
       runtimeSttConfig.preset === QUICK_PRESETS.FAR_NOISY
-        ? "遠距離／吵雜：使用已在 iPhone 與 HTC U23 測試中改善辨識的 voice capture。"
+        ? "遠距離／吵雜：固定使用 voice 收音；Android 上可能與自動模式相同。"
         : runtimeSttConfig.preset === QUICK_PRESETS.CUSTOM
           ? "目前使用工程參數覆寫；按「恢復自動」可回到標準設定。"
           : runtimeSttConfig.captureMode === "voice"
