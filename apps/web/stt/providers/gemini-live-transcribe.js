@@ -8,6 +8,8 @@ import {
 const GEMINI_MODEL = "gemini-3.5-transcribe-live";
 const TARGET_SAMPLE_RATE = 16_000;
 const TARGET_CHUNK_SAMPLES = 1_600;
+// Roughly three seconds of 16-kHz PCM in base64 JSON.
+const MAX_QUEUED_AUDIO_BYTES = 128 * 1024;
 const OPEN_TIMEOUT_MS = 8_000;
 const TOKEN_TIMEOUT_MS = 8_000;
 const SETUP_TIMEOUT_MS = 8_000;
@@ -512,16 +514,23 @@ export class GeminiLiveTranscribeProvider {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
-    socket.send(
-      JSON.stringify({
-        realtimeInput: {
-          audio: {
-            data: pcm16Base64(samples),
-            mimeType: "audio/pcm;rate=16000",
-          },
+    const payload = JSON.stringify({
+      realtimeInput: {
+        audio: {
+          data: pcm16Base64(samples),
+          mimeType: "audio/pcm;rate=16000",
         },
-      }),
-    );
+      },
+    });
+    const queuedBytes = socket.bufferedAmount;
+    // The payload is ASCII. An intentional Stop may flush one short tail.
+    if (!this.stopping && queuedBytes + payload.length > MAX_QUEUED_AUDIO_BYTES) {
+      this.debug("audio-send-backlog", "buffered-bytes=" + queuedBytes);
+      this.handleUnexpectedTransportFailure(socket, "gemini-audio-backlog",
+        "音訊傳送延遲，請檢查網路後重新開始");
+      return;
+    }
+    socket.send(payload);
 
     if (!this.firstAudioSent) {
       this.firstAudioSent = true;
