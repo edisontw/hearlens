@@ -785,6 +785,9 @@ export class GeminiLiveTranscribeProvider {
 
   async stop() {
     this.debug("provider-stop");
+    // Keep only the remainder from an established session. Cleanup releases
+    // the microphone and clears the live buffer before any final send.
+    const finalSamples = this.listeningReady ? this.pendingSamples : null;
     this.startEpoch += 1;
     this.tokenAbortController?.abort();
     this.socketOpenRejecter?.();
@@ -810,6 +813,10 @@ export class GeminiLiveTranscribeProvider {
     }
 
     if (socket.readyState === WebSocket.OPEN) {
+      if (finalSamples?.length) {
+        this.sendAudioChunk(finalSamples);
+        this.debug("audio-tail-queued", "samples=" + finalSamples.length);
+      }
       socket.send(
         JSON.stringify({
           realtimeInput: {

@@ -123,6 +123,8 @@ test("stop after an already-closed Gemini socket retires queued captions", async
     provider.onFinal = event => finals.push(event.text);
     provider.onStatus = event => states.push(event.state);
     provider.listeningReady = true;
+    provider.pushResampledSamples(new Float32Array([0.5]));
+    socket.send = () => assert.fail("closed socket must not receive the PCM remainder");
 
     // The transport can close while stop() is releasing microphone resources.
     socket.readyState = FakeTransportSocket.CLOSED;
@@ -138,6 +140,52 @@ test("stop after an already-closed Gemini socket retires queued captions", async
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(finals, []);
     assert.deepEqual(errors, [], "normal stop must not report a fatal error");
+  });
+});
+
+test("manual Gemini stop sends remaining PCM exactly once before audioStreamEnd", async () => {
+  for (const [wholeChunks, tailLength] of [[0, 3], [1, 1599], [1, 0]]) {
+    await withFakeWebSocket(async ({ provider, socket }) => {
+      const sent = [];
+      socket.send = payload => sent.push(JSON.parse(payload).realtimeInput);
+      provider.listeningReady = true;
+      const samples = new Float32Array(wholeChunks * 1600 + tailLength);
+      if (tailLength) samples.set([0.5, -0.5, 0.25], wholeChunks * 1600);
+      provider.pushResampledSamples(samples);
+      assert.equal(sent.length, wholeChunks, "only full chunks are sent while listening");
+
+      const stopping = provider.stop();
+      await new Promise(resolve => setImmediate(resolve));
+      socket.close();
+      await stopping;
+
+      assert.deepEqual(sent.at(-1), { audioStreamEnd: true });
+      const chunks = sent.slice(0, -1);
+      assert.equal(chunks.length, wholeChunks + Number(tailLength > 0));
+      if (tailLength) {
+        const { data, mimeType } = chunks.at(-1).audio;
+        const pcm = Buffer.from(data, "base64");
+        assert.equal(mimeType, "audio/pcm;rate=16000");
+        assert.equal(pcm.length, tailLength * 2, "no padding or duplicated samples");
+        assert.deepEqual([0, 2, 4].map(offset => pcm.readInt16LE(offset)),
+          [16383, -16384, 8191]);
+      }
+      assert.deepEqual(provider.pendingSamples, []);
+    });
+  }
+});
+
+test("Gemini disposal discards buffered PCM without sending it", async () => {
+  await withFakeWebSocket(async ({ provider, socket }) => {
+    let sends = 0;
+    socket.send = () => { sends += 1; };
+    provider.listeningReady = true;
+    provider.pushResampledSamples(new Float32Array([0.5, -0.5]));
+
+    await provider.dispose();
+
+    assert.equal(sends, 0);
+    assert.deepEqual(provider.pendingSamples, []);
   });
 });
 
