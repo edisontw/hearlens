@@ -1,4 +1,4 @@
-import { normalizeCaptureMode } from "./capture-profile.mjs";
+import { CAPTURE_MODES } from "./capture-profile.mjs";
 
 export const QUICK_PRESETS = Object.freeze({
   AUTO: "auto",
@@ -20,10 +20,14 @@ export function normalizeQuickPreset(value) {
     : QUICK_PRESETS.AUTO;
 }
 
+export function parseCaptureOverride(value) {
+  const mode = String(value ?? "").trim().toLowerCase();
+  return mode === CAPTURE_MODES.RAW || mode === CAPTURE_MODES.VOICE ? mode : null;
+}
+
 export function resolveQuickPreset({
   presetValue = "",
-  captureOverridePresent = false,
-  captureValue = "",
+  captureOverride = null,
   tuningOverridePresent = false,
   userAgent = "",
   platform = "",
@@ -37,17 +41,10 @@ export function resolveQuickPreset({
   const presetCaptureMode =
     requestedPreset === QUICK_PRESETS.FAR_NOISY || android ? "voice" : "raw";
 
-  if (captureOverridePresent || tuningOverridePresent) {
-    return {
-      preset: QUICK_PRESETS.CUSTOM,
-      captureMode: captureOverridePresent
-        ? normalizeCaptureMode(captureValue)
-        : presetCaptureMode,
-    };
-  }
-
   return {
-    preset: effectivePreset,
-    captureMode: presetCaptureMode,
+    preset: captureOverride !== null || tuningOverridePresent
+      ? QUICK_PRESETS.CUSTOM
+      : effectivePreset,
+    captureMode: captureOverride ?? presetCaptureMode,
   };
 }

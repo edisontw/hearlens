@@ -1,11 +1,11 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261104-android-auto-ui2";
+} from "./providers/browser-speech.js?v=20261118-capture-override1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261104-android-auto-ui2";
+  "./providers/gemini-live-transcribe.js?v=20261118-capture-override1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261104-android-auto-ui2";
+  "./providers/google-cloud-streaming.js?v=20261118-capture-override1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
