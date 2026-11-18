@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { disposeCaptionResourcesSafely } from "../../caption-stop.mjs";
 import { GeminiLiveTranscribeProvider } from "./gemini-live-transcribe.js";
 
 test("a final transcription received while stopping does not close the socket immediately", async () => {
@@ -181,6 +182,50 @@ test("mid-session WebSocket error fails closed even before subsequent close even
     assert.equal(errors.length, 1);
   });
 });
+
+for (const closeSucceeds of [true, false]) {
+  test("fatal Gemini cleanup waits for AudioContext close " +
+    (closeSucceeds ? "before allowing restart" : "and blocks restart on rejection"), async () => {
+    await withFakeWebSocket(async ({ provider, socket }) => {
+      const close = Promise.withResolvers();
+      let closeCalls = 0;
+      let micStops = 0;
+      let retryAllowed;
+      const cleanupErrors = [];
+      provider.listeningReady = true;
+      provider.stream = { getTracks: () => [{ stop() { micStops += 1; } }] };
+      provider.audioContext = {
+        state: "running",
+        close() {
+          closeCalls += 1;
+          return close.promise;
+        },
+      };
+      let cleanup;
+      provider.onError = () => {
+        cleanup = disposeCaptionResourcesSafely(provider, async () => {},
+          (phase, error) => cleanupErrors.push([phase, error.message]));
+        void cleanup.then(result => { retryAllowed = result; });
+      };
+
+      socket.emit("error");
+      await new Promise(resolve => setImmediate(resolve));
+      const retryBeforeClose = retryAllowed;
+      const socketStateBeforeAudioClose = socket.readyState;
+      if (closeSucceeds) close.resolve();
+      else close.reject(new Error("synthetic AudioContext close failure"));
+
+      assert.equal(await cleanup, closeSucceeds, "the UI must see the actual cleanup result");
+      assert.equal(retryBeforeClose, undefined, "the UI must wait for the first cleanup");
+      assert.equal(micStops, 1);
+      assert.equal(closeCalls, 1);
+      assert.equal(socketStateBeforeAudioClose, FakeTransportSocket.CLOSED,
+        "socket should close independently of AudioContext cleanup");
+      assert.deepEqual(cleanupErrors, closeSucceeds
+        ? [] : [["provider", "synthetic AudioContext close failure"]]);
+    });
+  });
+}
 
 test("Gemini socket error during setup immediately rejects startup without a false listening alert", async () => {
   await withFakeWebSocket(async ({ provider, socket, errors }) => {
