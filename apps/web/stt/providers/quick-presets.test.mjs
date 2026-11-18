@@ -60,8 +60,7 @@ test("explicit capture override wins and is reported as custom", () => {
   assert.deepEqual(
     resolveQuickPreset({
       presetValue: "far-noisy",
-      captureOverridePresent: true,
-      captureValue: "raw",
+      captureOverride: "raw",
       userAgent: "Mozilla/5.0 (Linux; Android 13; moto g62)",
     }),
     {
@@ -99,8 +98,7 @@ test("bounded tuning override is reported as custom while retaining preset captu
 test("Android explicit raw override remains available for research", () => {
   assert.deepEqual(resolveQuickPreset({
     presetValue: "auto",
-    captureOverridePresent: true,
-    captureValue: "raw",
+    captureOverride: "raw",
     userAgent: "Android 13",
   }), {
     preset: QUICK_PRESETS.CUSTOM,
@@ -138,8 +136,7 @@ test("Android legacy Far link is shown as Auto without changing Voice capture", 
   assert.deepEqual(resolveQuickPreset({
     presetValue: "far-noisy",
     userAgent: "Android 13",
-    captureOverridePresent: true,
-    captureValue: "raw",
+    captureOverride: "raw",
   }), {
     preset: QUICK_PRESETS.CUSTOM,
     captureMode: "raw",

@@ -1,15 +1,15 @@
-import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261104-android-auto-ui2";
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261104-android-auto-ui2";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261104-android-auto-ui2";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261104-android-auto-ui2";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261104-android-auto-ui2";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261104-android-auto-ui2";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261104-android-auto-ui2";
+import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261118-capture-override1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261118-capture-override1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261118-capture-override1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261118-capture-override1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261118-capture-override1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261118-capture-override1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261118-capture-override1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261104-android-auto-ui2";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261118-capture-override1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -21,7 +21,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261104-android-auto-ui2";
+} from "./transcript-window.mjs?v=20261118-capture-override1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -40,15 +40,16 @@ import {
 import {
   QUICK_PRESETS,
   isAndroidPlatform,
+  parseCaptureOverride,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261104-android-auto-ui2";
+} from "./stt/providers/quick-presets.mjs?v=20261118-capture-override1";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261104-android-auto-ui2";
+const BUILD_ID = "20261118-capture-override1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -74,11 +75,10 @@ function readRuntimeSttConfig() {
   const inputGain = Number.isFinite(requestedGain)
     ? Math.min(8, Math.max(1, requestedGain))
     : 1;
-  const captureOverridePresent = params.has("capture");
+  const captureOverride = parseCaptureOverride(params.get("capture"));
   const quickPreset = resolveQuickPreset({
     presetValue: params.get("preset"),
-    captureOverridePresent,
-    captureValue: params.get("capture"),
+    captureOverride,
     tuningOverridePresent: tuningProfile.enabled || fixedGainRequested,
     userAgent: navigator.userAgent || "",
     platform: navigator.userAgentData?.platform || navigator.platform || "",
@@ -93,7 +93,7 @@ function readRuntimeSttConfig() {
     inputMode: fixedGainRequested ? "fixed" : "adaptive",
     preset: quickPreset.preset,
     captureMode: quickPreset.captureMode,
-    captureOverridePresent,
+    captureOverride,
     tuningProfile,
     normalizationConfig: tuningProfile.normalizationConfig,
   };
@@ -320,9 +320,7 @@ function renderAdvancedTuningUi() {
   if (els.tuningMaxGain) els.tuningMaxGain.value = String(controls.maxGain);
   if (els.tuningResponse) els.tuningResponse.value = controls.responseSpeed;
   if (els.tuningCapture) {
-    els.tuningCapture.value = runtimeSttConfig.captureOverridePresent
-      ? runtimeSttConfig.captureMode
-      : "";
+    els.tuningCapture.value = runtimeSttConfig.captureOverride ?? "";
   }
 
   if (els.tuningSummary) {

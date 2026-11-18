@@ -69,6 +69,15 @@ try {
     assert.equal(await androidPage.locator("#quick-preset").isVisible(), false);
     assert.match(await androidPage.locator("#android-preset-status").innerText(), /自動/);
 
+    for (const query of ["?capture=", "?preset=far-noisy&capture=legacy"]) {
+      await androidPage.goto(origin + "/index.html" + query, { waitUntil: "networkidle" });
+      assert.match(await androidPage.locator("#diag-runtime").textContent(),
+        /preset=auto \/ capture=voice/, query);
+      assert.match(await androidPage.locator("#android-preset-status").innerText(), /自動/);
+      assert.equal(await androidPage.locator("#tuning-capture").inputValue(), "");
+      assert.equal(await androidPage.locator("#reset-preset").isVisible(), false);
+    }
+
     await androidPage.goto(origin + "/index.html?capture=raw", { waitUntil: "networkidle" });
     assert.match(await androidPage.locator("#diag-runtime").textContent(), /preset=custom \/ capture=raw/);
     assert.match(await androidPage.locator("#android-preset-status").innerText(), /工程覆寫/);
