@@ -77,6 +77,7 @@ class FakeTransportSocket {
   constructor() {
     this.listeners = new Map();
     this.readyState = 0;
+    this.bufferedAmount = 0;
     FakeTransportSocket.last = this;
   }
 
@@ -228,6 +229,39 @@ test("mid-session WebSocket error fails closed even before subsequent close even
     socket.readyState = FakeTransportSocket.CLOSED;
     socket.emit("close", { code: 1006 });
     assert.equal(errors.length, 1);
+  });
+});
+
+test("Gemini audio congestion bounds the send queue and stops capture once", async () => {
+  await withFakeWebSocket(async ({ provider, socket, errors }) => {
+    const maxBytes = 128 * 1024;
+    const chunk = new Float32Array(1600);
+    const events = [];
+    let micStops = 0;
+    socket.send = payload => { socket.bufferedAmount += Buffer.byteLength(payload); };
+    provider.onDebug = event => events.push(event);
+    provider.listeningReady = true;
+    provider.stream = { getTracks: () => [{ stop() { micStops += 1; } }] };
+
+    for (let i = 0; i < 10; i += 1) provider.pushResampledSamples(chunk);
+    assert(socket.bufferedAmount > 0 && socket.bufferedAmount < maxBytes);
+    assert.equal(provider.active, true, "ordinary variation below the limit can recover");
+    socket.bufferedAmount = 0;
+
+    for (let i = 0; i < 40 && provider.active; i += 1) provider.pushResampledSamples(chunk);
+    assert(socket.bufferedAmount <= maxBytes, "the next chunk must not exceed the limit");
+    assert.equal(provider.active, false);
+    assert.equal(micStops, 1);
+    assert.deepEqual(provider.pendingSamples, []);
+    socket.emit("error");
+    socket.close();
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].code, "gemini-audio-backlog");
+    assert.equal(errors[0].fatal, true);
+    assert.match(errors[0].message, /網路/);
+    const backlog = events.find(event => event.event === "audio-send-backlog");
+    assert.match(backlog.detail, /^buffered-bytes=\d+$/);
+    await provider.dispose();
   });
 });
 
