@@ -55,16 +55,18 @@ export function createOfflineCausalResearchDSP({
       !Array.isArray(compression) || compression.length !== bands) {
     throw new RangeError("baseGainsDb and ratios require one value for each band");
   }
-  gains.forEach((v, i) => validNumber(v, "baseGainsDb[" + i + "]", -12, 12));
-  compression.forEach((v, i) => validNumber(v, "ratios[" + i + "]", 1, 4));
+  const initialGainsDb = new Float64Array(bands);
+  const ratiosCopy = new Float64Array(bands);
+  for (let index = 0; index < bands; index += 1) {
+    initialGainsDb[index] = validNumber(gains[index], "baseGainsDb[" + index + "]", -12, 12);
+    ratiosCopy[index] = validNumber(compression[index], "ratios[" + index + "]", 1, 4);
+  }
   validNumber(thresholdDbfs, "thresholdDbfs", -90, -10);
   validNumber(attackMs, "attackMs", 2, 100);
   validNumber(releaseMs, "releaseMs", 20, 2000);
   validNumber(limiterCeiling, "limiterCeiling", 0.05, 0.95);
   const coefficients = Float64Array.from(boundaries,
     hz => Math.exp(-2 * Math.PI * hz / sampleRate));
-  const initialGainsDb = Float64Array.from(gains);
-  const ratiosCopy = Float64Array.from(compression);
   const lpf = new Float64Array(boundaries.length);
   const envelopes = new Float64Array(bands);
   const gainStateDb = Float64Array.from(initialGainsDb);
