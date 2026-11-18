@@ -119,6 +119,7 @@ export class GeminiLiveTranscribeProvider {
     this.captureTrack = null;
     this.captureTrackHandlers = null;
     this.captureMuteTimer = null;
+    this.captureShutdownPromise = null;
   }
 
   assertStartCurrent(epoch) {
@@ -691,6 +692,11 @@ export class GeminiLiveTranscribeProvider {
     this.debug("provider-start");
 
     try {
+      if (this.captureShutdownPromise) {
+        await this.captureShutdownPromise;
+        this.assertStartCurrent(epoch);
+        this.captureShutdownPromise = null;
+      }
       const token = await this.fetchToken();
       this.assertStartCurrent(epoch);
       await this.openSocket(token);
@@ -716,18 +722,26 @@ export class GeminiLiveTranscribeProvider {
     } catch (error) {
       this.active = false;
       this.listeningReady = false;
-      await this.shutdownCapture();
+      const socket = this.socket;
+      this.socket = null;
       try {
-        this.socket?.close();
+        socket?.close();
       } catch {
         // Ignore close errors during failed startup.
       }
-      this.socket = null;
+      await this.shutdownCapture();
       throw error;
     }
   }
 
-  async shutdownCapture() {
+  shutdownCapture() {
+    // Fatal handlers start releasing the mic immediately, and UI disposal
+    // must observe the outcome of that same cleanup before enabling Start.
+    this.captureShutdownPromise ??= this.releaseCapture();
+    return this.captureShutdownPromise;
+  }
+
+  async releaseCapture() {
     this.clearMutedMicFailure();
     const priorTrack = this.captureTrack;
     const handlers = this.captureTrackHandlers;
@@ -762,8 +776,6 @@ export class GeminiLiveTranscribeProvider {
       track.stop();
     }
 
-    // Detach synchronously so simultaneous fatal-close/dispose cleanup
-    // cannot close the same AudioContext twice.
     const context = this.audioContext;
     this.audioContext = null;
     if (context && context.state !== "closed") {
@@ -858,8 +870,7 @@ export class GeminiLiveTranscribeProvider {
     // after pagehide/dispose, unlike the intentional Stop drain.
     const socket = this.socket;
     this.socket = null;
-    await this.shutdownCapture();
-
+    const captureShutdown = this.shutdownCapture();
     try {
       socket?.close(1000, "dispose");
     } catch {
@@ -870,5 +881,6 @@ export class GeminiLiveTranscribeProvider {
     if (this.stopResolver) {
       this.stopResolver("dispose");
     }
+    await captureShutdown;
   }
 }
