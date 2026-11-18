@@ -114,3 +114,12 @@ test("SW2 module exposes no browser/native live audio/network device access",()=
     assert.doesNotMatch(source,forbidden);
   }
 });
+
+test("SW2 rejects missing gain and compression entries at construction", () => {
+  for (const field of ["baseGainsDb", "ratios"]) {
+    const values = Array(6).fill(1);
+    delete values[2];
+    assert.throws(() => createOfflineCausalResearchDSP({ ...config, [field]: values }),
+      { name: "RangeError", message: new RegExp(field + "\\[2\\]") });
+  }
+});
