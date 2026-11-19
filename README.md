@@ -40,22 +40,13 @@ The project is intentionally split into three capability layers:
 - `services/stt-proxy/` — optional Google Cloud streaming STT bridge for later comparison
 - `tests/` — deterministic DSP vectors, device-bench protocols and human-test definitions
 
-## Current status
+## Current milestone status (2026-11-19)
 
-**M01 — Caption Hearing Lab**
+- **M01 captions — CLOSED / maintenance.** Owner confirmed Moto g62 Android Chrome everyday-use PASS. Do not schedule additional routine caption tests or polish work; reopen only upon a new reproducible substantial problem.
+- **M03 personalized DSP — OFFLINE RESEARCH.** Audiogram, CAMFIT research targets, STFT WDRC and causal DSP prototypes exist. The causal version is not equivalent to CAMFIT-driven STFT and must not be substituted for personalized hearing output. See [2026-11-19 measured offline comparison](docs/M03_CAUSAL_CAMFIT_OFFLINE_REVIEW_2026-11-19.md).
+- **M04 AIR31/A2DP — BLOCKED for open-ear live assistance; physical recording DEFERRED.** An Android playing-A2DP route does not establish earbud acoustic output or latency. No worn hearing amplification is authorized.
 
-The Web Hearing Lab is runnable on GitHub Pages. Current work focuses on:
-
-- microphone permission and capture diagnostics,
-- requested vs. actual audio constraints,
-- device/sample-rate/latency information,
-- caption backend abstraction with Browser SpeechRecognition as an optional fallback,
-- a free-tier Gemini 3.5 Transcribe Live benchmark path using short-lived tokens from MN4,
-- an optional Google Cloud streaming STT comparison path,
-- rolling recent-caption state,
-- large-text senior-friendly interaction.
-
-Live hearing amplification is deliberately not the first feature.
+[Active roadmap](docs/ROADMAP.md) is the current work-order index. Older milestone handoffs and [2026-11-02 continuous-delivery policy](docs/CONTINUOUS_DELIVERY_PLAN_2026-11-02.md) are retained as historical context, not instructions to restart M01 testing or spend fixed effort percentages.
 
 ## Safety / intended use
 
@@ -63,6 +54,6 @@ HearLens is currently a **research prototype** for communication assistance. It 
 
 See [docs/SAFETY.md](docs/SAFETY.md) before implementing any audio-output feature.
 
-## M04 software-first SW1 Android mic probe
+## Historical M04 software-first SW1 Android mic probe
 
 A separate **input-only** Android diagnostic app now lives at [apps/android-mic-probe](apps/android-mic-probe/README.md). It probes actual phone/Bluetooth headset microphone routing and short foreground PCM level statistics, **without producing any output audio, saving raw speech or using network permission**. This is a development diagnostics APK, not part of the website or an approved hearing amplifier. See [M04 software-first feasibility](docs/M04_SOFTWARE_FIRST_CAPTURE_FEASIBILITY_2026-10-12.md) and [SAFETY](docs/SAFETY.md). Hardware POCs remain deferred.

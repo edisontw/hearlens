@@ -1,6 +1,8 @@
-# HearLens continuous delivery and evidence gates — 2026-11-02
+# HearLens continuous delivery and evidence gates — 2026-11-02 (historical)
 
-**Status:** active hourly work policy. [ROADMAP](./ROADMAP.md) remains the single current work-order index. This policy replaces *priority/order* assumptions in older handoffs and archived roadmaps; it does not erase historical evidence or relax [SAFETY](./SAFETY.md).
+> **SUPERSEDED as an active work policy on 2026-11-19.** M01 is CLOSED by owner field acceptance; fixed ~60/25/15 development allocations and further routine caption polishing no longer apply. Consult [current roadmap](./ROADMAP.md) and [M03 offline causal/CAMFIT review](./M03_CAUSAL_CAMFIT_OFFLINE_REVIEW_2026-11-19.md). This document is retained only to explain historical decisions, not to request more SW1–SW4/AIR31 tests.
+
+**Historical status as of 2026-11-02:** then-active hourly work policy; no longer current. [ROADMAP](./ROADMAP.md) remains the single current work-order index. This policy replaces *priority/order* assumptions in older handoffs and archived roadmaps; it does not erase historical evidence or relax [SAFETY](./SAFETY.md).
 
 ## Product outcome and non-negotiable boundaries
 
