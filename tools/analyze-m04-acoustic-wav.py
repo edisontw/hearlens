@@ -82,8 +82,15 @@ def one_event(pcm, rate, start, stop, min_lag, max_lag):
     if not math.isfinite(coefficient) or coefficient < 0.35:
         raise ValueError("Weak correlation: check channel identity, noise and stimulus")
     # Correlation near the search boundaries cannot exclude a peak just outside.
-    if index <= max(1, round(0.002 * rate)) or index >= len(score) - 1 - max(1, round(0.002 * rate)):
+    peak_neighborhood = max(1, round(0.002 * rate))
+    if index <= peak_neighborhood or index >= len(score) - 1 - peak_neighborhood:
         raise ValueError("Correlation peak at lag-window edge; widen delay range")
+    # Exclude the immediate neighborhood of the best peak. A separate
+    # near-tie can be direct leakage, room echo, or repeated stimulus.
+    competing_score = max(np.max(score[:index - peak_neighborhood]),
+                          np.max(score[index + peak_neighborhood + 1:]))
+    if competing_score >= 0.9 * coefficient:
+        raise ValueError("Ambiguous correlation: competing arrivals; check leakage and stimulus")
     return {"reference_start_s": start, "reference_end_s": stop,
             "delay_ms": 1000 * lag / rate, "absolute_correlation": coefficient,
             "warning": ("Near-zero arrival may be direct-room sound/crosstalk, NOT Bluetooth output"
