@@ -26,6 +26,36 @@ The 513-tap candidate has no **future-input** requirement when used as a causal 
 
 For 513 taps the impulse contains 95% of its **squared coefficient energy** by sample index 5 (left) or 8 (right). This is **not** filter group delay, E2E acoustic latency, permissible DSP delay or perceived echo; the minimum-phase filter is nonlinear-phase, and its frequency-dependent group delay requires its own validation. No dynamic 50/65/80 gain law was exercised.
 
+
+## 2026-11-19 dynamic-design gate: wider-gain stress (research-only)
+
+The original *two* illustrative G65 curves were a **narrow static feasibility screen**, not evidence of general personalized frequency response. A follow-up stress screen was performed using the exact synthetic CAMFIT 50/65/80 research anchors from the JavaScript reference (left thresholds 0/5/10/15/20/25 dB HL; right 10/15/20/25/30/35 dB HL). For each ear, 45 independent six-band nominal input-level vectors were screened (three uniform levels, two mixed vectors and 40 seeded random 50–80 model-level vectors). Their FIR kernels were **redesigned offline**; this was **not** actual time-varying WDRC or automatic band-level detection.
+
+The screen also used **100 unrelated synthetic six-band gain shapes**, independently sampled from 0–12 dB. These are stress fixtures, **not CAMFIT-prescribed audiograms** or clinically representative prevalence estimates. All numbers compare **static minimum-phase FIR magnitude with the idealized smooth spectral target** at 48 kHz, 250–8000 Hz, and are not STFT output-waveform parity.
+
+| Fixture | Filter length | Worst 250–8000 Hz magnitude error | 95th-percentile per-profile worst error |
+| --- | ---: | ---: | ---: |
+| CAMFIT-derived 45 per ear, 2 ears | 513 taps | Left **0.143 dB**, right **1.212 dB** | Not an independent representative sample |
+| Unrelated six-band gains, n=100 | 257 taps | **6.360 dB** | 4.803 dB |
+| Unrelated six-band gains, n=100 | 513 taps | **4.936 dB** | 3.679 dB |
+| Unrelated six-band gains, n=100 | 1025 taps | **2.890 dB** | 2.218 dB |
+
+The stress shows that the apparently excellent 513-tap result is **profile dependent**. The longer 1025-tap kernel reduces error but requires **98.4 million theoretical direct FIR MAC/s for both ears** at steady state, or **196.8 million MAC/s** if two full FIR branches are used for a coefficient crossfade. The 513-tap corresponding counts are 49.248 and 98.496 million MAC/s. These are upper-level arithmetic counts for naive direct implementations, **not Android CPU benchmarks**, and must not be mistaken for release-ready performance.
+
+In a narrow, deliberately prescribed **50-ms transition** between separately designed 513-tap G50 and G80 kernels, blending outputs of two FIRs on the **same input history** was verified against directly interpolating coefficients at five samples. The maximum algebraic residual was **1.39×10⁻¹⁷**. This confirms only a linear-convolution identity: it does **not** prove click-free, artifact-free or intelligible dynamic compression, input-band envelope correctness, bounded callback compute, or safe hearing output. A physical SPL limiter, hardware route protection, and real headphone latency are still absent.
+
+**How to reproduce the optional non-CI screen:**
+
+~~~sh
+python3 tools/research-m03-minphase-fir.py --selfcheck --dynamic-design-screen
+~~~
+
+### Revised decision
+
+- **NO-GO** for claiming that this 513-tap FIR is a general-purpose dynamic CAMFIT replacement or integrating it with Android/audio output.
+- **Research gate remains closed** until a single concrete dynamic architecture provides per-band 50/65/80 level estimation, a stable gain-update mechanism, bounded callback compute, and *multiple-profile* response accuracy. Do not keep increasing FIR tap count without a credible CPU/latency budget.
+- The existing M03 STFT/WDRC remains the offline reference. M01 stays CLOSED and M04 real AIR31 hearing output stays BLOCKED/DEFERRED.
+
 ## Decision / next gate
 
 - **GO only for a conditional offline design candidate:** the static magnitude-response fit is materially better than the current first-order IIR on these *two rounded illustrative gain shapes*. The present dataset is too narrow for a general prescription-equivalence claim.
