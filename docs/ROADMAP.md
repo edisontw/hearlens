@@ -1,84 +1,37 @@
-# Roadmap — active plan (2026-11-02)
+# HearLens roadmap — current decision (2026-11-19)
 
-This page is the current work order. [Historical roadmap](./ROADMAP_HISTORY_2026-10-20.md)
-preserves earlier completion details and superseded instructions; its unchecked boxes are **not** new work orders.
-[Evidence review and decision gates](./M04D62_DIAGNOSTICS_AND_PROGRESS_RESET_2026-10-22.md).
-[Hourly delivery policy](./CONTINUOUS_DELIVERY_PLAN_2026-11-02.md).
-[First 12-round delivery review](./DELIVERY_REVIEW_ROUND12_2026-11-02.md) (merged outcomes, avoidable work and next evidence-gated slices).
+**Authoritative work-order index.** GitHub's live `main` is the source of truth; any SHA in historical documentation is a snapshot. Earlier work plans, milestone handoffs and percentage allocations are historical and do **not** authorize repeating completed work. [Product vision](./PRODUCT_VISION.md) · [Safety](./SAFETY.md) · [M03 causal/CAMFIT offline review](./M03_CAUSAL_CAMFIT_OFFLINE_REVIEW_2026-11-19.md).
 
-## Product and equipment commitments
+## Current milestone gates
 
-- Phone built-in microphone is primary; ordinary Bluetooth earphones are preferred output.
-- Existing kit: Moto g62 / Android 13, AIR31 A2DP, iPhone source, Windows Realtek 3.5-mm mic.
-- No purchase, mandatory external microphone, ear-canal sealing, mandatory talker-side phone placement,
-  earbud microphone tests, OEM/ODM project or wired-headphone migration.
-- The existing owner-approved low-level **off-ear** bench remains separate from worn hearing output.
-  [SAFETY](./SAFETY.md) and the D3 exception still apply.
+| Area | Decision | What is verified | What is **not** verified |
+| --- | --- | --- | --- |
+| **M01 — captions** | **CLOSED / maintenance** (owner acceptance, 2026-11-19) | Moto g62 Android Chrome everyday session **PASS**; existing caption functionality and engineering regressions. Reopen for a new, reproducible significant regression only. | Formal multi-device WER/clinical benefit; these are not required to close the current engineering phase. |
+| **M03 — personal hearing DSP** | **Offline research only**; causal direct replacement **NO-GO** | Separate per-ear audiograms, research CAMFIT computation and upstream fixtures, STFT offline WDRC/digital limiter, SW2 causal 0-future-lookahead baseline; the 2026-11-19 targeted comparison documents non-equivalence. | A common causal 50/65/80 gain law, satisfactory shaped-frequency response, physical input/output calibration, safe live route/mute, clinical fitting or worn benefit. |
+| **M04 — AIR31/A2DP** | **BLOCKED** for open-ear real-time hearing; field acquisition **DEFERRED** | Moto g62 built-in mic input and Android playing-A2DP route observations; synthetic output policies and ambiguous-arrival rejection (#137). | Confirmed earbud-specific acoustic signal, measured phone-mic-to-AIR31 acoustic E2E latency, no-speaker-fallback hard mute, per-ear acoustic MPO and daily-use benefit. |
 
-## Current evidence
+M01 closure is a development decision, **not** a declaration of formally validated caption accuracy or medical effectiveness. M03's digital limiter constrains PCM, not ear-level dB SPL. M04's A2DP playing route is not evidence of earbud acoustic output.
 
-| Area | Completed | Open |
-| --- | --- | --- |
-| M01 captions | Streaming Gemini, Traditional Chinese, large text, focus mode, last-final retention, recall/copy, lifecycle guards | Combined everyday-use acceptance; formal accuracy benchmark deferred |
-| M03 personalization | Bilateral profile editor, CAMFIT research arithmetic including pinned upstream cross-check, offline WDRC/limiter | Device output calibration, worn benefit; no clinical prescription claim |
-| Android input | Built-in mic demonstrated in SW1; route observed in live bench | Event-window signal quality in recent chirp conditions |
-| AIR31 output | Actual playing A2DP route observed; D6.1 playback-head/drain implementation | Detectable earbud-specific acoustic output; D6.1/D6.2 field acceptance |
-| Latency | Analysis and bench tools | **No valid phone-mic→AIR31 acoustic latency measurement** |
+## Next work — only when a meaningful engineering gate exists
 
-## Active delivery order — 2026-11-02
+**M03 first, conditional:** Avoid additional STFT-versus-causal tuning or tests for their own sake. If a concrete low-lookahead causal design is proposed, require (a) a shared independent 50/65/80 research target law, (b) per-ear shaped-gain response and envelope acceptance criteria against the existing STFT synthetic reference, (c) bounded callback memory/computation and final digital limiting. A **single focused offline** proof is the next justified implementation slice; if no promising design exists, park it rather than opening a low-value PR.
 
-The [hourly continuous-delivery plan](./CONTINUOUS_DELIVERY_PLAN_2026-11-02.md) defines the current priority and evidence gates. **M01 caption-first usability is the primary delivery lane (~60%)**, M04 measurable Bluetooth feasibility is conditional (~25%), and M03 offline research/safety regressions are parallel (~15%). Verified safety, privacy or CI regressions override the percentages.
+**M04 parked:** Do not repeat SW1–SW4, D6.1/D6.2, raise test-tone volume, request additional owner recordings, or purchase new hardware. Only resume physical feasibility after new independently identifiable AIR31 acoustic output evidence and a test plan capable of rejecting direct-source/echo ambiguities. Acoustic latency cannot be inferred from codec frame times, Android timestamps, `AudioContext.outputLatency` or the #137 correlation screen. Ordinary Bluetooth earphones remain an ergonomic preference, not a demonstrated low-latency transparent hearing path.
 
-- **Android caption field fix (2026-11-04):** Auto selects OS voice capture on Android based on current field observations (raw/Auto no text, far/voice transcribes); non-Android defaults remain raw; explicit raw URL override stays research-only. No in-session auto-switch or claimed scene recognition. A passive warning requires transmitted audio, multiple speech-active reports and 15 s without text. See [decision note](./M01_ANDROID_AUTO_VOICE_2026-11-04.md).
-- **Next M01 slice:** audit primary Gemini 3.5 Transcribe Live/MN4 token startup, expiry, network interruption and actionable manual recovery. #96–#103/#105 already cover several Stop, review and optional-provider failures; fix only a new reproducible gap. The formal 24-run recognition matrix remains deferred.
-- **Next M03 slice:** investigate one concrete offline left/right, CAMFIT/WDRC or final digital-limiter numerical/fail-closed defect; add deterministic regression only if the current suite misses it. No uncalibrated live playback.
-- **Next M04 slice (conditional):** #104 provides an offline six-chirp presence screen, **not** measured AIR31 output. Review existing D6.2 evidence and any available original WAV first. Without earbud-specific acoustic evidence, park the physical gate and continue M01/M03; no recurring recording request.
-- **Hourly workflow:** fresh `main` SHA and CI/Pages review → one testable change → branch/PR → verified CI → safe merge → verify `main`; every 12 rounds reassess delivered value. No artificial docs-only commits or repeated SW1–SW4 tests.
+**Safety release is separate from algorithm success:** Any real-phone microphone-to-earphone amplification remains prohibited until calibrated per-ear output, real hard-mute/no-speaker-fallback including already queued audio, routing interruptions and gain ramp have passed physical evidence gates. [Safety](./SAFETY.md).
 
-## Primary lane A — M01 everyday caption acceptance
+## Engineering workflow
 
-One approximately five-minute everyday caption session can cover Start/Stop, readable focus layout,
-last-final retention through silence, recall and manual restart after interruption. Record failure cases
-with build/device metadata. This is UX/stability acceptance, not a controlled STT accuracy claim.
-Do not require the 24-run formal benchmark while changing the pipeline. No new caption recording
-or transcription upload is requested by this software change.
+- Consult current `main`, related PR/CI and focused specifications before changing code.
+- Implement only a real, reproducible defect or a decision-gated capability; preserve existing work and test with the smallest relevant suite.
+- Branch/PR with reviewed CI for source changes; avoid redundant docs-only cycles and unnecessary GitHub Actions usage.
+- No standing manual user test matrix or arbitrary M01/M03/M04 work quota. User tests only after a materially new, safely verifiable capability is ready.
+- Retain source observations, underlying tests and safety documents even if historical *handoff instructions* are removed. Git history preserves prior snapshots.
 
-## Conditional lane B — D6.2 diagnostic readiness (software)
+## Historical evidence (not active instructions)
 
-- [x] Publish nominal post-track scalar levels and fixed cap budget before unknown OS/earbud volume.
-- [x] Add constant-memory 100-ms source RMS windows, separate partial tail and exact-zero runs.
-- [x] Separate source/attempted frames, accepted frames, retry events and legacy-loop discarded tail.
-- [x] Publish final counters only after writer cleanup; prevent restart until cleanup finishes.
-- [x] Preserve D6.1 playback-head/drain checks and all existing output bounds.
-- [x] Java behavior tests, existing Node checks and Android APK build PASS on PR #94 code commit `e1d6e8c` ([Android run](https://github.com/edisontw/hearlens/actions/runs/39651830155)); subsequent README changes do not change APK source.
-- [ ] Review resulting diagnostics before scheduling a physical trial. No new recordings requested now.
-
-## Conditional lane B — Detectable AIR31 output (one short session)
-
-Only after the D6.2 software-readiness review passes and the trial's measurability is established:
-
-1. Output-only known six-chirp source, no Moto microphone or iPhone source; AIR31 off ears.
-2. Use fixed near-mic geometry and existing output limits. Check live recording visibility first.
-3. Save one short Realtek recording and final diagnostic only if the signal is observable.
-4. A positive result requires recognizable six-event timing and absence of the same pattern in silence.
-   Android acceptance/drain alone is not acoustic PASS; this is not an E2E latency measurement.
-5. If not observable, label **NOT_MEASURABLE_AT_CURRENT_SETTINGS**. Diagnose level, geometry,
-   endpoint and recorder; at most one explicitly justified correction/retest in this round, then park.
-   No blind L2 escalation or another direct/on/moved batch.
-
-## Conditional lane B — Coarse architecture screen
-
-After output presence passes, inspect event-window Moto input and only then reconnect the mic loop.
-Design a few longer-spaced, nonperiodic acoustic landmarks so direct source, room echoes and
-replayed source cannot be confused with the next event. Compare events within a single recording,
-record geometry and source identity controls. Do not subtract timestamps between independent WAVs.
-This may establish a coarse delay range, with uncertainty; sparse mono data cannot establish a
-validated P95/jitter, calibrated ear SPL or daily open-fit hearing suitability. Stop on ambiguous identity.
-Do not assume any measured AIR31 result from Bluetooth research estimates.
-
-## Parked work
-
-Further generic DSP tuning, neural denoising, ear-local SDK/ODM acquisition, new hardware,
-multidevice matrices, SRT trials and absolute ear-level calibration are not the next development task.
-Existing evidence should be reused; SW1–SW4 and basic microphone/pairing checks are closed.
-Worn live hearing remains unvalidated and is not enabled by D6.2.
+- [Earlier roadmap](./ROADMAP_HISTORY_2026-10-20.md)
+- [2026-11-02 delivery policy (superseded)](./CONTINUOUS_DELIVERY_PLAN_2026-11-02.md) and [12-round retrospective](./DELIVERY_REVIEW_ROUND12_2026-11-02.md)
+- [M04 diagnostic/evidence reset](./M04D62_DIAGNOSTICS_AND_PROGRESS_RESET_2026-10-22.md)
+- [CAMFIT research bridge](./M03_CAMFIT_SYNTHETIC_WDRC_BRIDGE_2026-10-14.md), [SW2 causal baseline](./SW2_CAUSAL_DSP_SOFTWARE_CEILING_2026-10-12.md)
+- [Test protocol](./TEST_PROTOCOL.md) for future **evidence-gated** testing, not immediate requests.
