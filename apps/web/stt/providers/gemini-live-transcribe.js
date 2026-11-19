@@ -111,6 +111,7 @@ export class GeminiLiveTranscribeProvider {
     this.setupRejecter = null;
     this.stopResolver = null;
     this.stopDrainTimer = null;
+    this.frameQueues = new WeakMap();
     this.firstAudioSent = false;
     this.lastLevelDebugAt = 0;
     this.fatalTransportHandled = false;
@@ -308,7 +309,8 @@ export class GeminiLiveTranscribeProvider {
     // Serialize decoding per socket so a later final cannot overtake an earlier
     // frame. Keep the backlog bounded if a browser Blob read stalls.
     const pendingFrames = [];
-    let processingFrames = false;
+    const queue = { processing: false, stopReason: null };
+    this.frameQueues.set(socket, queue);
     socket.addEventListener("message", (event) => {
       if (this.socket !== socket || this.fatalTransportHandled) return;
       if (pendingFrames.length >= 128) {
@@ -321,8 +323,8 @@ export class GeminiLiveTranscribeProvider {
         return;
       }
       pendingFrames.push(event);
-      if (processingFrames) return;
-      processingFrames = true;
+      if (queue.processing) return;
+      queue.processing = true;
       void (async () => {
         try {
           while (pendingFrames.length && this.socket === socket &&
@@ -339,7 +341,10 @@ export class GeminiLiveTranscribeProvider {
           }
         } finally {
           pendingFrames.length = 0;
-          processingFrames = false;
+          queue.processing = false;
+          if (this.socket === socket && queue.stopReason) {
+            this.stopResolver?.(queue.stopReason);
+          }
         }
       })();
     });
@@ -352,9 +357,7 @@ export class GeminiLiveTranscribeProvider {
         this.clearSetupWaiters();
       }
 
-      if (this.stopResolver) {
-        this.stopResolver("socket-close");
-      }
+      this.finishStopAfterFrames("socket-close");
 
       this.handleUnexpectedTransportFailure(
         socket, "gemini-closed", "Gemini Live connection closed.");
@@ -374,6 +377,18 @@ export class GeminiLiveTranscribeProvider {
     }
   }
 
+  finishStopAfterFrames(reason) {
+    if (!this.stopResolver) return;
+    const queue = this.frameQueues.get(this.socket);
+    // Manual Stop keeps already-received frames eligible until the serial
+    // decoder finishes or the existing hard stop timeout expires.
+    if (queue?.processing) {
+      queue.stopReason = reason;
+      return;
+    }
+    this.stopResolver(reason);
+  }
+
   scheduleStopDrain(reason) {
     if (!this.stopping || !this.stopResolver) return;
 
@@ -381,7 +396,7 @@ export class GeminiLiveTranscribeProvider {
     this.debug("stop-drain-scheduled", reason);
     this.stopDrainTimer = window.setTimeout(() => {
       this.stopDrainTimer = null;
-      this.stopResolver?.("drain-complete");
+      this.finishStopAfterFrames("drain-complete");
     }, STOP_DRAIN_GRACE_MS);
   }
 
@@ -807,7 +822,8 @@ export class GeminiLiveTranscribeProvider {
     await this.shutdownCapture();
 
     const socket = this.socket;
-    if (!socket || socket.readyState === WebSocket.CLOSED) {
+    if (!socket || (socket.readyState === WebSocket.CLOSED &&
+        (this.fatalTransportHandled || !this.frameQueues.get(socket)?.processing))) {
       // A closed transport may still have queued message callbacks. Retire
       // its identity before allowing another caption session to start.
       this.socket = null;
@@ -851,6 +867,9 @@ export class GeminiLiveTranscribeProvider {
         this.debug("stop-flush-complete", reason);
         resolve();
       };
+      if (socket.readyState === WebSocket.CLOSED) {
+        this.finishStopAfterFrames("socket-close");
+      }
     });
 
     try {

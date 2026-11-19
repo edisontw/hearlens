@@ -144,6 +144,53 @@ test("stop after an already-closed Gemini socket retires queued captions", async
   });
 });
 
+for (const trigger of ["grace expiry", "socket close", "stop timeout"]) {
+  test("manual Gemini stop drains received frames at " + trigger, async () => {
+    await withFakeWebSocket(async ({ provider, socket }) => {
+      const timers = new Map();
+      window.setTimeout = (callback, delay) => {
+        const id = Symbol();
+        timers.set(id, { callback, delay });
+        return id;
+      };
+      window.clearTimeout = id => timers.delete(id);
+      const fireTimer = delay => {
+        const [id, timer] = [...timers].find(([, entry]) => entry.delay === delay);
+        timers.delete(id);
+        timer.callback();
+      };
+      const events = [];
+      provider.onFinal = event => events.push(event.text);
+      provider.onStatus = event => events.push(event.state);
+      socket.send = () => {};
+      const stopping = provider.stop();
+      await new Promise(resolve => setImmediate(resolve));
+
+      socket.emit("message", { data: '{"serverContent":{"turnComplete":true}}' });
+      await new Promise(resolve => setImmediate(resolve));
+      const decode = Promise.withResolvers();
+      class DelayedBlob extends Blob {
+        text() { return decode.promise; }
+      }
+      socket.emit("message", { data: new DelayedBlob(["delayed"]) });
+      socket.emit("message", { data:
+        '{"serverContent":{"inputTranscription":{"text":"第二段"}}}' });
+
+      if (trigger === "socket close") socket.close();
+      else fireTimer(1_000);
+      if (trigger === "stop timeout") fireTimer(5_000);
+      await new Promise(resolve => setImmediate(resolve));
+
+      decode.resolve('{"serverContent":{"inputTranscription":{"text":"第一段"}}}');
+      await stopping;
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(events, trigger === "stop timeout" ? ["stopped"] :
+        ["第一段", "第二段", "stopped"]);
+      assert.equal(timers.size, 0);
+    });
+  });
+}
+
 test("manual Gemini stop sends remaining PCM exactly once before audioStreamEnd", async () => {
   for (const [wholeChunks, tailLength] of [[0, 3], [1, 1599], [1, 0]]) {
     await withFakeWebSocket(async ({ provider, socket }) => {
