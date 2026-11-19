@@ -41,6 +41,16 @@ class M04AcousticReaderTests(unittest.TestCase):
         self.assertGreater(result["absolute_correlation"], 0.98)
         self.assertIn("NOT verifiable", result["warning"])
 
+    def test_rejects_competing_direct_leakage_and_replay_arrivals(self):
+        rate, pcm = self.fixture()
+        start = round(0.4 * rate)
+        reference = pcm[start:start + 480, 0]
+        # Distinct copies with similar correlation can represent direct
+        # leakage and a delayed speaker/earbud arrival on the receiver mic.
+        pcm[start + 160:start + 640, 1] = reference * 0.65
+        with self.assertRaisesRegex(ValueError, "Ambiguous correlation"):
+            module["one_event"](pcm, rate, 0.4, 0.46, 0, 3200)
+
     def test_rejects_silence_clipping_and_lag_boundary(self):
         rate, pcm = self.fixture()
         with self.assertRaisesRegex(ValueError, "silent"):
