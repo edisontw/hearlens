@@ -52,7 +52,8 @@ jobs:
       - name: Install pinned Chromium test runner
         run: |
           npm install --no-save --no-package-lock playwright@1.56.0
-          npx playwright install --with-deps chromium
+          # The hosted runner already has the shared libraries for headless Chromium.
+          npx playwright install chromium --only-shell
       - name: Stage exactly the canonical audiogram domain module for Pages
         run: |
           cp packages/audiogram/audiogram.mjs apps/web/audiogram-domain.mjs
