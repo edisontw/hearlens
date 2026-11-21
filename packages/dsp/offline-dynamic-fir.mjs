@@ -12,6 +12,8 @@ import { normalizePrescriptionTargets } from "../prescription-targets/prescripti
 
 const RATE = 48000;
 const TAPS = 513;
+const MIDPOINT = (TAPS - 1) / 2;
+const UNIQUE_TAPS = MIDPOINT + 1;
 const FFT_N = 4096;
 const CENTER_HZ = Object.freeze([250, 500, 1000, 2000, 4000, 8000]);
 const BOUNDARIES = CENTER_HZ.slice(1).map((f, i) => Math.sqrt(CENTER_HZ[i] * f));
@@ -62,9 +64,10 @@ function frequencyWeights(hz) {
 }
 
 // Fixed, shared-phase FIR basis: sum_j basis[j][tap] = delay_256[tap].
+// Real, even spectra and the symmetric window give mirrored time-domain taps.
 // No per-update FIR design, FFT, network, I/O or buffer allocation in processInto.
 function designBasis() {
-  const basis = Array.from({ length: 6 }, () => new Float64Array(TAPS));
+  const basis = Array.from({ length: 6 }, () => new Float64Array(UNIQUE_TAPS));
   const freqRe = new Float64Array(FFT_N), freqIm = new Float64Array(FFT_N);
   const spectra = Array.from({ length: 6 }, () => new Float64Array(FFT_N / 2 + 1));
   for (let k = 0; k <= FFT_N / 2; k++) {
@@ -78,9 +81,9 @@ function designBasis() {
       if (k !== 0 && k !== FFT_N / 2) freqRe[FFT_N - k] = spectra[j][k];
     }
     offlineFFT(freqRe, freqIm, true);
-    for (let tap = 0; tap < TAPS; tap++) {
+    for (let tap = 0; tap < UNIQUE_TAPS; tap++) {
       const window = 0.54 - 0.46 * Math.cos(2 * Math.PI * tap / (TAPS - 1));
-      basis[j][tap] = freqRe[(tap - (TAPS - 1) / 2 + FFT_N) % FFT_N] * window;
+      basis[j][tap] = freqRe[(tap - MIDPOINT + FFT_N) % FFT_N] * window;
     }
   }
   return basis;
@@ -106,8 +109,9 @@ function interpolateGains(bands, nominalLevels, maxGainDb) {
 export function createOfflineDynamicFirResearch(config) {
   const { bands, ear, maxGainDb, limiterCeiling, transitionSamples } = researchConfig(config);
   const basis = sharedBasis ?? (sharedBasis = designBasis());
-  const history = new Float32Array(TAPS);
-  const from = new Float64Array(TAPS), to = new Float64Array(TAPS);
+  // Duplicate the ring so both mirrored reads stay contiguous across wrap.
+  const history = new Float32Array(2 * TAPS);
+  const from = new Float64Array(UNIQUE_TAPS), to = new Float64Array(UNIQUE_TAPS);
   let write = 0, ready = false, faulted = false, fade = transitionSamples;
   let acceptedSamples = 0, limitedSamples = 0, updates = 0, maxAbsOutput = 0;
   let targetGainsDb = Object.freeze([]);
@@ -126,7 +130,7 @@ export function createOfflineDynamicFirResearch(config) {
     catch (error) { faulted = true; throw error; }
     const weight = ready ? progress() : 1;
     const amplitudes = gains.map(db => Math.pow(10, db / 20));
-    for (let tap = 0; tap < TAPS; tap++) {
+    for (let tap = 0; tap < UNIQUE_TAPS; tap++) {
       if (ready) from[tap] += (to[tap] - from[tap]) * weight;
       let result = 0;
       for (let band = 0; band < 6; band++) {
@@ -153,15 +157,19 @@ export function createOfflineDynamicFirResearch(config) {
     }
     try {
       for (let i = 0; i < input.length; i++) {
-        history[write] = input[i];
+        history[write] = history[write + TAPS] = input[i];
         const weight = progress();
-        let value = 0, ring = write;
-        for (let tap = 0; tap < TAPS; tap++) {
-          const coeff = fade >= transitionSamples ? to[tap] :
-            from[tap] + (to[tap] - from[tap]) * weight;
-          value += coeff * history[ring];
-          if (--ring < 0) ring = TAPS - 1;
+        const newest = write + TAPS;
+        const oldest = newest - (TAPS - 1);
+        const transitioning = fade < transitionSamples;
+        let value = 0;
+        for (let tap = 0; tap < MIDPOINT; tap++) {
+          const coeff = transitioning ? from[tap] + (to[tap] - from[tap]) * weight : to[tap];
+          value += coeff * (history[newest - tap] + history[oldest + tap]);
         }
+        const center = transitioning ?
+          from[MIDPOINT] + (to[MIDPOINT] - from[MIDPOINT]) * weight : to[MIDPOINT];
+        value += center * history[newest - MIDPOINT];
         if (!Number.isFinite(value)) throw new Error("nonfinite FIR result");
         if (Math.abs(value) > limiterCeiling) limitedSamples++;
         dest[i] = Math.max(-ceiling, Math.min(ceiling, value));
@@ -187,7 +195,7 @@ export function createOfflineDynamicFirResearch(config) {
       return Object.freeze({
         kind: "offline-synthetic-dynamic-fir-research-only", ear, sampleRate: RATE,
         firTaps: TAPS, basisBands: 6, algorithmicFutureLookaheadSamples: 0,
-        frozenGainLinearPhaseDelaySamples: (TAPS - 1) / 2,
+        frozenGainLinearPhaseDelaySamples: MIDPOINT,
         nominalSyntheticInputOnly: true, physicalMicCalibrated: false,
         physicalReceiverCalibrated: false, acousticMpoMeasured: false,
         hearingOutputAuthorized: false, audioRoute: "none",
