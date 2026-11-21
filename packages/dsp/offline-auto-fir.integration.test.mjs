@@ -1,38 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createOfflineAutoFirResearch } from "./offline-auto-fir.mjs";
-import { createOfflineSixBandLevelResearch } from "./offline-six-band-level.mjs";
-import { createOfflineDynamicFirResearch } from "./offline-dynamic-fir.mjs";
+import {core, pcm, targets} from "./offline-auto-fir.testkit.mjs";
 
-const centers = [250, 500, 1000, 2000, 4000, 8000];
-const targets = {
-  schema: "hearlens-prescription-targets-v1", usage: "offline-research-only",
-  origin: { kind: "synthetic-fixture", referenceId: null },
-  ears: Object.fromEntries(["left","right"].map(ear => [ear, {
-    bands: centers.map((centerHz,i) => ({
-      centerHz, gainDbByInputLevel: {
-        50: ear === "left" ? i + 3 : i + 6,
-        65: ear === "left" ? i + 2 : i + 5,
-        80: ear === "left" ? i + 1 : i + 4,
-      },
-    })),
-  }])),
-};
-function core(ear) {
-  const fir = createOfflineDynamicFirResearch({
-    usage: "offline-synthetic-test-only", targets, ear, sampleRate: 48000,
-    maxGainDb: 12, limiterCeiling: 0.3, transitionMs: 50,
-  });
-  const detector = createOfflineSixBandLevelResearch({
-    usage: "offline-synthetic-test-only", sampleRate: 48000,
-    attackMs: 15, releaseMs: 400,
-  });
-  return createOfflineAutoFirResearch({
-    usage: "offline-synthetic-test-only", fir, detector, controlIntervalSamples: 480,
-  });
-}
-const pcm = Float32Array.from({length: 5281}, (_,i) =>
-  i < 600 ? 0 : (i < 3000 ? .006 : .65) * Math.sin(2*Math.PI*1000*i/48000));
 function stream(ear, size) {
   const p = core(ear), out = new Float32Array(pcm.length);
   for (let i = 0; i < pcm.length; i += size) {
@@ -68,4 +37,24 @@ test("real left/right profiles remain distinct; limiter, reset and fail-stop rem
   assert.equal(left.p.diagnostics.acceptedSamples,0);
   assert.equal(left.p.diagnostics.fir.ready,false);
   assert.equal(left.p.processInto(new Float32Array(1),new Float32Array(1)),1);
+});
+
+test("concurrent ears keep independent delay lines and control state", () => {
+  for (const active of ["left", "right"]) {
+    const quiet = active === "left" ? "right" : "left";
+    const processors = { [active]: core(active), [quiet]: core(quiet) };
+    const output = new Float32Array(pcm.length);
+    const silence = new Float32Array(480);
+    const quietOutput = new Float32Array(480);
+    for (let pos = 0; pos < pcm.length; pos += 480) {
+      const chunk = pcm.subarray(pos, pos + 480);
+      processors[active].processInto(chunk, output.subarray(pos, pos + chunk.length));
+      quietOutput.fill(1);
+      const written = processors[quiet].processInto(silence.subarray(0, chunk.length), quietOutput);
+      assert(quietOutput.subarray(0, written).every(sample => sample === 0));
+    }
+    assert.deepEqual(output, stream(active, 480).out);
+    assert.deepEqual(processors[quiet].diagnostics.fir.lastTargetGainsDb,
+      targets.ears[quiet].bands.map(band => band.gainDbByInputLevel[50]));
+  }
 });
