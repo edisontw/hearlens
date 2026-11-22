@@ -103,3 +103,72 @@ test("fixed-horizon retarget mode keeps stereo isolation, partitions, limiter an
   assert.equal(guarded.diagnostics.acceptedSamples, 0);
   assert.equal(guarded.processInto(new Float32Array(1), new Float32Array(1)), 1);
 });
+
+
+test("mixed strong/weak bands: 180ms strong-tone pulse tracks weak-tone gain without changing policy", () => {
+  // Entirely synthetic PCM. Nominal detector coordinates are not calibrated SPL.
+  // Novel relative to the existing single-tone step: a continuous -42dBFS RMS
+  // 2kHz weak tone overlaps a 180ms -22dBFS RMS 1kHz strong-tone pulse.
+  const rate = 48000, count = 3 * rate, delay = 256, window = 480;
+  const weakAmp = Math.SQRT2 * 10 ** (-42 / 20);
+  const strongAmp = Math.SQRT2 * 10 ** (-22 / 20);
+  const input = Float32Array.from({ length: count }, (_, n) =>
+    weakAmp * Math.sin(2 * Math.PI * 2000 * n / rate) +
+    (n >= rate && n < 1.18 * rate ?
+      strongAmp * Math.sin(2 * Math.PI * 1000 * n / rate) : 0));
+
+  function render(policy) {
+    const processor = core("left", undefined, { transitionRetargetPolicy: policy });
+    const output = new Float32Array(count);
+    for (let pos = 0; pos < count; pos += window) {
+      processor.processInto(input.subarray(pos, pos + window),
+        output.subarray(pos, pos + window));
+    }
+    const diagnostics = processor.diagnostics;
+    assert.equal(diagnostics.audioRoute, "none");
+    assert.equal(diagnostics.hearingOutputAuthorized, false);
+    assert.equal(diagnostics.fir.algorithmicFutureLookaheadSamples, 0);
+    assert(output.every(sample => Number.isFinite(sample) && Math.abs(sample) <= 0.3));
+    assert.equal(diagnostics.fir.limitedSamples, 0);
+    return output;
+  }
+  function weakGainDb(output, ms) {
+    // 10 ms holds exactly 20 cycles at 2 kHz. Project the delayed output
+    // onto the weak tone to exclude the coincident 1 kHz fundamental.
+    const start = Math.round(ms * rate / 1000) + delay;
+    let sine = 0, cosine = 0;
+    for (let n = start; n < start + window; n++) {
+      const phase = 2 * Math.PI * 2000 * (n - delay) / rate;
+      sine += output[n] * Math.sin(phase);
+      cosine += output[n] * Math.cos(phase);
+    }
+    return 20 * Math.log10((2 * Math.hypot(sine, cosine) / window) / weakAmp);
+  }
+  function stats(output, fromMs, toMs) {
+    const values = [];
+    for (let ms = fromMs; ms + 10 <= toMs; ms += 10) {
+      values.push(weakGainDb(output, ms));
+    }
+    assert(values.length > 0 && values.every(Number.isFinite));
+    return {
+      meanDb: values.reduce((total, gain) => total + gain, 0) / values.length,
+      rangeDb: Math.max(...values) - Math.min(...values),
+    };
+  }
+  const measured = Object.fromEntries(["restart", "fixed-horizon"].map(policy => {
+    const output = render(policy);
+    return [policy, {
+      baseline: stats(output, 700, 900),
+      pulse: stats(output, 1000, 1180),
+      earlyRelease: stats(output, 1190, 1450),
+      lateRelease: stats(output, 2100, 2400),
+    }];
+  }));
+  for (const record of Object.values(measured)) {
+    assert(Math.abs(record.baseline.meanDb - 5.332) < 0.02);
+    assert(record.pulse.meanDb < record.baseline.meanDb);
+  }
+  // Descriptive characterization, not a quality pass threshold:
+  // do not enshrine either candidate's current ripple as the desired behavior.
+  console.log("M03 synthetic strong/weak pulse " + JSON.stringify(measured));
+});
