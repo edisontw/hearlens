@@ -197,12 +197,18 @@ test("synthetic syllable envelope across the 1.4/1.5kHz boundary characterizes m
       strongAmplitude * envelope * Math.sin(2 * Math.PI * 1400 * n / rate);
   });
 
-  function render(policy, partition) {
+  // Additional strong-only control helps separate 1.4kHz envelope leakage
+  // into the 1.5kHz projection from the incremental weak-carrier response.
+  // Float32 subtraction leaves only negligible quantization differences.
+  const strongOnly = Float32Array.from(input, (value, n) =>
+    value - weakAmplitude * Math.sin(2 * Math.PI * 1500 * n / rate));
+
+  function render(policy, partition, source = input) {
     const processor = core("left", undefined, { transitionRetargetPolicy: policy });
     const output = new Float32Array(count);
     for (let n = 0; n < count; n += partition) {
       const stop = Math.min(n + partition, count);
-      processor.processInto(input.subarray(n, stop), output.subarray(n, stop));
+      processor.processInto(source.subarray(n, stop), output.subarray(n, stop));
     }
     const d = processor.diagnostics;
     assert.equal(d.audioRoute, "none");
@@ -271,15 +277,25 @@ test("synthetic syllable envelope across the 1.4/1.5kHz boundary characterizes m
   assert.deepEqual(render("restart", 128), restart);
   const fixed = render("fixed-horizon", 480);
   const results = {};
-  for (const [name, output] of [["restart", restart], ["fixed-horizon", fixed]]) {
-    const baseline = weakGainStats(output, 700, 850);
-    const syllables = weakGainStats(output, 900, 2600);
-    const recovery = weakGainStats(output, 2700, 3100);
+  for (const [name, output, strongOnlyOutput] of [
+    ["restart", restart, render("restart", 480, strongOnly)],
+    ["fixed-horizon", fixed, render("fixed-horizon", 480, strongOnly)],
+  ]) {
+    const incremental = new Float32Array(count);
+    for (let i = 0; i < count; i++) incremental[i] = output[i] - strongOnlyOutput[i];
+    // Raw projection is vulnerable to 1.4kHz envelope spectral leakage.
+    // Difference of two independently rendered streams is a better estimate
+    // of the weak contribution, but still includes nonlinear detector response
+    // to adding the weak tone and MUST NOT be read as isolated filter gain.
+    const rawSyllableProjection = weakGainStats(output, 900, 2600);
+    const baseline = weakGainStats(incremental, 700, 850);
+    const syllables = weakGainStats(incremental, 900, 2600);
+    const recovery = weakGainStats(incremental, 2700, 3100);
     const residual = syllableResidualDbc(output);
     assert(Math.abs(baseline.meanDb) < 20);
     assert(syllables.rangeDb > 0);
     assert(Number.isFinite(residual.dbC));
-    results[name] = { baseline, syllables, recovery, residual };
+    results[name] = { baseline, syllables, rawSyllableProjection, recovery, residual };
   }
   // Characterization only: do not freeze a subjective "best" policy or
   // interpret dBc, ripple and the synthetic -44/-23dBFS as acoustic outcomes.
