@@ -16,10 +16,10 @@ export const targets = {
     })),
   }])),
 };
-export function makeFir(ear, factory = createOfflineDynamicFirResearch) {
+export function makeFir(ear, factory = createOfflineDynamicFirResearch, options = {}) {
   return factory({
     usage: "offline-synthetic-test-only", targets, ear, sampleRate: 48000,
-    maxGainDb: 12, limiterCeiling: 0.3, transitionMs: 50,
+    maxGainDb: 12, limiterCeiling: 0.3, transitionMs: 50, ...options,
   });
 }
 export function makeDetector() {
@@ -28,9 +28,9 @@ export function makeDetector() {
     attackMs: 15, releaseMs: 400,
   });
 }
-export function core(ear, factory) {
+export function core(ear, factory, options) {
   return createOfflineAutoFirResearch({
-    usage: "offline-synthetic-test-only", fir: makeFir(ear, factory), detector: makeDetector(), controlIntervalSamples: 480,
+    usage: "offline-synthetic-test-only", fir: makeFir(ear, factory, options), detector: makeDetector(), controlIntervalSamples: 480,
   });
 }
 export const pcm = Float32Array.from({length: 5281}, (_,i) =>

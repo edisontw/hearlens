@@ -21,10 +21,11 @@ const valid = (x, a, b) => typeof x === "number" && Number.isFinite(x) && x >= a
 const LIMIT_HEADROOM = 1e-7;
 
 function researchConfig(config) {
-  const allowed = ["usage", "targets", "ear", "sampleRate", "maxGainDb", "limiterCeiling", "transitionMs"];
+  const required = ["usage", "targets", "ear", "sampleRate", "maxGainDb", "limiterCeiling", "transitionMs"];
+  const allowed = [...required, "transitionRetargetPolicy"];
   if (config === null || typeof config !== "object" || Array.isArray(config) ||
       Object.keys(config).some(k => !allowed.includes(k)) ||
-      allowed.some(k => !Object.hasOwn(config, k))) {
+      required.some(k => !Object.hasOwn(config, k))) {
     throw new TypeError("explicit offline research configuration required (no output route)");
   }
   if (config.usage !== "offline-synthetic-test-only" || config.sampleRate !== RATE) {
@@ -33,6 +34,10 @@ function researchConfig(config) {
   if (config.ear !== "left" && config.ear !== "right") throw new RangeError("ear must be left/right");
   if (!valid(config.maxGainDb, 0, 12) || !valid(config.limiterCeiling, 0.05, 0.8) ||
       !valid(config.transitionMs, 10, 200)) throw new RangeError("unsupported research bounds");
+  const transitionRetargetPolicy = config.transitionRetargetPolicy ?? "restart";
+  if (transitionRetargetPolicy !== "restart" && transitionRetargetPolicy !== "fixed-horizon") {
+    throw new RangeError("transitionRetargetPolicy must be restart or fixed-horizon");
+  }
   const targets = normalizePrescriptionTargets(config.targets);
   if (targets.origin.kind !== "synthetic-fixture") throw new TypeError("synthetic-fixture targets only");
   const bands = targets.ears[config.ear]?.bands;
@@ -40,7 +45,7 @@ function researchConfig(config) {
       bands.some((b, i) => b.centerHz !== CENTER_HZ[i])) {
     throw new RangeError("six octave-center bands required for selected ear");
   }
-  return { bands, ear: config.ear, maxGainDb: config.maxGainDb,
+  return { bands, ear: config.ear, maxGainDb: config.maxGainDb, transitionRetargetPolicy,
     limiterCeiling: config.limiterCeiling, transitionSamples: Math.round(RATE * config.transitionMs / 1000) };
 }
 
@@ -107,7 +112,7 @@ function interpolateGains(bands, nominalLevels, maxGainDb) {
 }
 
 export function createOfflineDynamicFirResearch(config) {
-  const { bands, ear, maxGainDb, limiterCeiling, transitionSamples } = researchConfig(config);
+  const { bands, ear, maxGainDb, limiterCeiling, transitionSamples, transitionRetargetPolicy } = researchConfig(config);
   const basis = sharedBasis ?? (sharedBasis = designBasis());
   // Duplicate the ring so both mirrored reads stay contiguous across wrap.
   const history = new Float32Array(2 * TAPS);
@@ -128,10 +133,13 @@ export function createOfflineDynamicFirResearch(config) {
     let gains;
     try { gains = interpolateGains(bands, levels, maxGainDb); }
     catch (error) { faulted = true; throw error; }
+    const wasTransitioning = ready && fade < transitionSamples;
     const weight = ready ? progress() : 1;
     const amplitudes = gains.map(db => Math.pow(10, db / 20));
     for (let tap = 0; tap < UNIQUE_TAPS; tap++) {
-      if (ready) from[tap] += (to[tap] - from[tap]) * weight;
+      if (ready && (transitionRetargetPolicy === "restart" || !wasTransitioning)) {
+        from[tap] += (to[tap] - from[tap]) * weight;
+      }
       let result = 0;
       for (let band = 0; band < 6; band++) {
         result += basis[band][tap] * amplitudes[band];
@@ -140,7 +148,10 @@ export function createOfflineDynamicFirResearch(config) {
       if (!ready) from[tap] = result;
     }
     ready = true;
-    fade = updates === 0 ? transitionSamples : 0;
+    if (updates === 0) fade = transitionSamples;
+    // The study mode lets the first active fade finish at its original horizon
+    // while replacing its destination with the newest detector target.
+    else if (transitionRetargetPolicy === "restart" || !wasTransitioning) fade = 0;
     targetGainsDb = Object.freeze(gains);
     updates++;
     return targetGainsDb;
@@ -194,6 +205,7 @@ export function createOfflineDynamicFirResearch(config) {
     get diagnostics() {
       return Object.freeze({
         kind: "offline-synthetic-dynamic-fir-research-only", ear, sampleRate: RATE,
+        transitionRetargetPolicy,
         firTaps: TAPS, basisBands: 6, algorithmicFutureLookaheadSamples: 0,
         frozenGainLinearPhaseDelaySamples: MIDPOINT,
         nominalSyntheticInputOnly: true, physicalMicCalibrated: false,
