@@ -112,3 +112,10 @@ test("Research FIR has no playback, microphone, recording or network APIs",()=>{
  const s=readFileSync(new URL("./offline-dynamic-fir.mjs",import.meta.url),"utf8");
  for(const re of [/\bAudioTrack\b/,/\bAudioRecord\b/,/\bgetUserMedia\b/,/\bAudioContext\b/,/\bWebSocket\b/,/\bfetch\s*\(/,/\bAudioWorklet\b/])assert.doesNotMatch(s,re);
 });
+
+
+test("fixed-horizon retarget mode is explicit and rejects unknown policy values",()=>{
+ assert.equal(createOfflineDynamicFirResearch(conf({transitionRetargetPolicy:"fixed-horizon"})).diagnostics.transitionRetargetPolicy,"fixed-horizon");
+ assert.equal(createOfflineDynamicFirResearch(conf()).diagnostics.transitionRetargetPolicy,"restart");
+ assert.throws(()=>createOfflineDynamicFirResearch(conf({transitionRetargetPolicy:"unknown"})),/transitionRetargetPolicy/);
+});

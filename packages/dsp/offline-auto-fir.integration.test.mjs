@@ -58,3 +58,48 @@ test("concurrent ears keep independent delay lines and control state", () => {
       targets.ears[quiet].bands.map(band => band.gainDbByInputLevel[50]));
   }
 });
+
+
+test("fixed-horizon retarget mode keeps stereo isolation, partitions, limiter and reset", () => {
+  const policy = { transitionRetargetPolicy: "fixed-horizon" };
+  function run(ear, size, input = pcm) {
+    const processor = core(ear, undefined, policy), output = new Float32Array(input.length);
+    for (let pos = 0; pos < input.length; pos += size) {
+      const count = Math.min(size, input.length - pos);
+      processor.processInto(input.subarray(pos, pos + count), output.subarray(pos, pos + count));
+    }
+    return { processor, output };
+  }
+  const reference = run("left", 480);
+  for (const size of [1, 128, 1024, 4096]) {
+    assert.deepEqual(run("left", size).output, reference.output);
+  }
+  const right = run("right", 480);
+  assert.notDeepEqual(reference.processor.diagnostics.fir.lastTargetGainsDb,
+    right.processor.diagnostics.fir.lastTargetGainsDb);
+  assert.equal(reference.processor.diagnostics.fir.algorithmicFutureLookaheadSamples, 0);
+  assert.equal(reference.processor.diagnostics.fir.frozenGainLinearPhaseDelaySamples, 256);
+  assert(reference.output.every(sample => Number.isFinite(sample) && Math.abs(sample) <= 0.3));
+  assert(right.output.every(sample => Number.isFinite(sample) && Math.abs(sample) <= 0.3));
+
+  const active = core("left", undefined, policy), silent = core("right", undefined, policy);
+  const silentInput = new Float32Array(480), silentOutput = new Float32Array(480);
+  const activeOutput = new Float32Array(480);
+  for (let pos = 0; pos < pcm.length; pos += 480) {
+    const chunk = pcm.subarray(pos, pos + 480);
+    active.processInto(chunk, activeOutput);
+    const written = silent.processInto(silentInput, silentOutput);
+    assert(silentOutput.subarray(0, written).every(sample => sample === 0));
+  }
+
+  const guarded = core("right", undefined, policy);
+  const loud = new Float32Array(1024).fill(8), limited = new Float32Array(1024);
+  guarded.processInto(loud, limited);
+  assert(limited.every(sample => Math.abs(sample) <= 0.3));
+  assert(guarded.diagnostics.fir.limitedSamples > 0);
+  assert.throws(() => guarded.processInto(Float32Array.of(0, NaN), new Float32Array(2)), /finite/);
+  assert.equal(guarded.diagnostics.faulted, true);
+  guarded.reset();
+  assert.equal(guarded.diagnostics.acceptedSamples, 0);
+  assert.equal(guarded.processInto(new Float32Array(1), new Float32Array(1)), 1);
+});
