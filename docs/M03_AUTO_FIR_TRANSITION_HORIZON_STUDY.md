@@ -1,6 +1,6 @@
 # M03 Auto-FIR transition horizon study
 
-This is an offline synthetic 48 kHz study on the PR #145 fixed-basis stereo Auto-FIR. The optional `transitionRetargetPolicy: "fixed-horizon"` setting keeps the 50 ms coefficient transition on its original sample-clock horizon while replacing the transition destination with each new detector target. It is opt-in. The existing default, `"restart"`, remains unchanged.
+This is an offline synthetic 48 kHz study on the PR #145 fixed-basis stereo Auto-FIR. The optional `transitionRetargetPolicy: "fixed-horizon"` setting keeps the original coefficient origin and the 50 ms sample-clock horizon while replacing only the transition destination with each new detector target. A repeated identical target therefore does not apply elapsed fade progress twice. It is opt-in. The existing default, `"restart"`, remains unchanged.
 
 ## Reproduce
 
@@ -20,9 +20,9 @@ Both ears produced the same dynamics within rounding. Their absolute target gain
 | Retarget policy | Attack midpoint | Release midpoint | Attack residual, mean power | Attack worst window | Release residual, mean power | High-hold gain pumping |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Restart each target (current default) | 90 ms | 1,180 ms | -51.41 dBc | -39.22 dBc | -31.60 dBc | 0.000079 dB peak-to-peak |
-| Preserve original 50 ms horizon | 30 ms | 1,080 ms | -43.53 dBc | -31.63 dBc | -31.60 dBc | <0.000001 dB peak-to-peak |
+| Preserve original 50 ms horizon | 30 ms | 1,090 ms | -46.06 dBc | -35.95 dBc | -31.60 dBc | <0.000001 dB peak-to-peak |
 
-Both gain traces were monotonic at the 0.02 dB criterion. The candidate advances the attack midpoint by 60 ms and the release midpoint by 100 ms. It raises aggregate attack residual power by 7.88 dB and the worst-window residual by 7.59 dB. Release transient residual is essentially unchanged. The high-hold gain ripple is negligible for both policies.
+Both gain traces were monotonic at the 0.02 dB criterion. A regression reissues an identical target halfway through a fade and verifies bit-identical output to the stream with no redundant retarget, guarding against reapplying elapsed interpolation progress. The candidate advances the attack midpoint by 60 ms and the release midpoint by 90 ms. It raises aggregate attack residual power by 5.35 dB and the worst-window residual by 3.27 dB. Release transient residual is essentially unchanged. The high-hold gain ripple is negligible for both policies.
 
 The candidate's sample peak stayed below the 0.3 digital ceiling in this signal and did not trigger the limiter. The dedicated regression also drives bounded extreme PCM into the candidate and verifies clipping, fail-stop, and reset. Both ears remain isolated. Output is bit-identical across callback partitions of 1, 128, 480, 1024 and 4096 samples. The mode does not buffer future input. Frozen-gain group delay remains 256 samples.
 

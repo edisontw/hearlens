@@ -137,7 +137,9 @@ export function createOfflineDynamicFirResearch(config) {
     const weight = ready ? progress() : 1;
     const amplitudes = gains.map(db => Math.pow(10, db / 20));
     for (let tap = 0; tap < UNIQUE_TAPS; tap++) {
-      if (ready) from[tap] += (to[tap] - from[tap]) * weight;
+      if (ready && (transitionRetargetPolicy === "restart" || !wasTransitioning)) {
+        from[tap] += (to[tap] - from[tap]) * weight;
+      }
       let result = 0;
       for (let band = 0; band < 6; band++) {
         result += basis[band][tap] * amplitudes[band];

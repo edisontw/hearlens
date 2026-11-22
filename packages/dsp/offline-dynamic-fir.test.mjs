@@ -119,3 +119,19 @@ test("fixed-horizon retarget mode is explicit and rejects unknown policy values"
  assert.equal(createOfflineDynamicFirResearch(conf()).diagnostics.transitionRetargetPolicy,"restart");
  assert.throws(()=>createOfflineDynamicFirResearch(conf({transitionRetargetPolicy:"unknown"})),/transitionRetargetPolicy/);
 });
+
+
+test("fixed-horizon repeated target preserves its original interpolation origin",()=>{
+ function stream(repeatTarget){
+  const processor=createOfflineDynamicFirResearch(conf({transitionRetargetPolicy:"fixed-horizon"}));
+  const output=new Float32Array(5000),input=new Float32Array(5000).fill(0.01);
+  processor.setSyntheticBandLevels(Array(6).fill(50));
+  processor.processInto(input.subarray(0,1024),output.subarray(0,1024));
+  processor.setSyntheticBandLevels(Array(6).fill(80));
+  processor.processInto(input.subarray(1024,2224),output.subarray(1024,2224));
+  if(repeatTarget)processor.setSyntheticBandLevels(Array(6).fill(80));
+  processor.processInto(input.subarray(2224),output.subarray(2224));
+  return output;
+ }
+ assert.deepEqual(stream(true),stream(false));
+});
