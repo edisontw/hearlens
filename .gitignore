@@ -1,4 +1,7 @@
 node_modules/
+.models/
+.venv-local-taigi/
+__pycache__/
 .DS_Store
 *.log
 .env

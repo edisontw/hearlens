@@ -9,7 +9,7 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261119-stop-drain1" />
+    <link rel="stylesheet" href="./styles.css?v=20261123-local-taigi1" />
   </head>
   <body>
     <main class="shell">
@@ -31,6 +31,13 @@
           </div>
         </div>
 
+        <label class="language-mode-control" for="language-mode">
+          <span>字幕語言模式</span>
+          <select id="language-mode" aria-describedby="stt-privacy-notice">
+            <option value="mandarin">中文／中英（Gemini）</option>
+            <option value="taigi">台語（本機 Ryzen 5 模型；漢字轉寫）</option>
+          </select>
+        </label>
         <p id="stt-privacy-notice" class="stt-privacy-notice" role="note">開始後，麥克風聲音會傳送至 Google Gemini 進行雲端辨識。請先告知對話者。</p>
 
         <div id="caption" class="caption" tabindex="0"
@@ -285,6 +292,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261119-stop-drain1"></script>
+    <script type="module" src="./main.js?v=20261123-local-taigi1"></script>
   </body>
 </html>

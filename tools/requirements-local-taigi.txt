@@ -1,0 +1,4 @@
+ctranslate2==4.6.2
+faster-whisper==1.2.1
+huggingface-hub==0.34.4
+transformers==4.57.1

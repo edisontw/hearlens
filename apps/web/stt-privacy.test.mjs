@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { captionSttPrivacyNotice } from "./stt-privacy.mjs";
-import { resolveSttProviderId } from "./stt/provider.js";
+import { createSttProvider, resolveSttProviderId } from "./stt/provider.js";
+import { encodePcm16Wav, resampleMonoLinear } from "./stt/providers/local-taigi-audio.mjs";
 
 test("pre-start privacy notice identifies the true configured provider", () => {
   const gemini = captionSttPrivacyNotice("gemini-live-transcribe");
@@ -17,6 +18,10 @@ test("pre-start privacy notice identifies the true configured provider", () => {
   assert.match(google, /語音代理/);
   assert.match(google, /Google Cloud/);
   assert.doesNotMatch(google, /Google Gemini/);
+  const taigi = captionSttPrivacyNotice("local-taigi");
+  assert.match(taigi, /CPU 模型/);
+  assert.match(taigi, /不傳送至雲端/);
+  assert.match(taigi, /漢字轉寫/);
   for (const unknown of [null, "", "future-provider"]) {
     assert.match(captionSttPrivacyNotice(unknown), /可能傳送至外部辨識服務/);
   }
@@ -27,6 +32,8 @@ test("notice is visible before Start and associated with the accessibility tree"
   const main = readFileSync("apps/web/main.js", "utf8");
   const css = readFileSync("apps/web/styles.css", "utf8");
   assert(html.indexOf('id="stt-privacy-notice"') < html.indexOf('id="start"'));
+  assert(html.indexOf('id="language-mode"') < html.indexOf('id="start"'));
+  assert.match(html, /option value="taigi"/);
   assert.match(html, /id="stt-privacy-notice" class="stt-privacy-notice" role="note"/);
   assert.match(html, /id="start"[^>]*aria-describedby="stt-privacy-notice"/);
   assert.match(main, /captionSttPrivacyNotice\(runtimeSttConfig\.provider\)/);
@@ -55,4 +62,18 @@ test("AUTO resolves before microphone permission and names the actual cloud prov
   const main = readFileSync("apps/web/main.js", "utf8");
   assert.match(main, /provider: resolveSttProviderId\(provider, tokenUrl\)/);
   assert(main.indexOf("不支援的語音辨識選項") < main.indexOf("const diagnosticStream = await navigator.mediaDevices.getUserMedia"));
+});
+
+test("Taiwanese mode selects the local model and prepares bounded mono PCM16 WAV clips", () => {
+  const provider = createSttProvider({ provider: "local-taigi" });
+  assert.equal(provider.id, "local-taigi");
+  assert.equal(provider.label, "台語本機模型（CPU INT8）");
+  const resampled = resampleMonoLinear(new Float32Array(48_000).fill(0.25), 48_000);
+  assert.equal(resampled.length, 16_000);
+  const wav = encodePcm16Wav(resampled);
+  const header = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  assert.equal(String.fromCharCode(...wav.subarray(0, 4)), "RIFF");
+  assert.equal(header.getUint32(24, true), 16_000);
+  assert.equal(header.getUint16(22, true), 1);
+  assert.equal(wav.length, 44 + 16_000 * 2);
 });
