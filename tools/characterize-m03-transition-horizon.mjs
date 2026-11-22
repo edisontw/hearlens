@@ -64,9 +64,6 @@ function summarize(ear, policy) {
     }
     return null;
   }
-  function trace(startMs, endMs) {
-    return gains.filter(row => row.ms >= startMs && row.ms <= endMs);
-  }
   function monotonicViolations(rows, direction) {
     let count = 0, largest = 0;
     for (let i = 1; i < rows.length; i++) {
