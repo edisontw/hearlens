@@ -172,3 +172,132 @@ test("mixed strong/weak bands: 180ms strong-tone pulse tracks weak-tone gain wit
   // do not enshrine either candidate's current ripple as the desired behavior.
   console.log("M03 synthetic strong/weak pulse " + JSON.stringify(measured));
 });
+
+
+test("synthetic syllable envelope across the 1.4/1.5kHz boundary characterizes modulation and residual", () => {
+  // 1.4 and 1.5 kHz straddle the geometric 1k/2k band boundary (~1.414kHz).
+  // They have exactly 14 and 15 cycles per 10 ms window, respectively, so
+  // the two known carriers can be projected independently in those windows.
+  // This is digital synthetic PCM only: not speech, acoustic SPL, or hearing output.
+  const rate = 48000, delay = 256, hop = 480, count = 163200;
+  const weakAmplitude = Math.SQRT2 * 10 ** (-44 / 20);
+  const strongAmplitude = Math.SQRT2 * 10 ** (-23 / 20);
+  const syllablesMs = [[900, 1140], [1380, 1630], [1860, 2100], [2340, 2590]];
+  const input = Float32Array.from({ length: count }, (_, n) => {
+    const ms = n * 1000 / rate;
+    let envelope = 0;
+    for (const [start, end] of syllablesMs) {
+      if (ms >= start && ms < end) {
+        const edge = Math.max(0, Math.min(1, (ms - start) / 12, (end - ms) / 12));
+        envelope = Math.sin(Math.PI * edge / 2) ** 2; // 12ms raised-cosine edges
+        break;
+      }
+    }
+    return weakAmplitude * Math.sin(2 * Math.PI * 1500 * n / rate) +
+      strongAmplitude * envelope * Math.sin(2 * Math.PI * 1400 * n / rate);
+  });
+
+  // Additional strong-only control helps separate 1.4kHz envelope leakage
+  // into the 1.5kHz projection from the incremental weak-carrier response.
+  // Float32 subtraction leaves only negligible quantization differences.
+  const strongOnly = Float32Array.from(input, (value, n) =>
+    value - weakAmplitude * Math.sin(2 * Math.PI * 1500 * n / rate));
+
+  function render(policy, partition, source = input) {
+    const processor = core("left", undefined, { transitionRetargetPolicy: policy });
+    const output = new Float32Array(count);
+    for (let n = 0; n < count; n += partition) {
+      const stop = Math.min(n + partition, count);
+      processor.processInto(source.subarray(n, stop), output.subarray(n, stop));
+    }
+    const d = processor.diagnostics;
+    assert.equal(d.audioRoute, "none");
+    assert.equal(d.hearingOutputAuthorized, false);
+    assert.equal(d.physicalMicCalibrated, false);
+    assert.equal(d.fir.algorithmicFutureLookaheadSamples, 0);
+    assert.equal(d.fir.frozenGainLinearPhaseDelaySamples, delay);
+    assert.equal(d.fir.limitedSamples, 0);
+    assert(output.every(v => Number.isFinite(v) && Math.abs(v) <= 0.3));
+    return output;
+  }
+
+  function coefficients(output, startMs, frequency, frames = hop) {
+    const first = Math.round(startMs * rate / 1000) + delay;
+    let sine = 0, cosine = 0;
+    for (let i = 0; i < frames; i++) {
+      const phase = 2 * Math.PI * frequency * (first + i - delay) / rate;
+      sine += output[first + i] * Math.sin(phase);
+      cosine += output[first + i] * Math.cos(phase);
+    }
+    return [2 * sine / frames, 2 * cosine / frames];
+  }
+
+  function weakGainStats(output, fromMs, toMs) {
+    const values = [];
+    for (let ms = fromMs; ms + 10 <= toMs; ms += 10) {
+      const [s, c] = coefficients(output, ms, 1500);
+      values.push(20 * Math.log10(Math.hypot(s, c) / weakAmplitude));
+    }
+    assert(values.length > 0 && values.every(Number.isFinite));
+    return {
+      meanDb: values.reduce((sum, value) => sum + value, 0) / values.length,
+      rangeDb: Math.max(...values) - Math.min(...values),
+    };
+  }
+
+  function syllableResidualDbc(output) {
+    // Orthogonal 20ms two-tone least-squares projection. The remaining energy
+    // includes intentional syllable-envelope sidebands, detector modulation,
+    // transient FIR motion and numerical error: NOT a perceptual distortion score.
+    let residual = 0, fitted = 0, windows = 0;
+    for (const [from, to] of [[940, 1100], [1420, 1590], [1900, 2060], [2380, 2550]]) {
+      for (let ms = from; ms + 20 <= to; ms += 20) {
+        const first = Math.round(ms * rate / 1000) + delay;
+        const [s14, c14] = coefficients(output, ms, 1400, 960);
+        const [s15, c15] = coefficients(output, ms, 1500, 960);
+        for (let i = 0; i < 960; i++) {
+          const phase14 = 2 * Math.PI * 1400 * (first + i - delay) / rate;
+          const phase15 = 2 * Math.PI * 1500 * (first + i - delay) / rate;
+          const estimate = s14 * Math.sin(phase14) + c14 * Math.cos(phase14) +
+            s15 * Math.sin(phase15) + c15 * Math.cos(phase15);
+          const remainder = output[first + i] - estimate;
+          fitted += estimate * estimate;
+          residual += remainder * remainder;
+        }
+        windows++;
+      }
+    }
+    assert(windows > 0 && fitted > 0 && residual >= 0);
+    return { windows, dbC: 10 * Math.log10(Math.max(residual / fitted, 1e-30)) };
+  }
+
+  const restart = render("restart", 480);
+  // The pre-existing policy tests include extensive partition checks; verify
+  // this new input also gives identical PCM with a different callback partition.
+  assert.deepEqual(render("restart", 128), restart);
+  const fixed = render("fixed-horizon", 480);
+  const results = {};
+  for (const [name, output, strongOnlyOutput] of [
+    ["restart", restart, render("restart", 480, strongOnly)],
+    ["fixed-horizon", fixed, render("fixed-horizon", 480, strongOnly)],
+  ]) {
+    const incremental = new Float32Array(count);
+    for (let i = 0; i < count; i++) incremental[i] = output[i] - strongOnlyOutput[i];
+    // Raw projection is vulnerable to 1.4kHz envelope spectral leakage.
+    // Difference of two independently rendered streams is a better estimate
+    // of the weak contribution, but still includes nonlinear detector response
+    // to adding the weak tone and MUST NOT be read as isolated filter gain.
+    const rawSyllableProjection = weakGainStats(output, 900, 2600);
+    const baseline = weakGainStats(incremental, 700, 850);
+    const syllables = weakGainStats(incremental, 900, 2600);
+    const recovery = weakGainStats(incremental, 2700, 3100);
+    const residual = syllableResidualDbc(output);
+    assert(Math.abs(baseline.meanDb) < 20);
+    assert(syllables.rangeDb > 0);
+    assert(Number.isFinite(residual.dbC));
+    results[name] = { baseline, syllables, rawSyllableProjection, recovery, residual };
+  }
+  // Characterization only: do not freeze a subjective "best" policy or
+  // interpret dBc, ripple and the synthetic -44/-23dBFS as acoustic outcomes.
+  console.log("M03 synthetic syllable boundary " + JSON.stringify(results));
+});
