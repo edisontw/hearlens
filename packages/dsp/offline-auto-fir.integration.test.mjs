@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {core, makeFir, pcm, targets} from "./offline-auto-fir.testkit.mjs";
+import {core, makeDetector, makeFir, pcm, targets} from "./offline-auto-fir.testkit.mjs";
+import {createOfflineAutoFirResearch} from "./offline-auto-fir.mjs";
 
 function stream(ear, size) {
   const p = core(ear), out = new Float32Array(pcm.length);
@@ -348,18 +349,36 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
     return { processor, output };
   }
 
-  function renderFrozen(input) {
-    const processor = makeFir("left");
-    processor.setSyntheticBandLevels(Array(6).fill(50));
+  function renderFrozenAtPrePulseState(input, policy, event) {
+    const fir = makeFir("left", undefined, { transitionRetargetPolicy: policy });
+    const detector = makeDetector();
+    const processor = createOfflineAutoFirResearch({
+      usage: "offline-synthetic-test-only",
+      fir,
+      detector,
+      controlIntervalSamples: hop,
+    });
     const output = new Float32Array(input.length);
-    for (let pos = 0; pos < input.length; pos += 4096) {
-      const end = Math.min(input.length, pos + 4096);
-      processor.processInto(input.subarray(pos, end), output.subarray(pos, end));
+    const end = Math.round(event.startMs * rate / 1000);
+    let pos = 0;
+    while (pos < end) {
+      const next = Math.min(end, pos + hop);
+      processor.processInto(input.subarray(pos, next), output.subarray(pos, next));
+      pos = next;
     }
-    assert.equal(processor.diagnostics.audioRoute, "none");
-    assert.equal(processor.diagnostics.hearingOutputAuthorized, false);
+    const nominalLevels = new Float64Array(6);
+    detector.readNominalLevelsInto(nominalLevels);
+    for (; pos < input.length; pos += 4096) {
+      const end = Math.min(input.length, pos + 4096);
+      // Continue from the identical pre-event FIR history, but do not feed
+      // detector retargets after the event. Its policy-specific pre-pulse
+      // coefficients therefore provide the frozen-gain transient control.
+      fir.processInto(input.subarray(pos, end), output.subarray(pos, end));
+    }
+    assert.equal(fir.diagnostics.audioRoute, "none");
+    assert.equal(fir.diagnostics.hearingOutputAuthorized, false);
     assert(output.every(x => Number.isFinite(x) && Math.abs(x) <= 0.3));
-    return { processor, output };
+    return { output, nominalLevels };
   }
 
   function coefficients(output, startMs, frequency, frames = hop, offset = delay) {
@@ -457,15 +476,23 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
       pulseEvents: [event],
       weakStartMs: Infinity,
     });
-    const frozenMixed = renderFrozen(input).output;
     const policies = {};
     for (const policy of ["restart", "fixed-horizon"]) {
       const mixed = renderAuto(input, policy);
       const strong = renderAuto(strongOnly, policy);
+      const frozen = renderFrozenAtPrePulseState(input, policy, event);
+      const eventStart = Math.round(event.startMs * rate / 1000);
+      assert.deepEqual(frozen.output.subarray(0, eventStart), mixed.output.subarray(0, eventStart));
       assert.equal(mixed.processor.diagnostics.fir.limitedSamples, 0);
       assert.equal(strong.processor.diagnostics.fir.limitedSamples, 0);
       const incrementalWeak = Float32Array.from(mixed.output, (value, i) => value - strong.output[i]);
-      policies[policy] = { mixed: mixed.output, incrementalWeak, diagnostics: mixed.processor.diagnostics };
+      policies[policy] = {
+        mixed: mixed.output,
+        frozen: frozen.output,
+        nominalLevels: frozen.nominalLevels,
+        incrementalWeak,
+        diagnostics: mixed.processor.diagnostics,
+      };
     }
     const before = [];
     for (let ms = event.startMs - 100; ms < event.startMs - 20; ms += 10) {
@@ -480,18 +507,17 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
         Math.round(event.startMs * rate / 1000),
         Math.round((event.startMs + event.durationMs) * rate / 1000)).map(Math.abs)),
       envelopeLeakageInputDbc: twoToneResidualDbc(input, event.startMs, 0),
-      frozenFirResidualDbc: twoToneResidualDbc(frozenMixed, event.startMs, delay),
       policies: {},
     };
     for (const policy of ["restart", "fixed-horizon"]) {
-      const { mixed, incrementalWeak, diagnostics } = policies[policy];
+      const { mixed, frozen, nominalLevels, incrementalWeak, diagnostics } = policies[policy];
       const baseline = mean(before.map(ms => weakGainDb(incrementalWeak, ms)));
       const windowStarts = [];
       for (let ms = event.startMs; ms + 10 <= event.startMs + 1700; ms += 10) windowStarts.push(ms);
       const weakValues = windowStarts.map(ms => weakGainDb(incrementalWeak, ms));
       const rawValues = windowStarts.map(ms => weakGainDb(mixed, ms));
       const minimum = Math.min(...weakValues);
-      const transientDeltaDb = maxRmsOvershootDb(mixed, frozenMixed, event);
+      const transientDeltaDb = maxRmsOvershootDb(mixed, frozen, event);
       const eventPeak = peakInEvent(mixed, event);
       let recoveryMs = null;
       for (let i = 0; i + 2 < afterStarts.length; i++) {
@@ -513,6 +539,8 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
         recoveryHorizonMs: 1700,
         terminalWeakBandGainDeltaDb: mean(weakValues.slice(-10)) - baseline,
         dynamicResidualDbc: twoToneResidualDbc(mixed, event.startMs, delay),
+        frozenFirResidualDbc: twoToneResidualDbc(frozen, event.startMs, delay),
+        prePulseNominalLevels: Array.from(nominalLevels),
         limitedSamples: diagnostics.fir.limitedSamples,
       };
     }
@@ -529,12 +557,13 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
     pulseEvents: [isolatedEvent],
     weakStartMs: 1200,
   });
-  const isolatedFrozen = renderFrozen(isolated).output;
   const isolatedMetrics = {};
   for (const policy of ["restart", "fixed-horizon"]) {
     const { processor, output } = renderAuto(isolated, policy);
+    const isolatedFrozen = renderFrozenAtPrePulseState(isolated, policy, isolatedEvent);
     const eventEnd = Math.round(isolatedEvent.startMs * rate / 1000);
     assert(output.subarray(0, eventEnd).every(value => value === 0));
+    assert.deepEqual(isolatedFrozen.output.subarray(0, eventEnd), output.subarray(0, eventEnd));
     const steadyProbe = [];
     for (let ms = 3500; ms < 3700; ms += 10) steadyProbe.push(weakGainDb(output, ms));
     const stableDb = mean(steadyProbe);
@@ -547,7 +576,7 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
       }
     }
     const isolatedPeak = peakInEvent(output, isolatedEvent);
-    const isolatedTransientDeltaDb = maxRmsOvershootDb(output, isolatedFrozen, isolatedEvent);
+    const isolatedTransientDeltaDb = maxRmsOvershootDb(output, isolatedFrozen.output, isolatedEvent);
     isolatedMetrics[policy] = {
       eventPeak: isolatedPeak,
       eventPeakDbfs: 20 * Math.log10(isolatedPeak),
@@ -557,7 +586,8 @@ test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and
       lateWeakProbeGainDb: stableDb,
       probeSettlingMsWithin0_1dB: probeSettlingMs,
       inputEnvelopeResidualDbc: twoToneResidualDbc(isolated, isolatedEvent.startMs, 0),
-      frozenFirResidualDbc: twoToneResidualDbc(isolatedFrozen, isolatedEvent.startMs, delay),
+      frozenFirResidualDbc: twoToneResidualDbc(isolatedFrozen.output, isolatedEvent.startMs, delay),
+      prePulseNominalLevels: Array.from(isolatedFrozen.nominalLevels),
       dynamicResidualDbc: twoToneResidualDbc(output, isolatedEvent.startMs, delay),
       limitedSamples: processor.diagnostics.fir.limitedSamples,
     };
