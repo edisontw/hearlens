@@ -3,7 +3,7 @@ import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./capt
 import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261119-stop-drain1";
 import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261123-local-taigi1";
 import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261119-stop-drain1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261119-stop-drain1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261123-local-taigi1";
 import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261119-stop-drain1";
 import {
   assertCaptionSessionCurrent,
@@ -21,7 +21,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261119-stop-drain1";
+} from "./transcript-window.mjs?v=20261123-local-taigi1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
