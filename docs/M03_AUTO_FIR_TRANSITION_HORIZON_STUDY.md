@@ -28,7 +28,7 @@ The candidate's sample peak stayed below the 0.3 digital ceiling in this signal 
 
 ## Decision
 
-**NO-GO for changing the default transition policy.** The method materially shortens the response but the attack sideband residual also rises on this tone. The study establishes the tradeoff and preserves the candidate behind an explicit offline research option. A broader stimulus set and a meaningful transient quality criterion are not yet available to justify enabling it by default. No clinical or listening claim follows from these synthetic measurements.
+**NO-GO for changing the default transition policy.** The method materially shortens the response but the attack sideband residual also rises on this tone. Later short-pulse and syllable-boundary characterizations broaden the synthetic comparison, but no meaningful perceptual transient acceptance criterion exists to justify enabling the candidate by default. It remains behind an explicit offline research option. No clinical or listening claim follows from these synthetic measurements.
 
 ## Architecture summary
 

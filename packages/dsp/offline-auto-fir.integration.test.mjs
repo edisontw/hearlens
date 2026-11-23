@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {core, pcm, targets} from "./offline-auto-fir.testkit.mjs";
+import {core, makeFir, pcm, targets} from "./offline-auto-fir.testkit.mjs";
 
 function stream(ear, size) {
   const p = core(ear), out = new Float32Array(pcm.length);
@@ -300,4 +300,293 @@ test("synthetic syllable envelope across the 1.4/1.5kHz boundary characterizes m
   // Characterization only: do not freeze a subjective "best" policy or
   // interpret dBc, ripple and the synthetic -44/-23dBFS as acoustic outcomes.
   console.log("M03 synthetic syllable boundary " + JSON.stringify(results));
+});
+
+
+test("short 5, 10 and 20 ms synthetic PCM spikes compare transition policies and controls", () => {
+  // Synthetic-only 48 kHz PCM. Strong 1.4 kHz spikes sit beside a continuous
+  // weak 1.5 kHz carrier near the 1/2 kHz band boundary. Nothing is played.
+  const rate = 48000, delay = 256, hop = 480, taps = 513;
+  const weakAmp = Math.SQRT2 * 10 ** (-44 / 20);
+  const strongAmp = Math.SQRT2 * 10 ** (-23 / 20);
+  const spikes = [
+    { startMs: 600, durationMs: 5 },
+    { startMs: 600, durationMs: 10 },
+    { startMs: 600, durationMs: 20 },
+  ];
+  const persistentCount = 2700 * rate / 1000;
+
+  function makeInput({ count, pulseEvents, weakStartMs = 0, pulsePeak = strongAmp }) {
+    return Float32Array.from({ length: count }, (_, n) => {
+      const ms = n * 1000 / rate;
+      const weak = ms >= weakStartMs ? weakAmp * Math.sin(2 * Math.PI * 1500 * n / rate) : 0;
+      let strong = 0;
+      for (const event of pulseEvents) {
+        if (ms >= event.startMs && ms < event.startMs + event.durationMs) {
+          strong = pulsePeak * Math.sin(2 * Math.PI * 1400 * n / rate);
+          break;
+        }
+      }
+      return weak + strong;
+    });
+  }
+
+  function renderAuto(input, policy, partition = hop) {
+    const processor = core("left", undefined, { transitionRetargetPolicy: policy });
+    const output = new Float32Array(input.length);
+    for (let pos = 0; pos < input.length; pos += partition) {
+      const end = Math.min(input.length, pos + partition);
+      processor.processInto(input.subarray(pos, end), output.subarray(pos, end));
+    }
+    const d = processor.diagnostics;
+    assert.equal(d.audioRoute, "none");
+    assert.equal(d.hearingOutputAuthorized, false);
+    assert.equal(d.physicalMicCalibrated, false);
+    assert.equal(d.fir.algorithmicFutureLookaheadSamples, 0);
+    assert.equal(d.fir.frozenGainLinearPhaseDelaySamples, delay);
+    assert(output.every(x => Number.isFinite(x) && Math.abs(x) <= 0.3));
+    return { processor, output };
+  }
+
+  function renderFrozen(input) {
+    const processor = makeFir("left");
+    processor.setSyntheticBandLevels(Array(6).fill(50));
+    const output = new Float32Array(input.length);
+    for (let pos = 0; pos < input.length; pos += 4096) {
+      const end = Math.min(input.length, pos + 4096);
+      processor.processInto(input.subarray(pos, end), output.subarray(pos, end));
+    }
+    assert.equal(processor.diagnostics.audioRoute, "none");
+    assert.equal(processor.diagnostics.hearingOutputAuthorized, false);
+    assert(output.every(x => Number.isFinite(x) && Math.abs(x) <= 0.3));
+    return { processor, output };
+  }
+
+  function coefficients(output, startMs, frequency, frames = hop, offset = delay) {
+    const first = Math.round(startMs * rate / 1000) + offset;
+    let sine = 0, cosine = 0;
+    for (let i = 0; i < frames; i++) {
+      const phase = 2 * Math.PI * frequency * (first + i - offset) / rate;
+      sine += output[first + i] * Math.sin(phase);
+      cosine += output[first + i] * Math.cos(phase);
+    }
+    return [2 * sine / frames, 2 * cosine / frames];
+  }
+
+  function weakGainDb(output, startMs) {
+    const [sine, cosine] = coefficients(output, startMs, 1500);
+    return 20 * Math.log10(Math.hypot(sine, cosine) / weakAmp);
+  }
+
+  function mean(values) {
+    assert(values.length > 0 && values.every(Number.isFinite));
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  function peakInEvent(output, event) {
+    const first = Math.round(event.startMs * rate / 1000) + delay;
+    const end = Math.min(output.length,
+      Math.round((event.startMs + event.durationMs) * rate / 1000) + delay + taps);
+    let peak = 0;
+    for (let i = first; i < end; i++) peak = Math.max(peak, Math.abs(output[i]));
+    return peak;
+  }
+
+  function maxRmsOvershootDb(output, frozen, event) {
+    const first = Math.round(event.startMs * rate / 1000) + delay;
+    const end = Math.min(output.length,
+      Math.round((event.startMs + event.durationMs) * rate / 1000) + delay + taps);
+    let maximum = -Infinity;
+    for (let start = first; start + 48 <= end; start += 48) {
+      let dynamicPower = 0, frozenPower = 0;
+      for (let i = start; i < start + 48; i++) {
+        dynamicPower += output[i] ** 2;
+        frozenPower += frozen[i] ** 2;
+      }
+      const frozenRms = Math.sqrt(frozenPower / 48);
+      if (frozenRms > 1e-9) {
+        maximum = Math.max(maximum, 10 * Math.log10(dynamicPower / frozenPower));
+      }
+    }
+    assert(Number.isFinite(maximum));
+    return maximum;
+  }
+
+  function twoToneResidualDbc(samples, startMs, offset = 0) {
+    const frames = 960, first = Math.round(startMs * rate / 1000) + offset;
+    const frequencies = [1400, 1500];
+    const fit = frequencies.map(frequency => {
+      let sine = 0, cosine = 0;
+      for (let i = 0; i < frames; i++) {
+        const phase = 2 * Math.PI * frequency * (first + i - offset) / rate;
+        sine += samples[first + i] * Math.sin(phase);
+        cosine += samples[first + i] * Math.cos(phase);
+      }
+      return [2 * sine / frames, 2 * cosine / frames];
+    });
+    let residual = 0, fitted = 0;
+    for (let i = 0; i < frames; i++) {
+      let estimate = 0;
+      for (let j = 0; j < frequencies.length; j++) {
+        const phase = 2 * Math.PI * frequencies[j] * (first + i - offset) / rate;
+        estimate += fit[j][0] * Math.sin(phase) + fit[j][1] * Math.cos(phase);
+      }
+      const value = samples[first + i], error = value - estimate;
+      residual += error * error;
+      fitted += estimate * estimate;
+    }
+    assert(fitted > 0 && residual >= 0);
+    return 10 * Math.log10(Math.max(residual / fitted, 1e-30));
+  }
+
+  // Exercise these exact non-aligned pulse boundaries with a different
+  // callback partition for each policy; results must remain bit-identical.
+  const partitionInput = makeInput({
+    count: 1700 * rate / 1000,
+    pulseEvents: [{ startMs: 800, durationMs: 20 }],
+  });
+  for (const policy of ["restart", "fixed-horizon"]) {
+    assert.deepEqual(renderAuto(partitionInput, policy, 128).output,
+      renderAuto(partitionInput, policy, 480).output);
+  }
+
+  const persistentMetrics = spikes.map(event => {
+    const input = makeInput({ count: persistentCount, pulseEvents: [event] });
+    const strongOnly = makeInput({
+      count: persistentCount,
+      pulseEvents: [event],
+      weakStartMs: Infinity,
+    });
+    const frozenMixed = renderFrozen(input).output;
+    const policies = {};
+    for (const policy of ["restart", "fixed-horizon"]) {
+      const mixed = renderAuto(input, policy);
+      const strong = renderAuto(strongOnly, policy);
+      assert.equal(mixed.processor.diagnostics.fir.limitedSamples, 0);
+      assert.equal(strong.processor.diagnostics.fir.limitedSamples, 0);
+      const incrementalWeak = Float32Array.from(mixed.output, (value, i) => value - strong.output[i]);
+      policies[policy] = { mixed: mixed.output, incrementalWeak, diagnostics: mixed.processor.diagnostics };
+    }
+    const before = [];
+    for (let ms = event.startMs - 100; ms < event.startMs - 20; ms += 10) {
+      before.push(ms);
+    }
+    const afterStarts = [];
+    for (let ms = Math.ceil((event.startMs + event.durationMs) / 10) * 10;
+      ms + 10 <= event.startMs + 1700; ms += 10) afterStarts.push(ms);
+    const result = {
+      durationMs: event.durationMs,
+      inputPeak: Math.max(...input.subarray(
+        Math.round(event.startMs * rate / 1000),
+        Math.round((event.startMs + event.durationMs) * rate / 1000)).map(Math.abs)),
+      envelopeLeakageInputDbc: twoToneResidualDbc(input, event.startMs, 0),
+      frozenFirResidualDbc: twoToneResidualDbc(frozenMixed, event.startMs, delay),
+      policies: {},
+    };
+    for (const policy of ["restart", "fixed-horizon"]) {
+      const { mixed, incrementalWeak, diagnostics } = policies[policy];
+      const baseline = mean(before.map(ms => weakGainDb(incrementalWeak, ms)));
+      const windowStarts = [];
+      for (let ms = event.startMs; ms + 10 <= event.startMs + 1700; ms += 10) windowStarts.push(ms);
+      const weakValues = windowStarts.map(ms => weakGainDb(incrementalWeak, ms));
+      const rawValues = windowStarts.map(ms => weakGainDb(mixed, ms));
+      const minimum = Math.min(...weakValues);
+      const transientDeltaDb = maxRmsOvershootDb(mixed, frozenMixed, event);
+      const eventPeak = peakInEvent(mixed, event);
+      let recoveryMs = null;
+      for (let i = 0; i + 2 < afterStarts.length; i++) {
+        const three = afterStarts.slice(i, i + 3).map(ms => weakGainDb(incrementalWeak, ms));
+        if (three.every(value => Math.abs(value - baseline) <= 0.1)) {
+          recoveryMs = afterStarts[i] - (event.startMs + event.durationMs);
+          break;
+        }
+      }
+      result.policies[policy] = {
+        eventPeak: eventPeak,
+        eventPeakDbfs: 20 * Math.log10(eventPeak),
+        overshootVsFrozenGainDb: Math.max(0, transientDeltaDb),
+        maxOneMsDeltaVsFrozenGainDb: transientDeltaDb,
+        weakBandGainChangeDb: minimum - baseline,
+        weakBandGainRangeDb: Math.max(...weakValues) - Math.min(...weakValues),
+        rawWeakProjectionRangeDb: Math.max(...rawValues) - Math.min(...rawValues),
+        recoveryMsWithin0_1dB: recoveryMs,
+        recoveryHorizonMs: 1700,
+        terminalWeakBandGainDeltaDb: mean(weakValues.slice(-10)) - baseline,
+        dynamicResidualDbc: twoToneResidualDbc(mixed, event.startMs, delay),
+        limitedSamples: diagnostics.fir.limitedSamples,
+      };
+    }
+    return result;
+  });
+
+  // After one second of silence, emit a single 20 ms strong tone, then wait
+  // 180 ms before the weak-carrier probe. This tests a cold-start transient
+  // without treating the probe as acoustic calibration.
+  const isolatedEvent = { startMs: 1000, durationMs: 20 };
+  const isolatedCount = 4000 * rate / 1000;
+  const isolated = makeInput({
+    count: isolatedCount,
+    pulseEvents: [isolatedEvent],
+    weakStartMs: 1200,
+  });
+  const isolatedFrozen = renderFrozen(isolated).output;
+  const isolatedMetrics = {};
+  for (const policy of ["restart", "fixed-horizon"]) {
+    const { processor, output } = renderAuto(isolated, policy);
+    const eventEnd = Math.round(isolatedEvent.startMs * rate / 1000);
+    assert(output.subarray(0, eventEnd).every(value => value === 0));
+    const steadyProbe = [];
+    for (let ms = 3500; ms < 3700; ms += 10) steadyProbe.push(weakGainDb(output, ms));
+    const stableDb = mean(steadyProbe);
+    let probeSettlingMs = null;
+    for (let ms = 1200; ms + 30 <= 3300; ms += 10) {
+      const values = [ms, ms + 10, ms + 20].map(start => weakGainDb(output, start));
+      if (values.every(value => Math.abs(value - stableDb) <= 0.1)) {
+        probeSettlingMs = ms - 1200;
+        break;
+      }
+    }
+    const isolatedPeak = peakInEvent(output, isolatedEvent);
+    const isolatedTransientDeltaDb = maxRmsOvershootDb(output, isolatedFrozen, isolatedEvent);
+    isolatedMetrics[policy] = {
+      eventPeak: isolatedPeak,
+      eventPeakDbfs: 20 * Math.log10(isolatedPeak),
+      overshootVsFrozenGainDb: Math.max(0, isolatedTransientDeltaDb),
+      maxOneMsDeltaVsFrozenGainDb: isolatedTransientDeltaDb,
+      weakProbeInitialGainDb: weakGainDb(output, 1200),
+      lateWeakProbeGainDb: stableDb,
+      probeSettlingMsWithin0_1dB: probeSettlingMs,
+      inputEnvelopeResidualDbc: twoToneResidualDbc(isolated, isolatedEvent.startMs, 0),
+      frozenFirResidualDbc: twoToneResidualDbc(isolatedFrozen, isolatedEvent.startMs, delay),
+      dynamicResidualDbc: twoToneResidualDbc(output, isolatedEvent.startMs, delay),
+      limitedSamples: processor.diagnostics.fir.limitedSamples,
+    };
+    assert.equal(processor.diagnostics.fir.limitedSamples, 0);
+  }
+
+  // A separate over-range synthetic pulse proves that the final digital
+  // limiter is active and counted. These clipped values are excluded from
+  // the policy quality metrics above.
+  const stressInput = makeInput({
+    count: 1600 * rate / 1000,
+    pulseEvents: [isolatedEvent],
+    weakStartMs: Infinity,
+    pulsePeak: 0.7,
+  });
+  const limiterStress = {};
+  for (const policy of ["restart", "fixed-horizon"]) {
+    const { processor, output } = renderAuto(stressInput, policy);
+    assert(processor.diagnostics.fir.limitedSamples > 0);
+    assert(output.every(value => Math.abs(value) <= 0.3));
+    limiterStress[policy] = {
+      eventPeak: peakInEvent(output, isolatedEvent),
+      limitedSamples: processor.diagnostics.fir.limitedSamples,
+    };
+  }
+
+  console.log("M03 short-spike synthetic PCM " + JSON.stringify({
+    persistentWeak: persistentMetrics,
+    afterOneSecondSilence: isolatedMetrics,
+    separateLimiterStress: limiterStress,
+  }));
 });
