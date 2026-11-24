@@ -1,17 +1,20 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261119-stop-drain1";
+} from "./providers/browser-speech.js?v=20261123-local-taigi1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261119-stop-drain1";
+  "./providers/gemini-live-transcribe.js?v=20261123-local-taigi1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261119-stop-drain1";
+  "./providers/google-cloud-streaming.js?v=20261123-local-taigi1";
+import { LocalTaigiProvider } from
+  "./providers/local-taigi.js?v=20261123-local-taigi1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
   BROWSER: "browser-speech",
   GEMINI: "gemini-live-transcribe",
   GOOGLE: "google-cloud-streaming",
+  LOCAL_TAIGI: "local-taigi",
 });
 
 // Resolve AUTO once so pre-capture disclosure and provider construction agree.
@@ -27,7 +30,8 @@ export function describeSttCapabilities() {
     browserSpeech: browserSpeechSupported(),
     geminiLiveTranscribeClient: true,
     googleCloudStreamingClient: true,
-    planned: ["openai-streaming", "local-taigi-breeze"],
+    localTaigiClient: true,
+    planned: ["openai-streaming"],
   };
 }
 
@@ -87,6 +91,12 @@ export function createSttProvider({
       onStatus,
       onError,
       onDebug,
+    });
+  }
+
+  if (requested === STT_PROVIDER_IDS.LOCAL_TAIGI) {
+    return new LocalTaigiProvider({
+      captureMode, onPartial, onFinal, onStatus, onError, onDebug,
     });
   }
 

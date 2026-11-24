@@ -1,15 +1,15 @@
 import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261119-stop-drain1";
 import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261119-stop-drain1";
 import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261119-stop-drain1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261119-stop-drain1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261123-local-taigi1";
 import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261119-stop-drain1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261119-stop-drain1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261123-local-taigi1";
 import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261119-stop-drain1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261119-stop-drain1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "./stt/provider.js?v=20261123-local-taigi1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -21,7 +21,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261119-stop-drain1";
+} from "./transcript-window.mjs?v=20261123-local-taigi1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -49,7 +49,7 @@ import {
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261119-stop-drain1";
+const BUILD_ID = "20261123-local-taigi1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -60,7 +60,10 @@ const MAX_REPORT_DEBUG_LINES = 5000;
 function readRuntimeSttConfig() {
   const params = new URLSearchParams(window.location.search);
   const rawProvider = (params.get("stt") || "gemini").trim().toLowerCase();
-  const provider =
+  const languageMode = params.get("mode") === "taigi" || rawProvider === "local-taigi"
+    ? "taigi"
+    : "mandarin";
+  const provider = languageMode === "taigi" ? "local-taigi" :
     rawProvider === "gemini"
       ? "gemini-live-transcribe"
       : rawProvider === "google"
@@ -86,6 +89,7 @@ function readRuntimeSttConfig() {
 
   const tokenUrl = (params.get("token") || DEFAULT_GEMINI_TOKEN_URL).trim();
   return {
+    languageMode,
     provider: resolveSttProviderId(provider, tokenUrl),
     tokenUrl,
     websocketUrl: (params.get("ws") || "").trim(),
@@ -103,6 +107,7 @@ const runtimeSttConfig = readRuntimeSttConfig();
 
 const els = {
   start: document.querySelector("#start"),
+  languageMode: document.querySelector("#language-mode"),
   sttPrivacyNotice: document.querySelector("#stt-privacy-notice"),
   stop: document.querySelector("#stop"),
   recall: document.querySelector("#recall"),
@@ -164,6 +169,24 @@ const els = {
 // Populate the already-visible pre-capture notice from the selected provider.
 if (els.sttPrivacyNotice) {
   els.sttPrivacyNotice.textContent = captionSttPrivacyNotice(runtimeSttConfig.provider);
+}
+if (els.languageMode) {
+  els.languageMode.value = runtimeSttConfig.languageMode;
+  els.languageMode.addEventListener("change", () => {
+    if (els.start?.disabled) {
+      els.languageMode.value = runtimeSttConfig.languageMode;
+      if (els.status) els.status.textContent = "請先停止聆聽，再更改語言模式。";
+      return;
+    }
+    const nextUrl = new URL(window.location.href);
+    if (els.languageMode.value === "taigi") {
+      nextUrl.searchParams.set("mode", "taigi");
+    } else {
+      nextUrl.searchParams.delete("mode");
+      if (nextUrl.searchParams.get("stt") === "local-taigi") nextUrl.searchParams.delete("stt");
+    }
+    window.location.assign(nextUrl.toString());
+  });
 }
 
 // Presentation only: no microphone, STT, audio or persistence privileges.
@@ -1157,7 +1180,8 @@ async function startSession() {
   }
 
   // Reject unknown provider query parameters before requesting microphone access.
-  if (![STT_PROVIDER_IDS.BROWSER, STT_PROVIDER_IDS.GEMINI, STT_PROVIDER_IDS.GOOGLE]
+  if (![STT_PROVIDER_IDS.BROWSER, STT_PROVIDER_IDS.GEMINI, STT_PROVIDER_IDS.GOOGLE,
+        STT_PROVIDER_IDS.LOCAL_TAIGI]
       .includes(runtimeSttConfig.provider)) {
     throw new Error("不支援的語音辨識選項；請使用預設 Gemini 字幕。");
   }
@@ -1641,6 +1665,8 @@ if (runtimeSttConfig.provider === "gemini-live-transcribe") {
   els.diagStt.textContent = runtimeSttConfig.websocketUrl
     ? "Google Cloud streaming proxy 已設定"
     : "Google Cloud 已選擇，但缺少 ?ws=wss://.../stt";
+} else if (runtimeSttConfig.provider === "local-taigi") {
+  els.diagStt.textContent = "台語本機 CPU INT8（開始聆聽時檢查模型服務）";
 } else {
   els.diagStt.textContent = sttCapabilities.browserSpeech
     ? "可用（Browser fallback）"
