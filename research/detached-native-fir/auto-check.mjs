@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -360,6 +361,83 @@ function compare(reference, native, controlInterval = CONTROL_INTERVAL) {
 }
 
 const baselineReference = makeReference(480);
+const portableExport = process.argv.find(argument =>
+  argument.startsWith("--export-portable="));
+if (portableExport) {
+  const outputDirectory = portableExport.slice("--export-portable=".length);
+  mkdirSync(outputDirectory, { recursive: true });
+  const reference = makeReference(128);
+  const fixture = makeFixture(128);
+  const sampleCount = reference.output.length / 2;
+  const logCount = Math.floor(sampleCount / CONTROL_INTERVAL);
+  const expectedBytes = Buffer.alloc(12 + reference.output.length * 4 +
+    2 * (11 * 8 + 8) + 8 + logCount * 2 * (8 + 6 * 8));
+  let offset = 0;
+  expectedBytes.writeUInt32LE(OUTPUT_MAGIC, offset); offset += 4;
+  expectedBytes.writeUInt32LE(sampleCount, offset); offset += 4;
+  expectedBytes.writeUInt32LE(logCount, offset); offset += 4;
+  for (const sample of reference.output) {
+    expectedBytes.writeFloatLE(sample, offset); offset += 4;
+  }
+  for (let ear = 0; ear < 2; ear++) {
+    const diagnostics = reference.ears[ear].processor.diagnostics;
+    const detector = diagnostics.detector;
+    const fir = diagnostics.fir;
+    const values = [diagnostics.acceptedSamples, diagnostics.sinceUpdate,
+      diagnostics.updates, diagnostics.initialized ? 1 : 0,
+      diagnostics.faulted ? 1 : 0, detector.acceptedSamples,
+      detector.faulted ? 1 : 0, fir.acceptedSamples, fir.updates,
+      fir.limitedSamples, fir.transitionRemainingSamples];
+    for (const value of values) {
+      expectedBytes.writeBigUInt64LE(BigInt(value), offset); offset += 8;
+    }
+    expectedBytes.writeDoubleLE(fir.maxAbsOutput, offset); offset += 8;
+  }
+  expectedBytes.writeBigUInt64LE(0n, offset); offset += 8;
+  for (let ear = 0; ear < 2; ear++) {
+    const indices = reference.ears[ear].capturedSampleIndices.slice(1);
+    const levels = reference.ears[ear].capturedLevels.slice(1);
+    for (let event = 0; event < logCount; event++) {
+      expectedBytes.writeBigUInt64LE(BigInt(indices[event]), offset); offset += 8;
+      for (const level of levels[event]) {
+        expectedBytes.writeDoubleLE(level, offset); offset += 8;
+      }
+    }
+  }
+  assert.equal(offset, expectedBytes.length);
+  const fixturePath = join(outputDirectory, "auto-fir-fixture.bin");
+  const oraclePath = join(outputDirectory, "auto-fir-js-oracle.bin");
+  writeFileSync(fixturePath, fixture);
+  writeFileSync(oraclePath, expectedBytes);
+  const hashFile = path => createHash("sha256").update(readFileSync(path)).digest("hex");
+  const manifest = {
+    format: "HearLens Native Auto-FIR v3 little-endian fixture/result",
+    generatedBy: "live JS offline-six-band-level + offline-auto-fir + offline-dynamic-fir references",
+    sampleRate: RATE,
+    limiterCeiling: LIMITER_CEILING,
+    callbackFrames: 128,
+    samplesPerEar: sampleCount,
+    controlIntervalSamples: CONTROL_INTERVAL,
+    controlUpdatesPerEar: logCount,
+    expectedControlIndices: "480, 960, ... 144000",
+    limiterCountsLR: reference.ears.map(ear => ear.processor.diagnostics.fir.limitedSamples),
+    pcmMaxErrorThreshold: MAX_ABSOLUTE_ERROR,
+    pcmRmsErrorThreshold: MAX_RMS_ERROR,
+    nominalLevelMaxErrorThreshold: MAX_LEVEL_ERROR,
+    audioRoute: "none",
+    hearingOutputAuthorized: false,
+    sha256: {
+      fixture: hashFile(fixturePath),
+      jsOracleResult: hashFile(oraclePath),
+    },
+  };
+  const manifestPath = join(outputDirectory, "manifest.json");
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  console.log(JSON.stringify({ result: "PASS", fixture: fixturePath,
+    oracle: oraclePath, manifest: manifestPath, samplesPerEar: sampleCount,
+    updatesPerEar: logCount }));
+  process.exit(0);
+}
 const rows = [];
 let firstNative = null;
 for (const blockFrames of BLOCK_SIZES) {
