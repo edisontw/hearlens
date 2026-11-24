@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 output_dir="${1:-$script_dir/android-arm64}"
+portable_fixture_source="${2:-}"
 mkdir -p "$output_dir"
 
 ndk_root="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
@@ -50,7 +51,21 @@ printf '{\n  "abi": "arm64-v8a",\n  "apiLevel": 29,\n  "targetTriple": "aarch64-
 printf 'Android NDK headless build PASS: %s\n' "$binary"
 cat "$output_dir/build-info.json"
 
-# Keep the native test oracle reproducible and package-ready for later `adb shell` use.
+# Package the exact shared x86_64 JS oracle fixture when CI provides it. Local builds
+# generate the same fixture directly from the live JavaScript reference.
 fixture_dir="$output_dir/portable-fixture"
-node "$script_dir/auto-check.mjs" "--export-portable=$fixture_dir"
+if [[ -n "$portable_fixture_source" ]]; then
+  for name in auto-fir-fixture.bin auto-fir-js-oracle.bin manifest.json; do
+    [[ -f "$portable_fixture_source/$name" ]] || {
+      echo "portable fixture is missing $name: $portable_fixture_source" >&2
+      exit 2
+    }
+  done
+  mkdir -p "$fixture_dir"
+  cp "$portable_fixture_source/auto-fir-fixture.bin" \
+    "$portable_fixture_source/auto-fir-js-oracle.bin" \
+    "$portable_fixture_source/manifest.json" "$fixture_dir/"
+else
+  node "$script_dir/auto-check.mjs" "--export-portable=$fixture_dir"
+fi
 printf 'Android NDK executable is cross-compiled only; no Android runtime is asserted.\n'

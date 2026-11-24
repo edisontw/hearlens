@@ -35,6 +35,21 @@ jobs:
           node-version: 24
       - name: Strict Native Release compile and parity suite
         run: make -C research/detached-native-fir clean verify
+      - name: Generate and verify portable JS-oracle fixture
+        run: |
+          fixture="$RUNNER_TEMP/hearlens-portable-fixture"
+          node research/detached-native-fir/auto-check.mjs "--export-portable=$fixture"
+          ./research/detached-native-fir/auto-check "$fixture/auto-fir-fixture.bin" \
+            > "$RUNNER_TEMP/hearlens-x64-portable-result.bin"
+          node research/detached-native-fir/verify-portable-output.mjs \
+            "$fixture/manifest.json" "$fixture/auto-fir-fixture.bin" \
+            "$fixture/auto-fir-js-oracle.bin" "$RUNNER_TEMP/hearlens-x64-portable-result.bin"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-n04-portable-js-oracle
+          path: ${{ runner.temp }}/hearlens-portable-fixture
+          if-no-files-found: error
+          retention-days: 30
       - name: Run unpaced x86_64 Native benchmark
         run: |
           mkdir -p "$RUNNER_TEMP/hearlens-native-x64"
@@ -76,11 +91,16 @@ jobs:
 
   linux-aarch64-native:
     runs-on: ubuntu-24.04-arm
+    needs: linux-x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: hearlens-n04-portable-js-oracle
+          path: ${{ runner.temp }}/hearlens-portable-fixture
       - name: Record ARM64 host and compiler
         run: |
           uname -a
@@ -88,6 +108,14 @@ jobs:
           g++ --version | head -n 1
       - name: Native ARM64 strict compile and parity suite
         run: make -C research/detached-native-fir clean verify
+      - name: Compare ARM64 runtime against the exact x86_64 JS oracle fixture
+        run: |
+          fixture="$RUNNER_TEMP/hearlens-portable-fixture"
+          ./research/detached-native-fir/auto-check "$fixture/auto-fir-fixture.bin" \
+            > "$RUNNER_TEMP/hearlens-arm64-portable-result.bin"
+          node research/detached-native-fir/verify-portable-output.mjs \
+            "$fixture/manifest.json" "$fixture/auto-fir-fixture.bin" \
+            "$fixture/auto-fir-js-oracle.bin" "$RUNNER_TEMP/hearlens-arm64-portable-result.bin"
       - name: Run unpaced ARM64 Native benchmark
         run: |
           mkdir -p "$RUNNER_TEMP/hearlens-native-arm64"
@@ -102,13 +130,19 @@ jobs:
 
   android-ndk-arm64:
     runs-on: ubuntu-24.04
+    needs: linux-x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: hearlens-n04-portable-js-oracle
+          path: ${{ runner.temp }}/hearlens-portable-fixture
       - name: Build API 29 arm64-v8a headless executable and JS oracle fixture
-        run: bash research/detached-native-fir/build-android.sh "$RUNNER_TEMP/hearlens-android-arm64"
+        run: bash research/detached-native-fir/build-android.sh \
+          "$RUNNER_TEMP/hearlens-android-arm64" "$RUNNER_TEMP/hearlens-portable-fixture"
       - uses: actions/upload-artifact@v4
         with:
           name: hearlens-n04-android-arm64-v8a

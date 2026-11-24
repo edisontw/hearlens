@@ -100,7 +100,7 @@ make auto-bench
 node auto-bench.mjs --paced-seconds=300 --paced-block=128 --output=results/paced-128-5min.json
 ```
 
-Linux AArch64 cross-compile, native ARM64 parity/benchmark, and API 29 `arm64-v8a` Android NDK build are independent CI jobs using standard public GitHub-hosted runners; benchmark timings do not gate CI. The Android artifact includes an ELF executable plus a reproducible 128-frame JS-oracle fixture. `build-android.sh /tmp/hearlens-android` records ABI, API level, compiler flags, dependencies and binary SHA-256, and rejects audio output dependencies. NDK cross-compile is not Android runtime evidence. For a later authorized headless runtime check, copy the artifact directory from CI, then:
+Linux AArch64 cross-compile, native ARM64 parity/benchmark, and API 29 `arm64-v8a` Android NDK build are independent CI jobs using standard public GitHub-hosted runners; benchmark timings do not gate CI. The x86_64 job generates and verifies one portable 128-frame JS-oracle fixture. The ARM64 runtime job downloads and executes those exact fixture bytes, and the Android artifact packages the same fixture with its ELF executable. `build-android.sh /tmp/hearlens-android` records ABI, API level, compiler flags, dependencies and binary SHA-256, and rejects audio output dependencies. NDK cross-compile is not Android runtime evidence. For a later authorized headless runtime check, copy the artifact directory from CI, then:
 
 ```sh
 adb push hearlens-auto-check-arm64-v8a /data/local/tmp/hearlens-auto-check
