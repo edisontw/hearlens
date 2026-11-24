@@ -1,0 +1,25 @@
+name: Native DSP research
+
+on:
+  push:
+    paths:
+      - ".github/workflows/native-dsp-research.yml"
+      - "research/detached-native-fir/**"
+  pull_request:
+    paths:
+      - ".github/workflows/native-dsp-research.yml"
+      - "research/detached-native-fir/**"
+
+permissions:
+  contents: read
+
+jobs:
+  fixed-fir-research:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Strict compile, parity, partition, isolation and allocation checks
+        run: make -C research/detached-native-fir clean verify
