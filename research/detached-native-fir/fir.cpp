@@ -47,15 +47,15 @@ int main() {
 
   for (std::size_t ear = 0; ear < filters.size(); ++ear) {
     for (std::size_t tap = 0; tap < hearlens::research::kUniqueTapCount; ++tap) {
-      const int pattern = static_cast<int>((tap * 13 + ear * 7) % 31) - 15;
-      coefficients[ear][tap] = static_cast<double>(pattern) / 8192.0;
+      const int pattern = static_cast<int>((tap * 811 + ear * 1'237) % 4'093) - 2'046;
+      coefficients[ear][tap] = static_cast<double>(pattern) / 1'048'573.0;
     }
   }
 
   for (std::size_t sample = 0; sample < kInputSamplesPerEar; ++sample) {
     for (std::size_t ear = 0; ear < filters.size(); ++ear) {
-      const int pattern = static_cast<int>((sample * 17 + ear * 101) % 997) - 498;
-      const float input = static_cast<float>(pattern) / 2048.0F;
+      const int pattern = static_cast<int>((sample * 619 + ear * 1'543) % 131'071) - 65'535;
+      const float input = static_cast<float>(pattern) / 131'071.0F;
       const float output = filters[ear].step(input, coefficients[ear]);
       const std::size_t sampleIndex = sample * filters.size() + ear;
       appendFloatLittleEndian(outputBytes, sampleIndex * sizeof(float), output);
