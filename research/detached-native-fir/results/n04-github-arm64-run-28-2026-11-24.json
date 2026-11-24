@@ -1,0 +1,1542 @@
+{
+  "result": "PASS",
+  "mode": "unpaced-throughput; callbacks are processed back-to-back",
+  "capturedAt": "2026-11-24T16:51:10.840Z",
+  "host": {
+    "platform": "linux",
+    "release": "7.0.0-1017-azure",
+    "architecture": "arm64",
+    "cpuModel": "unknown",
+    "logicalCpus": 4,
+    "availableParallelism": 4,
+    "cgroupCpuMax": null
+  },
+  "node": "v24.22.3",
+  "compiler": "13.3.0",
+  "compilerFlags": "-std=c++17 -O2 -fno-fast-math -ffp-contract=off -Wall -Wextra -Wpedantic -Werror",
+  "fixture": {
+    "sampleRate": 48000,
+    "warmupSecondsPerEar": 2,
+    "measuredSecondsPerEar": 32,
+    "controlIntervalSamples": 480,
+    "attackMs": 15,
+    "releaseMs": 400,
+    "transitionSamples": 2400,
+    "source": "shared-input-file",
+    "sha256": "6a10a38e8c5e8cb3c7960bc7f94223a061674b7bc0ad56967332b3ecb7069a87",
+    "scenarios": [
+      "silence",
+      "single tones",
+      "multitone",
+      "level step",
+      "short pulse train",
+      "sustained overload",
+      "modulated tone"
+    ]
+  },
+  "native": {
+    "architecture": "aarch64",
+    "compiler": "13.3.0",
+    "cplusplus": 201703,
+    "sampleRate": 48000,
+    "warmupSamplesPerEar": 96000,
+    "measuredSamplesPerEar": 1536000,
+    "controlIntervalSamples": 480,
+    "transitionSamples": 2400,
+    "peakRssBytes": 31096832,
+    "callbackAllocations": 0,
+    "allocationProbePositiveControls": true,
+    "rows": [
+      {
+        "mode": "fixed-fir",
+        "dynamicRetargets": 0,
+        "blockFrames": 64,
+        "deadlineUs": 1333.333333,
+        "warmupCallbacks": 1500,
+        "measuredCallbacks": 24000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 0.748910663,
+        "threadCpuSeconds": 0.74890792,
+        "threadCpuToWallRatio": 0.9999963373,
+        "throughputFramesPerSecond": 2050978.943,
+        "realTimeFactor": 42.72872798,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 2.50965,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 1.992477417,
+        "checksum": 3.666601535,
+        "callbacks": {
+          "all": {
+            "count": 24000,
+            "wallUs": {
+              "p50": 31.055,
+              "p95": 31.366,
+              "p99": 33.462,
+              "p99_9": 36.646,
+              "max": 62.749
+            },
+            "threadCpuUs": {
+              "p50": 30.688,
+              "p95": 30.984,
+              "p99": 33.024,
+              "p99_9": 36.28,
+              "max": 49.712
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.329125,
+              "p95": 2.35245,
+              "p99": 2.50965,
+              "p99_9": 2.74845,
+              "max": 4.706175
+            }
+          },
+          "update": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          },
+          "noUpdate": {
+            "count": 24000,
+            "wallUs": {
+              "p50": 31.055,
+              "p95": 31.366,
+              "p99": 33.462,
+              "p99_9": 36.646,
+              "max": 62.749
+            },
+            "threadCpuUs": {
+              "p50": 30.688,
+              "p95": 30.984,
+              "p99": 33.024,
+              "p99_9": 36.28,
+              "max": 49.712
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.329125,
+              "p95": 2.35245,
+              "p99": 2.50965,
+              "p99_9": 2.74845,
+              "max": 4.706175
+            }
+          }
+        }
+      },
+      {
+        "mode": "dynamic-fir",
+        "controlUpdatesPerEar": 3400,
+        "firRetargetsPerEarIncludingInitial": 3401,
+        "limitedSamplesIncludingWarmupLR": [
+          480698,
+          563098
+        ],
+        "blockFrames": 64,
+        "deadlineUs": 1333.333333,
+        "warmupCallbacks": 1500,
+        "measuredCallbacks": 24000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.27597631,
+        "threadCpuSeconds": 1.275987192,
+        "threadCpuToWallRatio": 1.000008528,
+        "throughputFramesPerSecond": 1203784.105,
+        "realTimeFactor": 25.07883552,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.2513,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 1.244296315,
+        "callbacks": {
+          "all": {
+            "count": 24000,
+            "wallUs": {
+              "p50": 52.765,
+              "p95": 55.364,
+              "p99": 56.684,
+              "p99_9": 59.892,
+              "max": 82.755
+            },
+            "threadCpuUs": {
+              "p50": 52.384,
+              "p95": 54.992,
+              "p99": 56.256,
+              "p99_9": 59.304,
+              "max": 64.872
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.957375,
+              "p95": 4.1523,
+              "p99": 4.2513,
+              "p99_9": 4.4919,
+              "max": 6.206625
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 55.205,
+              "p95": 56.805,
+              "p99": 57.797,
+              "p99_9": 68.988,
+              "max": 82.755
+            },
+            "threadCpuUs": {
+              "p50": 54.84,
+              "p95": 56.424,
+              "p99": 57.424,
+              "p99_9": 61.92,
+              "max": 64.64
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.140375,
+              "p95": 4.260375,
+              "p99": 4.334775,
+              "p99_9": 5.1741,
+              "max": 6.206625
+            }
+          },
+          "noUpdate": {
+            "count": 20800,
+            "wallUs": {
+              "p50": 52.693,
+              "p95": 54.133,
+              "p99": 55.053,
+              "p99_9": 58.037,
+              "max": 78.339
+            },
+            "threadCpuUs": {
+              "p50": 52.312,
+              "p95": 53.72,
+              "p99": 54.632,
+              "p99_9": 57.52,
+              "max": 64.872
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.951975,
+              "p95": 4.059975,
+              "p99": 4.128975,
+              "p99_9": 4.352775,
+              "max": 5.875425
+            }
+          }
+        }
+      },
+      {
+        "mode": "complete-auto-fir",
+        "controlUpdates": 3400,
+        "limitedSamplesIncludingWarmupLR": [
+          463130,
+          524617
+        ],
+        "blockFrames": 64,
+        "deadlineUs": 1333.333333,
+        "warmupCallbacks": 1500,
+        "measuredCallbacks": 24000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.44394953,
+        "threadCpuSeconds": 1.443967664,
+        "threadCpuToWallRatio": 1.000012559,
+        "throughputFramesPerSecond": 1063749.091,
+        "realTimeFactor": 22.1614394,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.8051,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 2.468067935,
+        "callbacks": {
+          "all": {
+            "count": 24000,
+            "wallUs": {
+              "p50": 59.708,
+              "p95": 62.62,
+              "p99": 64.068,
+              "p99_9": 67.916,
+              "max": 145.759
+            },
+            "threadCpuUs": {
+              "p50": 59.336,
+              "p95": 62.248,
+              "p99": 63.68,
+              "p99_9": 67.488,
+              "max": 145.048
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.4781,
+              "p95": 4.6965,
+              "p99": 4.8051,
+              "p99_9": 5.0937,
+              "max": 10.931925
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 62.428,
+              "p95": 64.06,
+              "p99": 64.852,
+              "p99_9": 67.916,
+              "max": 81.26
+            },
+            "threadCpuUs": {
+              "p50": 62.056,
+              "p95": 63.68,
+              "p99": 64.472,
+              "p99_9": 67.544,
+              "max": 72.704
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.6821,
+              "p95": 4.8045,
+              "p99": 4.8639,
+              "p99_9": 5.0937,
+              "max": 6.0945
+            }
+          },
+          "noUpdate": {
+            "count": 20800,
+            "wallUs": {
+              "p50": 59.62,
+              "p95": 61.292,
+              "p99": 62.188,
+              "p99_9": 68.084,
+              "max": 145.759
+            },
+            "threadCpuUs": {
+              "p50": 59.256,
+              "p95": 60.912,
+              "p99": 61.8,
+              "p99_9": 67.248,
+              "max": 145.048
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.4715,
+              "p95": 4.5969,
+              "p99": 4.6641,
+              "p99_9": 5.1063,
+              "max": 10.931925
+            }
+          }
+        }
+      },
+      {
+        "mode": "fixed-fir",
+        "dynamicRetargets": 0,
+        "blockFrames": 128,
+        "deadlineUs": 2666.666667,
+        "warmupCallbacks": 750,
+        "measuredCallbacks": 12000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 0.739467464,
+        "threadCpuSeconds": 0.73945932,
+        "threadCpuToWallRatio": 0.9999889867,
+        "throughputFramesPerSecond": 2077170.497,
+        "realTimeFactor": 43.27438536,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 2.38635,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 1.992477417,
+        "checksum": 3.666601535,
+        "callbacks": {
+          "all": {
+            "count": 12000,
+            "wallUs": {
+              "p50": 61.42,
+              "p95": 63.173,
+              "p99": 63.636,
+              "p99_9": 66.74,
+              "max": 96.723
+            },
+            "threadCpuUs": {
+              "p50": 61.056,
+              "p95": 62.792,
+              "p99": 63.24,
+              "p99_9": 66.296,
+              "max": 83.68
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.30325,
+              "p95": 2.3689875,
+              "p99": 2.38635,
+              "p99_9": 2.50275,
+              "max": 3.6271125
+            }
+          },
+          "update": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          },
+          "noUpdate": {
+            "count": 12000,
+            "wallUs": {
+              "p50": 61.42,
+              "p95": 63.173,
+              "p99": 63.636,
+              "p99_9": 66.74,
+              "max": 96.723
+            },
+            "threadCpuUs": {
+              "p50": 61.056,
+              "p95": 62.792,
+              "p99": 63.24,
+              "p99_9": 66.296,
+              "max": 83.68
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.30325,
+              "p95": 2.3689875,
+              "p99": 2.38635,
+              "p99_9": 2.50275,
+              "max": 3.6271125
+            }
+          }
+        }
+      },
+      {
+        "mode": "dynamic-fir",
+        "controlUpdatesPerEar": 3400,
+        "firRetargetsPerEarIncludingInitial": 3401,
+        "limitedSamplesIncludingWarmupLR": [
+          480698,
+          563098
+        ],
+        "blockFrames": 128,
+        "deadlineUs": 2666.666667,
+        "warmupCallbacks": 750,
+        "measuredCallbacks": 12000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.266349771,
+        "threadCpuSeconds": 1.26636468,
+        "threadCpuToWallRatio": 1.000011773,
+        "throughputFramesPerSecond": 1212935.032,
+        "realTimeFactor": 25.26947983,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.113075,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 1.244296315,
+        "callbacks": {
+          "all": {
+            "count": 12000,
+            "wallUs": {
+              "p50": 104.962,
+              "p95": 107.962,
+              "p99": 109.682,
+              "p99_9": 114.473,
+              "max": 182.454
+            },
+            "threadCpuUs": {
+              "p50": 104.592,
+              "p95": 107.576,
+              "p99": 109.288,
+              "p99_9": 113.576,
+              "max": 181.736
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.936075,
+              "p95": 4.048575,
+              "p99": 4.113075,
+              "p99_9": 4.2927375,
+              "max": 6.842025
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 107.21,
+              "p95": 109.258,
+              "p99": 110.53,
+              "p99_9": 115.337,
+              "max": 138.577
+            },
+            "threadCpuUs": {
+              "p50": 106.84,
+              "p95": 108.856,
+              "p99": 110.16,
+              "p99_9": 114.728,
+              "max": 127.232
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.020375,
+              "p95": 4.097175,
+              "p99": 4.144875,
+              "p99_9": 4.3251375,
+              "max": 5.1966375
+            }
+          },
+          "noUpdate": {
+            "count": 8800,
+            "wallUs": {
+              "p50": 104.642,
+              "p95": 106.682,
+              "p99": 107.938,
+              "p99_9": 114.473,
+              "max": 182.454
+            },
+            "threadCpuUs": {
+              "p50": 104.28,
+              "p95": 106.296,
+              "p99": 107.528,
+              "p99_9": 113.576,
+              "max": 181.736
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.924075,
+              "p95": 4.000575,
+              "p99": 4.047675,
+              "p99_9": 4.2927375,
+              "max": 6.842025
+            }
+          }
+        }
+      },
+      {
+        "mode": "complete-auto-fir",
+        "controlUpdates": 3400,
+        "limitedSamplesIncludingWarmupLR": [
+          463130,
+          524617
+        ],
+        "blockFrames": 128,
+        "deadlineUs": 2666.666667,
+        "warmupCallbacks": 750,
+        "measuredCallbacks": 12000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.435208773,
+        "threadCpuSeconds": 1.435191856,
+        "threadCpuToWallRatio": 0.9999882129,
+        "throughputFramesPerSecond": 1070227.572,
+        "realTimeFactor": 22.29640774,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.6419375,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 2.468067935,
+        "callbacks": {
+          "all": {
+            "count": 12000,
+            "wallUs": {
+              "p50": 119.025,
+              "p95": 122.169,
+              "p99": 123.785,
+              "p99_9": 131.568,
+              "max": 147.367
+            },
+            "threadCpuUs": {
+              "p50": 118.656,
+              "p95": 121.8,
+              "p99": 123.4,
+              "p99_9": 128.712,
+              "max": 137.608
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.4634375,
+              "p95": 4.5813375,
+              "p99": 4.6419375,
+              "p99_9": 4.9338,
+              "max": 5.5262625
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 121.361,
+              "p95": 123.449,
+              "p99": 124.409,
+              "p99_9": 131.288,
+              "max": 143.032
+            },
+            "threadCpuUs": {
+              "p50": 120.984,
+              "p95": 123.04,
+              "p99": 123.928,
+              "p99_9": 130.512,
+              "max": 132.656
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.5510375,
+              "p95": 4.6293375,
+              "p99": 4.6653375,
+              "p99_9": 4.9233,
+              "max": 5.3637
+            }
+          },
+          "noUpdate": {
+            "count": 8800,
+            "wallUs": {
+              "p50": 118.642,
+              "p95": 120.753,
+              "p99": 122.017,
+              "p99_9": 133.44,
+              "max": 147.367
+            },
+            "threadCpuUs": {
+              "p50": 118.28,
+              "p95": 120.376,
+              "p99": 121.632,
+              "p99_9": 128.064,
+              "max": 137.608
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.449075,
+              "p95": 4.5282375,
+              "p99": 4.5756375,
+              "p99_9": 5.004,
+              "max": 5.5262625
+            }
+          }
+        }
+      },
+      {
+        "mode": "fixed-fir",
+        "dynamicRetargets": 0,
+        "blockFrames": 192,
+        "deadlineUs": 4000,
+        "warmupCallbacks": 500,
+        "measuredCallbacks": 8000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 0.736309132,
+        "threadCpuSeconds": 0.736326496,
+        "threadCpuToWallRatio": 1.000023582,
+        "throughputFramesPerSecond": 2086080.334,
+        "realTimeFactor": 43.46000696,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 2.357275,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 1.992477417,
+        "checksum": 3.666601535,
+        "callbacks": {
+          "all": {
+            "count": 8000,
+            "wallUs": {
+              "p50": 91.771,
+              "p95": 93.618,
+              "p99": 94.291,
+              "p99_9": 98.619,
+              "max": 125.073
+            },
+            "threadCpuUs": {
+              "p50": 91.408,
+              "p95": 93.224,
+              "p99": 93.856,
+              "p99_9": 97.68,
+              "max": 124.704
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.294275,
+              "p95": 2.34045,
+              "p99": 2.357275,
+              "p99_9": 2.465475,
+              "max": 3.126825
+            }
+          },
+          "update": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          },
+          "noUpdate": {
+            "count": 8000,
+            "wallUs": {
+              "p50": 91.771,
+              "p95": 93.618,
+              "p99": 94.291,
+              "p99_9": 98.619,
+              "max": 125.073
+            },
+            "threadCpuUs": {
+              "p50": 91.408,
+              "p95": 93.224,
+              "p99": 93.856,
+              "p99_9": 97.68,
+              "max": 124.704
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.294275,
+              "p95": 2.34045,
+              "p99": 2.357275,
+              "p99_9": 2.465475,
+              "max": 3.126825
+            }
+          }
+        }
+      },
+      {
+        "mode": "dynamic-fir",
+        "controlUpdatesPerEar": 3400,
+        "firRetargetsPerEarIncludingInitial": 3401,
+        "limitedSamplesIncludingWarmupLR": [
+          480698,
+          563098
+        ],
+        "blockFrames": 192,
+        "deadlineUs": 4000,
+        "warmupCallbacks": 500,
+        "measuredCallbacks": 8000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.263651932,
+        "threadCpuSeconds": 1.263664104,
+        "threadCpuToWallRatio": 1.000009632,
+        "throughputFramesPerSecond": 1215524.593,
+        "realTimeFactor": 25.32342902,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.070775,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 1.244296315,
+        "callbacks": {
+          "all": {
+            "count": 8000,
+            "wallUs": {
+              "p50": 157.695,
+              "p95": 160.854,
+              "p99": 162.831,
+              "p99_9": 168.134,
+              "max": 188.141
+            },
+            "threadCpuUs": {
+              "p50": 157.32,
+              "p95": 160.472,
+              "p99": 162.424,
+              "p99_9": 166.96,
+              "max": 178.04
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.942375,
+              "p95": 4.02135,
+              "p99": 4.070775,
+              "p99_9": 4.20335,
+              "max": 4.703525
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 159.231,
+              "p95": 161.735,
+              "p99": 163.663,
+              "p99_9": 169.606,
+              "max": 188.141
+            },
+            "threadCpuUs": {
+              "p50": 158.864,
+              "p95": 161.352,
+              "p99": 163.256,
+              "p99_9": 169.224,
+              "max": 178.04
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.980775,
+              "p95": 4.043375,
+              "p99": 4.091575,
+              "p99_9": 4.24015,
+              "max": 4.703525
+            }
+          },
+          "noUpdate": {
+            "count": 4800,
+            "wallUs": {
+              "p50": 156.711,
+              "p95": 159.183,
+              "p99": 161.159,
+              "p99_9": 168.134,
+              "max": 177.286
+            },
+            "threadCpuUs": {
+              "p50": 156.344,
+              "p95": 158.8,
+              "p99": 160.672,
+              "p99_9": 166.2,
+              "max": 167.76
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.917775,
+              "p95": 3.979575,
+              "p99": 4.028975,
+              "p99_9": 4.20335,
+              "max": 4.43215
+            }
+          }
+        }
+      },
+      {
+        "mode": "complete-auto-fir",
+        "controlUpdates": 3400,
+        "limitedSamplesIncludingWarmupLR": [
+          463130,
+          524617
+        ],
+        "blockFrames": 192,
+        "deadlineUs": 4000,
+        "warmupCallbacks": 500,
+        "measuredCallbacks": 8000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.433316095,
+        "threadCpuSeconds": 1.433317296,
+        "threadCpuToWallRatio": 1.000000838,
+        "throughputFramesPerSecond": 1071640.795,
+        "realTimeFactor": 22.3258499,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.59615,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 2.468067935,
+        "callbacks": {
+          "all": {
+            "count": 8000,
+            "wallUs": {
+              "p50": 179.022,
+              "p95": 182.07,
+              "p99": 183.846,
+              "p99_9": 198.077,
+              "max": 263.321
+            },
+            "threadCpuUs": {
+              "p50": 178.656,
+              "p95": 181.688,
+              "p99": 183.448,
+              "p99_9": 188.944,
+              "max": 262.168
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.47555,
+              "p95": 4.55175,
+              "p99": 4.59615,
+              "p99_9": 4.951925,
+              "max": 6.583025
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 180.35,
+              "p95": 182.75,
+              "p99": 184.39,
+              "p99_9": 188.877,
+              "max": 263.321
+            },
+            "threadCpuUs": {
+              "p50": 179.976,
+              "p95": 182.368,
+              "p99": 184,
+              "p99_9": 188.472,
+              "max": 262.168
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.50875,
+              "p95": 4.56875,
+              "p99": 4.60975,
+              "p99_9": 4.721925,
+              "max": 6.583025
+            }
+          },
+          "noUpdate": {
+            "count": 4800,
+            "wallUs": {
+              "p50": 177.941,
+              "p95": 180.486,
+              "p99": 182.662,
+              "p99_9": 198.685,
+              "max": 208.333
+            },
+            "threadCpuUs": {
+              "p50": 177.576,
+              "p95": 180.112,
+              "p99": 182.288,
+              "p99_9": 189.8,
+              "max": 207.96
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.448525,
+              "p95": 4.51215,
+              "p99": 4.56655,
+              "p99_9": 4.967125,
+              "max": 5.208325
+            }
+          }
+        }
+      },
+      {
+        "mode": "fixed-fir",
+        "dynamicRetargets": 0,
+        "blockFrames": 256,
+        "deadlineUs": 5333.333333,
+        "warmupCallbacks": 375,
+        "measuredCallbacks": 6000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 0.73501271,
+        "threadCpuSeconds": 0.735035168,
+        "threadCpuToWallRatio": 1.000030555,
+        "throughputFramesPerSecond": 2089759.781,
+        "realTimeFactor": 43.53666211,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 2.36821875,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 1.992477417,
+        "checksum": 3.666601535,
+        "callbacks": {
+          "all": {
+            "count": 6000,
+            "wallUs": {
+              "p50": 122.145,
+              "p95": 124.193,
+              "p99": 126.305,
+              "p99_9": 131.081,
+              "max": 137.185
+            },
+            "threadCpuUs": {
+              "p50": 121.792,
+              "p95": 123.816,
+              "p99": 125.936,
+              "p99_9": 129.768,
+              "max": 135.464
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.29021875,
+              "p95": 2.32861875,
+              "p99": 2.36821875,
+              "p99_9": 2.45776875,
+              "max": 2.57221875
+            }
+          },
+          "update": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          },
+          "noUpdate": {
+            "count": 6000,
+            "wallUs": {
+              "p50": 122.145,
+              "p95": 124.193,
+              "p99": 126.305,
+              "p99_9": 131.081,
+              "max": 137.185
+            },
+            "threadCpuUs": {
+              "p50": 121.792,
+              "p95": 123.816,
+              "p99": 125.936,
+              "p99_9": 129.768,
+              "max": 135.464
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.29021875,
+              "p95": 2.32861875,
+              "p99": 2.36821875,
+              "p99_9": 2.45776875,
+              "max": 2.57221875
+            }
+          }
+        }
+      },
+      {
+        "mode": "dynamic-fir",
+        "controlUpdatesPerEar": 3400,
+        "firRetargetsPerEarIncludingInitial": 3401,
+        "limitedSamplesIncludingWarmupLR": [
+          480698,
+          563098
+        ],
+        "blockFrames": 256,
+        "deadlineUs": 5333.333333,
+        "warmupCallbacks": 375,
+        "measuredCallbacks": 6000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.262257212,
+        "threadCpuSeconds": 1.26213516,
+        "threadCpuToWallRatio": 0.9999033066,
+        "throughputFramesPerSecond": 1216867.676,
+        "realTimeFactor": 25.35140992,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.050825,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 1.244296315,
+        "callbacks": {
+          "all": {
+            "count": 6000,
+            "wallUs": {
+              "p50": 210.228,
+              "p95": 213.66,
+              "p99": 216.044,
+              "p99_9": 226.779,
+              "max": 296.927
+            },
+            "threadCpuUs": {
+              "p50": 209.856,
+              "p95": 213.28,
+              "p99": 215.656,
+              "p99_9": 220.2,
+              "max": 223.744
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.941775,
+              "p95": 4.006125,
+              "p99": 4.050825,
+              "p99_9": 4.25210625,
+              "max": 5.56738125
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 211.316,
+              "p95": 214.164,
+              "p99": 216.628,
+              "p99_9": 227.259,
+              "max": 296.927
+            },
+            "threadCpuUs": {
+              "p50": 210.944,
+              "p95": 213.768,
+              "p99": 216.256,
+              "p99_9": 220.712,
+              "max": 222.696
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.962175,
+              "p95": 4.015575,
+              "p99": 4.061775,
+              "p99_9": 4.26110625,
+              "max": 5.56738125
+            }
+          },
+          "noUpdate": {
+            "count": 2800,
+            "wallUs": {
+              "p50": 208.732,
+              "p95": 211.74,
+              "p99": 214.044,
+              "p99_9": 225.699,
+              "max": 275.984
+            },
+            "threadCpuUs": {
+              "p50": 208.368,
+              "p95": 211.368,
+              "p99": 213.592,
+              "p99_9": 217.64,
+              "max": 223.744
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.913725,
+              "p95": 3.970125,
+              "p99": 4.013325,
+              "p99_9": 4.23185625,
+              "max": 5.1747
+            }
+          }
+        }
+      },
+      {
+        "mode": "complete-auto-fir",
+        "controlUpdates": 3400,
+        "limitedSamplesIncludingWarmupLR": [
+          463130,
+          524617
+        ],
+        "blockFrames": 256,
+        "deadlineUs": 5333.333333,
+        "warmupCallbacks": 375,
+        "measuredCallbacks": 6000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.431519152,
+        "threadCpuSeconds": 1.431492992,
+        "threadCpuToWallRatio": 0.9999817257,
+        "throughputFramesPerSecond": 1072985.994,
+        "realTimeFactor": 22.35387487,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.5691875,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 2.468067935,
+        "callbacks": {
+          "all": {
+            "count": 6000,
+            "wallUs": {
+              "p50": 238.491,
+              "p95": 241.754,
+              "p99": 243.69,
+              "p99_9": 254.377,
+              "max": 295.168
+            },
+            "threadCpuUs": {
+              "p50": 238.128,
+              "p95": 241.376,
+              "p99": 243.304,
+              "p99_9": 249.104,
+              "max": 252.88
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.47170625,
+              "p95": 4.5328875,
+              "p99": 4.5691875,
+              "p99_9": 4.76956875,
+              "max": 5.5344
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 239.571,
+              "p95": 242.29,
+              "p99": 244.49,
+              "p99_9": 256.994,
+              "max": 295.168
+            },
+            "threadCpuUs": {
+              "p50": 239.208,
+              "p95": 241.888,
+              "p99": 244.088,
+              "p99_9": 250.136,
+              "max": 252.88
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.49195625,
+              "p95": 4.5429375,
+              "p99": 4.5841875,
+              "p99_9": 4.8186375,
+              "max": 5.5344
+            }
+          },
+          "noUpdate": {
+            "count": 2800,
+            "wallUs": {
+              "p50": 237.05,
+              "p95": 239.69,
+              "p99": 241.675,
+              "p99_9": 254.377,
+              "max": 260.625
+            },
+            "threadCpuUs": {
+              "p50": 236.68,
+              "p95": 239.296,
+              "p99": 241.256,
+              "p99_9": 246.624,
+              "max": 252.472
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.4446875,
+              "p95": 4.4941875,
+              "p99": 4.53140625,
+              "p99_9": 4.76956875,
+              "max": 4.88671875
+            }
+          }
+        }
+      },
+      {
+        "mode": "fixed-fir",
+        "dynamicRetargets": 0,
+        "blockFrames": 480,
+        "deadlineUs": 10000,
+        "warmupCallbacks": 200,
+        "measuredCallbacks": 3200,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 0.732998129,
+        "threadCpuSeconds": 0.733003072,
+        "threadCpuToWallRatio": 1.000006744,
+        "throughputFramesPerSecond": 2095503.302,
+        "realTimeFactor": 43.6563188,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 2.33139,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 1.992477417,
+        "checksum": 3.666601535,
+        "callbacks": {
+          "all": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 228.475,
+              "p95": 230.635,
+              "p99": 233.139,
+              "p99_9": 241.307,
+              "max": 325.101
+            },
+            "threadCpuUs": {
+              "p50": 228.12,
+              "p95": 230.272,
+              "p99": 232.752,
+              "p99_9": 239.008,
+              "max": 308.064
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.28475,
+              "p95": 2.30635,
+              "p99": 2.33139,
+              "p99_9": 2.41307,
+              "max": 3.25101
+            }
+          },
+          "update": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          },
+          "noUpdate": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 228.475,
+              "p95": 230.635,
+              "p99": 233.139,
+              "p99_9": 241.307,
+              "max": 325.101
+            },
+            "threadCpuUs": {
+              "p50": 228.12,
+              "p95": 230.272,
+              "p99": 232.752,
+              "p99_9": 239.008,
+              "max": 308.064
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.28475,
+              "p95": 2.30635,
+              "p99": 2.33139,
+              "p99_9": 2.41307,
+              "max": 3.25101
+            }
+          }
+        }
+      },
+      {
+        "mode": "dynamic-fir",
+        "controlUpdatesPerEar": 3400,
+        "firRetargetsPerEarIncludingInitial": 3401,
+        "limitedSamplesIncludingWarmupLR": [
+          480698,
+          563098
+        ],
+        "blockFrames": 480,
+        "deadlineUs": 10000,
+        "warmupCallbacks": 200,
+        "measuredCallbacks": 3200,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.259849062,
+        "threadCpuSeconds": 1.259850496,
+        "threadCpuToWallRatio": 1.000001138,
+        "throughputFramesPerSecond": 1219193.669,
+        "realTimeFactor": 25.3998681,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 3.99586,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 1.244296315,
+        "callbacks": {
+          "all": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 393.586,
+              "p95": 396.818,
+              "p99": 399.586,
+              "p99_9": 417.12,
+              "max": 418.36
+            },
+            "threadCpuUs": {
+              "p50": 393.208,
+              "p95": 396.464,
+              "p99": 399.216,
+              "p99_9": 406.912,
+              "max": 407.168
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.93586,
+              "p95": 3.96818,
+              "p99": 3.99586,
+              "p99_9": 4.1712,
+              "max": 4.1836
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 393.586,
+              "p95": 396.818,
+              "p99": 399.586,
+              "p99_9": 417.12,
+              "max": 418.36
+            },
+            "threadCpuUs": {
+              "p50": 393.208,
+              "p95": 396.464,
+              "p99": 399.216,
+              "p99_9": 406.912,
+              "max": 407.168
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 3.93586,
+              "p95": 3.96818,
+              "p99": 3.99586,
+              "p99_9": 4.1712,
+              "max": 4.1836
+            }
+          },
+          "noUpdate": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          }
+        }
+      },
+      {
+        "mode": "complete-auto-fir",
+        "controlUpdates": 3400,
+        "limitedSamplesIncludingWarmupLR": [
+          463130,
+          524617
+        ],
+        "blockFrames": 480,
+        "deadlineUs": 10000,
+        "warmupCallbacks": 200,
+        "measuredCallbacks": 3200,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 1.428678818,
+        "threadCpuSeconds": 1.428700472,
+        "threadCpuToWallRatio": 1.000015157,
+        "throughputFramesPerSecond": 1075119.18,
+        "realTimeFactor": 22.39831626,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 4.52142,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 2.468067935,
+        "callbacks": {
+          "all": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 446.278,
+              "p95": 449.887,
+              "p99": 452.142,
+              "p99_9": 466.238,
+              "max": 475.077
+            },
+            "threadCpuUs": {
+              "p50": 445.904,
+              "p95": 449.512,
+              "p99": 451.736,
+              "p99_9": 458.44,
+              "max": 474.704
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.46278,
+              "p95": 4.49887,
+              "p99": 4.52142,
+              "p99_9": 4.66238,
+              "max": 4.75077
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 446.278,
+              "p95": 449.887,
+              "p99": 452.142,
+              "p99_9": 466.238,
+              "max": 475.077
+            },
+            "threadCpuUs": {
+              "p50": 445.904,
+              "p95": 449.512,
+              "p99": 451.736,
+              "p99_9": 458.44,
+              "max": 474.704
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 4.46278,
+              "p95": 4.49887,
+              "p99": 4.52142,
+              "p99_9": 4.66238,
+              "max": 4.75077
+            }
+          },
+          "noUpdate": {
+            "count": 0,
+            "wallUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "threadCpuUs": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          }
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "32 seconds equivalent PCM is throughput work, not a 32-second wall-clock heat test.",
+    "Deadline misses are observational in an unpaced shared container and are not algorithm-only evidence.",
+    "Digital limiter output is not an SPL or acoustic MPO measurement."
+  ]
+}
