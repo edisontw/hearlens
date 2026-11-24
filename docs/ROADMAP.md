@@ -46,8 +46,8 @@ This is a separate implementation track from M03's closed offline quality-conver
 
 - **N01 — fixed FIR parity and host probe: COMPLETE.** PR [#152](https://github.com/edisontw/hearlens/pull/152) merged as `6b1ee4d732bcd8827d97493d19f33a61013c4e11`. Reproduction, precision controls, allocation probe, and the latest host-dependent timing snapshot are recorded in [the Native FIR README](../research/detached-native-fir/README.md).
 - **N02 — dynamic FIR, restart, limiter, reset, fail-stop: IMPLEMENTATION COMPLETE.** The C++ core in [PR #153](https://github.com/edisontw/hearlens/pull/153) matches `packages/dsp/offline-dynamic-fir.mjs` on synthetic stereo fixtures across five callback partitions. It accepts explicit nominal targets; it does not include the automatic six-band detector or constitute complete Auto-FIR.
-- **N03 — six-band detector and complete Native Auto-FIR: NOT STARTED.** Begin only after N02 review and exact-head CI pass. Preserve the JS detector/gain law and test with synthetic inputs.
-- **N04 — headless ARM64 synthetic benchmark: NOT STARTED.** It must not open audio devices. Without target-device measurements, report cross-compile/headless evidence only; do not claim Android device performance.
+- **N03 — six-band detector and complete Native Auto-FIR: IN REVIEW.** The C++ detector and sample-clock Auto-FIR adapter match the live JS reference on synthetic stereo PCM, including control-boundary and fail-stop checks. Exact-head review and CI are pending; implementation evidence is in the Native FIR README.
+- **N04 — headless ARM64 synthetic benchmark: NEXT.** Start after N03 merges. It must not open audio devices. Without target-device measurements, report cross-compile/headless evidence only; do not claim Android device performance.
 
 Native progress does not change M01 or M04 status. A digital limiter bounds PCM samples and does not establish safe ear-level SPL, acoustic MPO, route behavior, or a hard mute.
 

@@ -152,6 +152,8 @@ class DynamicFir {
     maxAbsOutput_ = 0.0;
   }
 
+  void failStop() noexcept { faulted_ = true; }
+
   bool ready() const noexcept { return ready_; }
   bool faulted() const noexcept { return faulted_; }
   bool configValid() const noexcept { return configValid_; }
