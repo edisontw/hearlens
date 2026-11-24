@@ -1,0 +1,75 @@
+name: Native DSP five-minute paced research
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/native-dsp-paced.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-arm64-paced:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build existing synthetic-only Auto-FIR benchmark
+        run: make -C research/detached-native-fir auto-bench
+      - name: Run five-minute paced synthetic PCM on Linux ARM64
+        working-directory: research/detached-native-fir
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/hearlens-native-paced"
+          mkdir -p "$out"
+          {
+            uname -a
+            lscpu
+            g++ --version
+            node --version
+            cat /sys/fs/cgroup/cpu.max || true
+            cat /sys/fs/cgroup/memory.max || true
+          } > "$out/host.txt"
+          printf 'utc\tloadavg\tnative_process_pid_comm_rss_kib\n' > "$out/rss.tsv"
+          node auto-bench.mjs --paced-seconds=300 --paced-block=128 \
+            --output="$out/paced-128-5min.json" &
+          bench_pid=$!
+          while kill -0 "$bench_pid" 2>/dev/null; do
+            native=$(ps --ppid "$bench_pid" -o pid=,comm=,rss= | awk '$2 == "auto-bench" {print $1 " " $2 " " $3}' || true)
+            printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(cat /proc/loadavg)" "$native" >> "$out/rss.tsv"
+            sleep 10
+          done
+          wait "$bench_pid"
+          node --input-type=module - "$out/paced-128-5min.json" <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+          const report = JSON.parse(readFileSync(process.argv[2], "utf8"));
+          const n = report.native;
+          assert.equal(report.result, "PASS");
+          assert.equal(report.host.architecture, "arm64");
+          assert.equal(n.architecture, "aarch64");
+          assert.equal(n.mode, "paced-complete-auto-fir");
+          assert.equal(n.requestedSeconds, 300);
+          assert.equal(n.blockFrames, 128);
+          assert.ok(n.wallElapsedSeconds >= 300);
+          assert.equal(n.measuredCallbacks, 112500);
+          assert.equal(n.controlUpdates, 30000);
+          assert.equal(n.allocationCount, 0);
+          assert.equal(n.finiteOutput, true);
+          assert.equal(n.injectedSchedulingStall, false);
+          assert.ok(Number.isFinite(n.checksum));
+          console.log(JSON.stringify(n, null, 2));
+          console.log("Linux ARM64 synthetic run only; deadline misses are observational. No Android runtime, thermal, physical route, SPL or hearing authorization evidence.");
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hearlens-n05-linux-arm64-paced
+          path: ${{ runner.temp }}/hearlens-native-paced
+          if-no-files-found: error
+          retention-days: 30
