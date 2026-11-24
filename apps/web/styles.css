@@ -120,6 +120,12 @@ h2 {
   color: var(--ok);
 }
 
+.status[data-state="loading"],
+.status[data-state="processing"] {
+  background: #fff7e6;
+  color: #8a4b08;
+}
+
 .status[data-state="error"] {
   background: #fef3f2;
   color: var(--danger);
@@ -431,6 +437,54 @@ details > summary {
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.45;
+}
+
+.local-asr-controls {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.local-asr-controls label {
+  font-weight: 700;
+}
+
+.local-asr-controls select {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.local-asr-controls #edison-model-controls {
+  display: contents;
+}
+
+.local-asr-controls #edison-model-controls[hidden] {
+  display: none;
+}
+
+.local-asr-controls p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 540px) {
+  .local-asr-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 540px) {

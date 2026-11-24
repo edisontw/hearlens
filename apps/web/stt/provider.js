@@ -1,15 +1,15 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261124-edison-local1";
+} from "./providers/browser-speech.js?v=20261125-edison-local-stability2";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261124-edison-local1";
+  "./providers/gemini-live-transcribe.js?v=20261125-edison-local-stability2";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261124-edison-local1";
+  "./providers/google-cloud-streaming.js?v=20261125-edison-local-stability2";
 import { EdisonLocalAsrProvider } from
-  "./providers/edison-local-asr.mjs?v=20261124-edison-local1";
+  "./providers/edison-local-asr.mjs?v=20261125-edison-local-stability2";
 export { validateEdisonLocalSelection } from
-  "./providers/edison-local-asr.mjs?v=20261124-edison-local1";
+  "./providers/edison-local-asr.mjs?v=20261125-edison-local-stability2";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
@@ -33,8 +33,9 @@ export function describeSttCapabilities() {
     geminiLiveTranscribeClient: true,
     googleCloudStreamingClient: true,
     edisonLocalBatch: true,
+    edisonLocalSegmented: true,
     edisonLocalStreaming: false,
-    planned: ["openai-streaming", "local-taigi-breeze"],
+    planned: ["openai-streaming", "native-taigi-evaluation"],
   };
 }
 

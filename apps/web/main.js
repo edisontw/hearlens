@@ -1,15 +1,15 @@
-import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261124-edison-local1";
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261124-edison-local1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261124-edison-local1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261124-edison-local1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261124-edison-local1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261124-edison-local1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261124-edison-local1";
+import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261125-edison-local-stability2";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261125-edison-local-stability2";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261125-edison-local-stability2";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261125-edison-local-stability2";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261125-edison-local-stability2";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261125-edison-local-stability2";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261125-edison-local-stability2";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS, validateEdisonLocalSelection } from "./stt/provider.js?v=20261124-edison-local1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS, validateEdisonLocalSelection } from "./stt/provider.js?v=20261125-edison-local-stability2";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -21,7 +21,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261124-edison-local1";
+} from "./transcript-window.mjs?v=20261125-edison-local-stability2";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -42,14 +42,14 @@ import {
   isAndroidPlatform,
   parseCaptureOverride,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261124-edison-local1";
+} from "./stt/providers/quick-presets.mjs?v=20261125-edison-local-stability2";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261124-edison-local1";
+const BUILD_ID = "20261125-edison-local-stability2";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
@@ -109,6 +109,11 @@ const runtimeSttConfig = readRuntimeSttConfig();
 const els = {
   start: document.querySelector("#start"),
   sttPrivacyNotice: document.querySelector("#stt-privacy-notice"),
+  sttProvider: document.querySelector("#stt-provider"),
+  edisonModel: document.querySelector("#edison-model"),
+  edisonLanguage: document.querySelector("#edison-language"),
+  edisonModelControls: document.querySelector("#edison-model-controls"),
+  edisonBetaNote: document.querySelector("#edison-beta-note"),
   stop: document.querySelector("#stop"),
   recall: document.querySelector("#recall"),
   recallRecent: document.querySelector("#recall-recent"),
@@ -170,6 +175,42 @@ const els = {
 if (els.sttPrivacyNotice) {
   els.sttPrivacyNotice.textContent = captionSttPrivacyNotice(runtimeSttConfig.provider);
 }
+
+function syncRecognitionProviderControls() {
+  if (els.sttProvider) els.sttProvider.value = runtimeSttConfig.provider;
+  if (els.edisonModel) els.edisonModel.value = runtimeSttConfig.edisonModel;
+  if (els.edisonLanguage) els.edisonLanguage.value = runtimeSttConfig.edisonLanguageMode;
+  const local = runtimeSttConfig.provider === STT_PROVIDER_IDS.EDISON_LOCAL;
+  if (els.edisonModelControls) els.edisonModelControls.hidden = !local;
+  if (els.edisonBetaNote) els.edisonBetaNote.hidden = !local;
+  if (els.sttPrivacyNotice) els.sttPrivacyNotice.textContent = captionSttPrivacyNotice(runtimeSttConfig.provider);
+}
+
+function applyRecognitionProviderSettings() {
+  if (!confirmSettingsReload()) {
+    syncRecognitionProviderControls();
+    return;
+  }
+  const url = new URL(window.location.href);
+  const selectedProvider = els.sttProvider?.value || STT_PROVIDER_IDS.GEMINI;
+  const local = selectedProvider === STT_PROVIDER_IDS.EDISON_LOCAL;
+  url.searchParams.set("stt", selectedProvider === STT_PROVIDER_IDS.GEMINI ? "gemini" : selectedProvider);
+  if (local) {
+    url.searchParams.set("edisonModel", els.edisonModel?.value || "breeze-asr-26-q5");
+    url.searchParams.set("edisonLanguage", els.edisonLanguage?.value || "auto");
+  } else {
+    url.searchParams.delete("edisonModel");
+    url.searchParams.delete("edisonLanguage");
+    url.searchParams.delete("edison");
+  }
+  url.searchParams.delete("_build");
+  window.location.assign(url);
+}
+
+syncRecognitionProviderControls();
+els.sttProvider?.addEventListener("change", applyRecognitionProviderSettings);
+els.edisonModel?.addEventListener("change", applyRecognitionProviderSettings);
+els.edisonLanguage?.addEventListener("change", applyRecognitionProviderSettings);
 
 // Presentation only: no microphone, STT, audio or persistence privileges.
 createCaptionFocusMode({
@@ -1312,6 +1353,11 @@ async function startSession() {
     onStatus: ({ label, state }) => {
       if (sessionId !== activeSessionId) return;
       els.diagStt.textContent = label;
+      if (runtimeSttConfig.provider === STT_PROVIDER_IDS.EDISON_LOCAL) {
+        const visibleState = ["loading", "processing", "listening", "error"].includes(state)
+          ? state : "idle";
+        setStatus(label || "Edison 本機字幕", visibleState);
+      }
       appendSttLog("S" + sessionId + " status " + state);
     },
     onError: ({ message, code, fatal }) => {
@@ -1655,7 +1701,7 @@ if (runtimeSttConfig.provider === "gemini-live-transcribe") {
     ? "Google Cloud streaming proxy 已設定"
     : "Google Cloud 已選擇，但缺少 ?ws=wss://.../stt";
 } else if (runtimeSttConfig.provider === "edison-local-asr") {
-  els.diagStt.textContent = "Edison 本機整段辨識已選擇；字幕會在停止收音後出現";
+  els.diagStt.textContent = "Edison 本機分段字幕 Experimental；模型只在此裝置執行";
 } else {
   els.diagStt.textContent = sttCapabilities.browserSpeech
     ? "可用（Browser fallback）"
