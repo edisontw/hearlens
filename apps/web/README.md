@@ -33,6 +33,8 @@ Then open:
 http://localhost:8080
 ```
 
+See [`../../docs/EDISON_LOCAL_ASR.md`](../../docs/EDISON_LOCAL_ASR.md) for the opt-in Edison batch ASR adapter. It is a local development experiment and does not replace the default Gemini provider.
+
 ## Important
 
 Browser SpeechRecognition is not the planned production STT SLA. The next architecture step is a provider interface so Web cloud streaming and later native on-device recognizers can be benchmarked without changing transcript UI/state logic.
