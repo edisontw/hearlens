@@ -148,8 +148,10 @@ jobs:
           name: hearlens-n04-portable-js-oracle
           path: ${{ runner.temp }}/hearlens-portable-fixture
       - name: Build API 29 arm64-v8a headless executable and JS oracle fixture
-        run: bash research/detached-native-fir/build-android.sh \
-          "$RUNNER_TEMP/hearlens-android-arm64" "$RUNNER_TEMP/hearlens-portable-fixture"
+        run: |
+          bash research/detached-native-fir/build-android.sh \
+            "$RUNNER_TEMP/hearlens-android-arm64" \
+            "$RUNNER_TEMP/hearlens-portable-fixture"
       - uses: actions/upload-artifact@v4
         with:
           name: hearlens-n04-android-arm64-v8a
