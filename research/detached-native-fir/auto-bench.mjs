@@ -158,15 +158,30 @@ function makeFixture() {
 const outputArgument = process.argv.find(arg => arg.startsWith("--output="));
 const pacedSecondsArgument = process.argv.find(arg => arg.startsWith("--paced-seconds="));
 const pacedBlockArgument = process.argv.find(arg => arg.startsWith("--paced-block="));
+const stallAfterArgument = process.argv.find(arg => arg.startsWith("--stall-after-callbacks="));
+const stallMillisecondsArgument = process.argv.find(arg => arg.startsWith("--stall-ms="));
 const pacedSeconds = pacedSecondsArgument
   ? Number(pacedSecondsArgument.slice("--paced-seconds=".length)) : 0;
 const pacedBlock = pacedBlockArgument
   ? Number(pacedBlockArgument.slice("--paced-block=".length)) : 128;
+const stallAfterCallbacks = stallAfterArgument
+  ? Number(stallAfterArgument.slice("--stall-after-callbacks=".length)) : 0;
+const stallMilliseconds = stallMillisecondsArgument
+  ? Number(stallMillisecondsArgument.slice("--stall-ms=".length)) : 0;
 assert.equal(Boolean(pacedSecondsArgument), Boolean(pacedBlockArgument),
   "paced mode requires both --paced-seconds and --paced-block");
+assert.equal(Boolean(stallAfterArgument), Boolean(stallMillisecondsArgument),
+  "stall control requires both --stall-after-callbacks and --stall-ms");
+assert(!stallAfterArgument || pacedSecondsArgument,
+  "stall control is only available in paced mode");
 if (pacedSecondsArgument) {
   assert(Number.isSafeInteger(pacedSeconds) && pacedSeconds > 0 && pacedSeconds <= 3_600);
   assert([64, 128, 192, 240, 256, 480].includes(pacedBlock));
+}
+if (stallAfterArgument) {
+  assert(Number.isSafeInteger(stallAfterCallbacks) && stallAfterCallbacks > 0);
+  assert(Number.isSafeInteger(stallMilliseconds) && stallMilliseconds > 0 &&
+    stallMilliseconds <= 2_000);
 }
 const fixture = makeFixture();
 const fixtureHash = createHash("sha256").update(fixture).digest("hex");
@@ -179,6 +194,10 @@ try {
   if (pacedSecondsArgument) {
     nativeArguments.push("--paced-seconds=" + pacedSeconds,
       "--paced-block=" + pacedBlock);
+  }
+  if (stallAfterArgument) {
+    nativeArguments.push("--stall-after-callbacks=" + stallAfterCallbacks,
+      "--stall-ms=" + stallMilliseconds);
   }
   const result = spawnSync(binary, nativeArguments, {
     cwd: NATIVE_DIRECTORY,
@@ -195,10 +214,21 @@ try {
     assert.equal(native.mode, "paced-complete-auto-fir");
     assert.equal(native.blockFrames, pacedBlock);
     assert.equal(native.requestedSeconds, pacedSeconds);
+    assert.equal(native.deadlineMissBasis,
+      "completion exceeds absolute scheduled start plus block period");
     assert.equal(native.allocationCount, 0);
     assert.equal(native.allocationProbePositiveControls, true);
     assert.equal(native.finiteOutput, true);
     assert(Number.isFinite(native.checksum));
+    if (stallAfterArgument) {
+      assert.equal(native.injectedSchedulingStall, true);
+      assert(native.deadlineMisses > 0,
+        "paced scheduling-stall positive control must detect deadline misses");
+      assert(native.scheduledWakeLatenessUs.max >= stallMilliseconds * 0.9,
+        "paced scheduling-stall positive control must expose wake lateness");
+    } else {
+      assert.equal(native.injectedSchedulingStall, false);
+    }
   } else {
     assert.equal(native.sampleRate, RATE);
     assert.equal(native.warmupSamplesPerEar, WARMUP_SAMPLES);
@@ -248,7 +278,10 @@ try {
     },
     ...(pacedSecondsArgument ? {
       paced: { requestedSeconds: pacedSeconds, blockFrames: pacedBlock,
-        sampleRate: RATE, syntheticInputLoops: true },
+        sampleRate: RATE, syntheticInputLoops: true,
+        ...(stallAfterArgument ? { injectedSchedulingStall: {
+          afterCallbacks: stallAfterCallbacks, milliseconds: stallMilliseconds,
+        } } : {}) },
     } : {}),
     native,
     limitations: [
@@ -262,6 +295,8 @@ try {
     writeFileSync(outputArgument.slice("--output=".length), json);
     console.log(JSON.stringify({ result: "PASS", output: outputArgument.slice(9),
       rows: native.rows?.length ?? 1, mode: native.mode ?? "unpaced-throughput",
+      deadlineMisses: native.deadlineMisses ?? null,
+      maxScheduleWakeLatenessUs: native.scheduledWakeLatenessUs?.max ?? null,
       fixtureSha256: fixtureHash }));
   } else {
     process.stdout.write(json);

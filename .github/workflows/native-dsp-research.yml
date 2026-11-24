@@ -44,6 +44,13 @@ jobs:
           node research/detached-native-fir/verify-portable-output.mjs \
             "$fixture/manifest.json" "$fixture/auto-fir-fixture.bin" \
             "$fixture/auto-fir-js-oracle.bin" "$RUNNER_TEMP/hearlens-x64-portable-result.bin"
+      - name: Confirm paced deadline-miss accounting detects a scheduling stall
+        run: |
+          mkdir -p "$RUNNER_TEMP/hearlens-native-paced-control"
+          node research/detached-native-fir/auto-bench.mjs \
+            --paced-seconds=7 --paced-block=128 \
+            --stall-after-callbacks=100 --stall-ms=500 \
+            --output="$RUNNER_TEMP/hearlens-native-paced-control/stall-control.json"
       - uses: actions/upload-artifact@v4
         with:
           name: hearlens-n04-portable-js-oracle

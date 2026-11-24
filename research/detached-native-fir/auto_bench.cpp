@@ -20,6 +20,7 @@
 #include <string>
 #include <sys/resource.h>
 #include <time.h>
+#include <thread>
 #include <vector>
 
 namespace allocation_probe {
@@ -114,6 +115,8 @@ struct CallbackSample {
   std::uint64_t wallNs = 0;
   std::uint64_t cpuNs = 0;
   bool update = false;
+  std::uint64_t wakeLatenessNs = 0;
+  std::uint64_t deadlineOverrunNs = 0;
 };
 
 struct MetricSummary {
@@ -204,7 +207,7 @@ bool measure(std::size_t blockFrames, std::size_t warmupSamples,
     const std::uint64_t cpuEnd = clockNs(CLOCK_THREAD_CPUTIME_ID);
     const std::uint64_t wallEnd = steadyNs();
     const std::size_t measuredIndex = callbackIndex - warmCallbacks;
-    samples[measuredIndex] = {wallEnd - wallStart, cpuEnd - cpuStart, update};
+    samples[measuredIndex] = {wallEnd - wallStart, cpuEnd - cpuStart, update, 0, 0};
     return ok;
   };
 
@@ -302,6 +305,7 @@ bool measure(std::size_t blockFrames, std::size_t warmupSamples,
 }
 
 bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
+              std::size_t stallAfterCallbacks, std::size_t stallMilliseconds,
               const BandBasis& basis, const std::array<BandTargets, 2>& targets,
               double attackMs, double releaseMs, std::size_t controlInterval,
               double maxGainDb, double ceiling, std::size_t transitionSamples,
@@ -331,6 +335,9 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
   const std::uint64_t stopNs = startNs + durationSeconds * 1'000'000'000ULL;
   std::uint64_t scheduledNs = startNs + periodNs;
   while (scheduledNs < stopNs) {
+    if (stallAfterCallbacks > 0 && samples.size() == stallAfterCallbacks) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(stallMilliseconds));
+    }
     timespec targetTime{};
     targetTime.tv_sec = static_cast<time_t>(scheduledNs / 1'000'000'000ULL);
     targetTime.tv_nsec = static_cast<long>(scheduledNs % 1'000'000'000ULL);
@@ -341,6 +348,10 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
     } while (sleepResult == EINTR);
     if (sleepResult != 0) return false;
 
+    const std::uint64_t callbackStartNs = clockNs(CLOCK_MONOTONIC);
+    const std::uint64_t wakeLatenessNs = callbackStartNs > scheduledNs
+        ? callbackStartNs - scheduledNs : 0;
+    const std::uint64_t callbackDeadlineNs = scheduledNs + periodNs;
     bool update = processor.left().sinceUpdate() + blockFrames >= controlInterval;
     const std::uint64_t wallStart = steadyNs();
     const std::uint64_t cpuStart = clockNs(CLOCK_THREAD_CPUTIME_ID);
@@ -351,8 +362,12 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
     allocation_probe::tracking = false;
     const std::uint64_t cpuEnd = clockNs(CLOCK_THREAD_CPUTIME_ID);
     const std::uint64_t wallEnd = steadyNs();
+    const std::uint64_t callbackCompleteNs = clockNs(CLOCK_MONOTONIC);
     if (!ok) return false;
-    samples.push_back({wallEnd - wallStart, cpuEnd - cpuStart, update});
+    const std::uint64_t deadlineOverrunNs = callbackCompleteNs > callbackDeadlineNs
+        ? callbackCompleteNs - callbackDeadlineNs : 0;
+    samples.push_back({wallEnd - wallStart, cpuEnd - cpuStart, update,
+        wakeLatenessNs, deadlineOverrunNs});
     for (std::size_t index = 0; index < allocationBefore.size(); ++index) {
       allocationCount += allocation_probe::counts[index] - allocationBefore[index];
     }
@@ -390,9 +405,16 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
   const auto all = summarize(samples, -1, deadlineUs);
   const auto updates = summarize(samples, 1, deadlineUs);
   const auto noUpdates = summarize(samples, 0, deadlineUs);
+  std::vector<double> wakeLatenessUs;
+  std::vector<double> deadlineOverrunUs;
+  wakeLatenessUs.reserve(samples.size());
+  deadlineOverrunUs.reserve(samples.size());
   std::size_t misses = 0, consecutive = 0, maxConsecutive = 0;
   for (const auto& sample : samples) {
-    if (static_cast<double>(sample.wallNs) > deadlineUs * 1000.0) {
+    wakeLatenessUs.push_back(static_cast<double>(sample.wakeLatenessNs) / 1000.0);
+    deadlineOverrunUs.push_back(
+        static_cast<double>(sample.deadlineOverrunNs) / 1000.0);
+    if (sample.deadlineOverrunNs > 0) {
       ++misses;
       ++consecutive;
       maxConsecutive = std::max(maxConsecutive, consecutive);
@@ -402,6 +424,8 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
   }
   if (!finiteOutput || !std::isfinite(checksum) || maxAbsOutput > ceiling ||
       allocationCount != 0 || samples.empty()) return false;
+  const auto wakeLatenessPercentiles = percentiles(wakeLatenessUs);
+  const auto deadlineOverrunPercentiles = percentiles(deadlineOverrunUs);
 
   struct rusage usage{};
   std::uint64_t peakRssBytes = 0;
@@ -422,6 +446,7 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
       << ",\"mode\":\"paced-complete-auto-fir\""
       << ",\"blockFrames\":" << blockFrames
       << ",\"deadlineUs\":" << deadlineUs
+      << ",\"deadlineMissBasis\":\"completion exceeds absolute scheduled start plus block period\""
       << ",\"requestedSeconds\":" << durationSeconds
       << ",\"wallElapsedSeconds\":" << elapsedSeconds
       << ",\"threadCpuSeconds\":" << threadCpuSeconds
@@ -434,6 +459,14 @@ bool runPaced(std::size_t blockFrames, std::size_t durationSeconds,
       << ",\"deadlineMissRate\":"
       << static_cast<double>(misses) / static_cast<double>(samples.size())
       << ",\"maxConsecutiveDeadlineMisses\":" << maxConsecutive
+      << ",\"scheduledWakeLatenessUs\":";
+  writePercentiles(std::cout, wakeLatenessPercentiles);
+  std::cout << ",\"deadlineOverrunUs\":";
+  writePercentiles(std::cout, deadlineOverrunPercentiles);
+  std::cout << ",\"injectedSchedulingStall\":"
+      << (stallAfterCallbacks > 0 ? "true" : "false")
+      << ",\"stallAfterCallbacks\":" << stallAfterCallbacks
+      << ",\"stallMilliseconds\":" << stallMilliseconds
       << ",\"deadlineUtilizationP99Percent\":" << all.utilizationPercent[2]
       << ",\"allocationCount\":" << allocationCount
       << ",\"allocationProbePositiveControls\":true"
@@ -461,7 +494,8 @@ BandLevels syntheticLevels(std::uint64_t tick, std::size_t ear) {
 }
 
 bool run(std::istream& fixture, std::size_t pacedSeconds = 0,
-         std::size_t pacedBlockFrames = 128) {
+         std::size_t pacedBlockFrames = 128, std::size_t stallAfterCallbacks = 0,
+         std::size_t stallMilliseconds = 0) {
   std::uint32_t magic = 0, totalSamples = 0, warmupSamples = 0;
   std::uint32_t measuredSamples = 0, controlInterval = 0;
   std::uint32_t transitionSamples = 0, sampleRate = 0;
@@ -542,8 +576,9 @@ bool run(std::istream& fixture, std::size_t pacedSeconds = 0,
   if (!controlsPass) return false;
 
   if (pacedSeconds > 0) {
-    return runPaced(pacedBlockFrames, pacedSeconds, basis, targets, attackMs,
-        releaseMs, controlInterval, maxGainDb, ceiling, transitionSamples, input);
+    return runPaced(pacedBlockFrames, pacedSeconds, stallAfterCallbacks,
+        stallMilliseconds, basis, targets, attackMs, releaseMs, controlInterval,
+        maxGainDb, ceiling, transitionSamples, input);
   }
 
   std::array<Coefficients, 2> fixedCoefficients{};
@@ -735,14 +770,17 @@ void operator delete[](void* p, std::align_val_t, const std::nothrow_t&) noexcep
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2 && argc != 4) {
+  if (argc != 2 && argc != 4 && argc != 6) {
     std::fprintf(stderr,
-        "usage: auto-bench FIXTURE.bin [--paced-seconds=N --paced-block=FRAMES]\n");
+        "usage: auto-bench FIXTURE.bin [--paced-seconds=N --paced-block=FRAMES "
+        "[--stall-after-callbacks=N --stall-ms=N]]\n");
     return 1;
   }
   std::size_t pacedSeconds = 0;
   std::size_t pacedBlockFrames = 128;
-  if (argc == 4) {
+  std::size_t stallAfterCallbacks = 0;
+  std::size_t stallMilliseconds = 0;
+  if (argc >= 4) {
     const std::string secondsArgument(argv[2]);
     const std::string blockArgument(argv[3]);
     constexpr const char* secondsPrefix = "--paced-seconds=";
@@ -757,12 +795,32 @@ int main(int argc, char** argv) {
     } catch (...) {
       return 1;
     }
+    if (argc == 6) {
+      const std::string stallAfterArgument(argv[4]);
+      const std::string stallMillisecondsArgument(argv[5]);
+      constexpr const char* stallAfterPrefix = "--stall-after-callbacks=";
+      constexpr const char* stallMillisecondsPrefix = "--stall-ms=";
+      if (stallAfterArgument.rfind(stallAfterPrefix, 0) != 0 ||
+          stallMillisecondsArgument.rfind(stallMillisecondsPrefix, 0) != 0) return 1;
+      try {
+        stallAfterCallbacks = static_cast<std::size_t>(std::stoull(
+            stallAfterArgument.substr(std::strlen(stallAfterPrefix))));
+        stallMilliseconds = static_cast<std::size_t>(std::stoull(
+            stallMillisecondsArgument.substr(std::strlen(stallMillisecondsPrefix))));
+      } catch (...) {
+        return 1;
+      }
+    }
     if (pacedSeconds == 0 || pacedSeconds > 60 * 60 ||
         pacedBlockFrames == 0 || pacedBlockFrames > kMaximumCallbackFrames ||
-        kMeasuredSamples % pacedBlockFrames != 0) return 1;
+        kMeasuredSamples % pacedBlockFrames != 0 ||
+        ((stallAfterCallbacks == 0) != (stallMilliseconds == 0)) ||
+        stallAfterCallbacks > pacedSeconds * kRate / pacedBlockFrames ||
+        stallMilliseconds > 2000) return 1;
   }
   std::ifstream fixture(argv[1], std::ios::binary);
-  if (!fixture || !run(fixture, pacedSeconds, pacedBlockFrames)) {
+  if (!fixture || !run(fixture, pacedSeconds, pacedBlockFrames,
+                       stallAfterCallbacks, stallMilliseconds)) {
     std::fprintf(stderr, "full Auto-FIR benchmark failed\n");
     return 1;
   }
