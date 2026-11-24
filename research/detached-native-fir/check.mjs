@@ -1,0 +1,3 @@
+import {spawnSync} from 'node:child_process';
+const r=spawnSync('./fir',{maxBuffer: 1024*1024}); if(r.status!==0||r.stdout.length!==16384*8)throw Error('execution failed');
+const h=[[],[]]; let mismatch=0,max=0;for(let i=0;i<16384;i++)for(let e=0;e<2;e++){h[e].push(Math.fround(((i*17+e*101)%997-498)/2048));let y=0;const at=j=>h[e][j]??0;for(let t=0;t<256;t++)y+=(((t*13+e*7)%31)-15)/8192*(at(i-t)+at(i-512+t));y+=(((256*13+e*7)%31)-15)/8192*at(i-256); y=Math.fround(y);const actual=r.stdout.readFloatLE((i*2+e)*4);if(!Object.is(y,actual))mismatch++;max=Math.max(max,Math.abs(y-actual));}console.log({samples:32768,mismatch,max});if(mismatch)process.exit(1);
