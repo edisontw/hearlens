@@ -1,4 +1,4 @@
-# HearLens roadmap — current decision (2026-11-23)
+# HearLens roadmap — current decision (2026-11-24)
 
 **Authoritative work-order index.** GitHub's live `main` is the source of truth; any SHA in historical documentation is a snapshot. Earlier work plans, milestone handoffs and percentage allocations are historical and do **not** authorize repeating completed work. [Product vision](./PRODUCT_VISION.md) · [Safety](./SAFETY.md) · [M03 causal/CAMFIT offline review](./M03_CAUSAL_CAMFIT_OFFLINE_REVIEW_2026-11-19.md) · [M03 short-spike quality convergence](./M03_SHORT_SPIKE_QUALITY_2026-11-23.md).
 
@@ -39,6 +39,17 @@ Move physical acoustic calibration, device routing and safe-mute evidence, and t
 - Branch/PR with reviewed CI for source changes; avoid redundant docs-only cycles and unnecessary GitHub Actions usage.
 - No standing manual user test matrix or arbitrary M01/M03/M04 work quota. User tests only after a materially new, safely verifiable capability is ready.
 - Retain source observations, underlying tests and safety documents even if historical *handoff instructions* are removed. Git history preserves prior snapshots.
+
+## Native DSP research ladder (offline synthetic PCM only)
+
+This is a separate implementation track from M03's closed offline quality-convergence gate. All stages use synthetic PCM and remain isolated from production DSP and audio hardware.
+
+- **N01 — fixed FIR parity and host probe: COMPLETE.** PR [#152](https://github.com/edisontw/hearlens/pull/152) merged as `6b1ee4d732bcd8827d97493d19f33a61013c4e11`. Reproduction, precision controls, allocation probe, and the latest host-dependent timing snapshot are recorded in [the Native FIR README](../research/detached-native-fir/README.md).
+- **N02 — dynamic FIR, restart, limiter, reset, fail-stop: IMPLEMENTATION COMPLETE.** The C++ core in [PR #153](https://github.com/edisontw/hearlens/pull/153) matches `packages/dsp/offline-dynamic-fir.mjs` on synthetic stereo fixtures across five callback partitions. It accepts explicit nominal targets; it does not include the automatic six-band detector or constitute complete Auto-FIR.
+- **N03 — six-band detector and complete Native Auto-FIR: NOT STARTED.** Begin only after N02 review and exact-head CI pass. Preserve the JS detector/gain law and test with synthetic inputs.
+- **N04 — headless ARM64 synthetic benchmark: NOT STARTED.** It must not open audio devices. Without target-device measurements, report cross-compile/headless evidence only; do not claim Android device performance.
+
+Native progress does not change M01 or M04 status. A digital limiter bounds PCM samples and does not establish safe ear-level SPL, acoustic MPO, route behavior, or a hard mute.
 
 ## Historical evidence (not active instructions)
 

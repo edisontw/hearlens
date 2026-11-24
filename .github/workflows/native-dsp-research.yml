@@ -5,10 +5,22 @@ on:
     paths:
       - ".github/workflows/native-dsp-research.yml"
       - "research/detached-native-fir/**"
+      - "packages/dsp/offline-dynamic-fir.mjs"
+      - "packages/dsp/offline-auto-fir.testkit.mjs"
+      - "packages/dsp/offline-auto-fir.mjs"
+      - "packages/dsp/offline-six-band-level.mjs"
+      - "packages/dsp/offline-wdrc.mjs"
+      - "packages/prescription-targets/prescription-targets.mjs"
   pull_request:
     paths:
       - ".github/workflows/native-dsp-research.yml"
       - "research/detached-native-fir/**"
+      - "packages/dsp/offline-dynamic-fir.mjs"
+      - "packages/dsp/offline-auto-fir.testkit.mjs"
+      - "packages/dsp/offline-auto-fir.mjs"
+      - "packages/dsp/offline-six-band-level.mjs"
+      - "packages/dsp/offline-wdrc.mjs"
+      - "packages/prescription-targets/prescription-targets.mjs"
 
 permissions:
   contents: read
