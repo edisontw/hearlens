@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 10914)
-Total output lines: 1541
-
 {
   "result": "PASS",
   "mode": "unpaced-throughput; callbacks are processed back-to-back",
@@ -702,7 +699,137 @@ Total output lines: 1541
               "p50": 0,
               "p95": 0,
               "p99": 0,
-        …914 tokens truncated…    "p95": 3.475225,
+              "p99_9": 0,
+              "max": 0
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "p99_9": 0,
+              "max": 0
+            }
+          },
+          "noUpdate": {
+            "count": 8000,
+            "wallUs": {
+              "p50": 80.4,
+              "p95": 140.642,
+              "p99": 255.164,
+              "p99_9": 662.266,
+              "max": 1866.426
+            },
+            "threadCpuUs": {
+              "p50": 80.209,
+              "p95": 139.768,
+              "p99": 250.532,
+              "p99_9": 661.372,
+              "max": 1864.558
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.01,
+              "p95": 3.51605,
+              "p99": 6.3791,
+              "p99_9": 16.55665,
+              "max": 46.66065
+            }
+          }
+        }
+      },
+      {
+        "mode": "dynamic-fir",
+        "controlUpdatesPerEar": 3400,
+        "firRetargetsPerEarIncludingInitial": 3401,
+        "limitedSamplesIncludingWarmupLR": [
+          480698,
+          563098
+        ],
+        "blockFrames": 192,
+        "deadlineUs": 4000,
+        "warmupCallbacks": 500,
+        "measuredCallbacks": 8000,
+        "samplesPerEar": 1536000,
+        "wallElapsedSeconds": 0.85120719,
+        "threadCpuSeconds": 0.851134775,
+        "threadCpuToWallRatio": 0.9999149267,
+        "throughputFramesPerSecond": 1804496.036,
+        "realTimeFactor": 37.59366741,
+        "deadlineMisses": 0,
+        "deadlineMissRate": 0,
+        "maxConsecutiveDeadlineMisses": 0,
+        "deadlineUtilizationP99Percent": 6.0611,
+        "allocationCount": 0,
+        "finiteOutput": true,
+        "maxAbsOutput": 0.2999998927,
+        "checksum": 1.244296315,
+        "callbacks": {
+          "all": {
+            "count": 8000,
+            "wallUs": {
+              "p50": 98.067,
+              "p95": 141.563,
+              "p99": 242.444,
+              "p99_9": 504.728,
+              "max": 3589.637
+            },
+            "threadCpuUs": {
+              "p50": 97.875,
+              "p95": 141.059,
+              "p99": 241.789,
+              "p99_9": 503.147,
+              "max": 3557.513
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.451675,
+              "p95": 3.539075,
+              "p99": 6.0611,
+              "p99_9": 12.6182,
+              "max": 89.740925
+            }
+          },
+          "update": {
+            "count": 3200,
+            "wallUs": {
+              "p50": 98.988,
+              "p95": 145.559,
+              "p99": 246.882,
+              "p99_9": 504.728,
+              "max": 3589.637
+            },
+            "threadCpuUs": {
+              "p50": 98.807,
+              "p95": 144.955,
+              "p99": 246.256,
+              "p99_9": 503.147,
+              "max": 3557.513
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.4747,
+              "p95": 3.638975,
+              "p99": 6.17205,
+              "p99_9": 12.6182,
+              "max": 89.740925
+            }
+          },
+          "noUpdate": {
+            "count": 4800,
+            "wallUs": {
+              "p50": 97.396,
+              "p95": 139.009,
+              "p99": 232.069,
+              "p99_9": 546.231,
+              "max": 1511.543
+            },
+            "threadCpuUs": {
+              "p50": 97.214,
+              "p95": 138.305,
+              "p99": 231.143,
+              "p99_9": 545.52,
+              "max": 1510.594
+            },
+            "deadlineUtilizationPercent": {
+              "p50": 2.4349,
+              "p95": 3.475225,
               "p99": 5.801725,
               "p99_9": 13.655775,
               "max": 37.788575

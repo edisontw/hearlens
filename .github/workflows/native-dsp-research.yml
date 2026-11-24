@@ -61,11 +61,14 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/hearlens-native-x64"
           node research/detached-native-fir/auto-bench.mjs \
+            --fixture-output="$RUNNER_TEMP/hearlens-native-x64/benchmark-fixture.bin" \
             --output="$RUNNER_TEMP/hearlens-native-x64/benchmark.json"
       - uses: actions/upload-artifact@v4
         with:
           name: hearlens-n04-linux-x64
-          path: ${{ runner.temp }}/hearlens-native-x64/benchmark.json
+          path: |
+            ${{ runner.temp }}/hearlens-native-x64/benchmark.json
+            ${{ runner.temp }}/hearlens-native-x64/benchmark-fixture.bin
           if-no-files-found: error
           retention-days: 30
 
@@ -108,6 +111,10 @@ jobs:
         with:
           name: hearlens-n04-portable-js-oracle
           path: ${{ runner.temp }}/hearlens-portable-fixture
+      - uses: actions/download-artifact@v4
+        with:
+          name: hearlens-n04-linux-x64
+          path: ${{ runner.temp }}/hearlens-native-x64
       - name: Record ARM64 host and compiler
         run: |
           uname -a
@@ -127,7 +134,25 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/hearlens-native-arm64"
           node research/detached-native-fir/auto-bench.mjs \
+            --fixture="$RUNNER_TEMP/hearlens-native-x64/benchmark-fixture.bin" \
             --output="$RUNNER_TEMP/hearlens-native-arm64/benchmark.json"
+      - name: Verify both hosts measured identical benchmark fixture bytes
+        run: |
+          node - "$RUNNER_TEMP/hearlens-native-x64/benchmark.json" \
+            "$RUNNER_TEMP/hearlens-native-arm64/benchmark.json" \
+            "$RUNNER_TEMP/hearlens-native-x64/benchmark-fixture.bin" <<'NODE'
+          const assert = require('node:assert/strict');
+          const { createHash } = require('node:crypto');
+          const { readFileSync } = require('node:fs');
+          const [x64Path, arm64Path, fixturePath] = process.argv.slice(2);
+          const x64 = JSON.parse(readFileSync(x64Path, 'utf8'));
+          const arm64 = JSON.parse(readFileSync(arm64Path, 'utf8'));
+          const rawHash = createHash('sha256').update(readFileSync(fixturePath)).digest('hex');
+          assert.equal(x64.fixture.sha256, rawHash);
+          assert.equal(arm64.fixture.sha256, rawHash);
+          assert.equal(x64.fixture.measuredSecondsPerEar, arm64.fixture.measuredSecondsPerEar);
+          console.log(`Verified shared benchmark fixture SHA-256 ${rawHash}`);
+          NODE
       - uses: actions/upload-artifact@v4
         with:
           name: hearlens-n04-linux-arm64

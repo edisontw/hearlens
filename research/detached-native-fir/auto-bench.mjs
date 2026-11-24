@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism, cpus, platform, release, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,6 +156,8 @@ function makeFixture() {
 }
 
 const outputArgument = process.argv.find(arg => arg.startsWith("--output="));
+const fixtureInputArgument = process.argv.find(arg => arg.startsWith("--fixture="));
+const fixtureOutputArgument = process.argv.find(arg => arg.startsWith("--fixture-output="));
 const pacedSecondsArgument = process.argv.find(arg => arg.startsWith("--paced-seconds="));
 const pacedBlockArgument = process.argv.find(arg => arg.startsWith("--paced-block="));
 const stallAfterArgument = process.argv.find(arg => arg.startsWith("--stall-after-callbacks="));
@@ -183,8 +185,15 @@ if (stallAfterArgument) {
   assert(Number.isSafeInteger(stallMilliseconds) && stallMilliseconds > 0 &&
     stallMilliseconds <= 2_000);
 }
-const fixture = makeFixture();
+const fixture = fixtureInputArgument
+  ? readFileSync(fixtureInputArgument.slice("--fixture=".length))
+  : makeFixture();
 const fixtureHash = createHash("sha256").update(fixture).digest("hex");
+if (fixtureOutputArgument) {
+  const fixtureOutputPath = fixtureOutputArgument.slice("--fixture-output=".length);
+  mkdirSync(dirname(fixtureOutputPath), { recursive: true });
+  writeFileSync(fixtureOutputPath, fixture);
+}
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "hearlens-autofir-bench-"));
 try {
   const fixturePath = join(temporaryDirectory, "synthetic-auto-fir.bin");
@@ -272,6 +281,7 @@ try {
       attackMs: ATTACK_MS,
       releaseMs: RELEASE_MS,
       transitionSamples: TRANSITION_SAMPLES,
+      source: fixtureInputArgument ? "shared-input-file" : "generated-on-current-host",
       sha256: fixtureHash,
       scenarios: ["silence", "single tones", "multitone", "level step",
         "short pulse train", "sustained overload", "modulated tone"],
