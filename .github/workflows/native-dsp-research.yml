@@ -26,12 +26,92 @@ permissions:
   contents: read
 
 jobs:
-  fixed-fir-research:
+  linux-x64:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Strict compile, parity, partition, isolation and allocation checks
+      - name: Strict Native Release compile and parity suite
         run: make -C research/detached-native-fir clean verify
+      - name: Run unpaced x86_64 Native benchmark
+        run: |
+          mkdir -p "$RUNNER_TEMP/hearlens-native-x64"
+          node research/detached-native-fir/auto-bench.mjs \
+            --output="$RUNNER_TEMP/hearlens-native-x64/benchmark.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-n04-linux-x64
+          path: ${{ runner.temp }}/hearlens-native-x64/benchmark.json
+          if-no-files-found: error
+          retention-days: 30
+
+  linux-aarch64-cross:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux AArch64 cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
+      - name: Cross-compile Native parity and benchmark executables
+        working-directory: research/detached-native-fir
+        run: |
+          flags=(-std=c++17 -O2 -fno-fast-math -ffp-contract=off -Wall -Wextra -Wpedantic -Werror)
+          aarch64-linux-gnu-g++ "${flags[@]}" auto_check.cpp -o auto-check-aarch64-linux
+          aarch64-linux-gnu-g++ "${flags[@]}" auto_bench.cpp -o auto-bench-aarch64-linux
+          aarch64-linux-gnu-readelf -h auto-check-aarch64-linux | grep 'Machine:.*AArch64'
+          aarch64-linux-gnu-readelf -h auto-bench-aarch64-linux | grep 'Machine:.*AArch64'
+          mkdir -p "$RUNNER_TEMP/hearlens-native-aarch64-cross"
+          cp auto-check-aarch64-linux auto-bench-aarch64-linux "$RUNNER_TEMP/hearlens-native-aarch64-cross/"
+          aarch64-linux-gnu-g++ --version | head -n 1 > "$RUNNER_TEMP/hearlens-native-aarch64-cross/compiler.txt"
+          sha256sum "$RUNNER_TEMP/hearlens-native-aarch64-cross/"* > "$RUNNER_TEMP/hearlens-native-aarch64-cross/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-n04-linux-aarch64-cross
+          path: ${{ runner.temp }}/hearlens-native-aarch64-cross
+          if-no-files-found: error
+          retention-days: 30
+
+  linux-aarch64-native:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Record ARM64 host and compiler
+        run: |
+          uname -a
+          lscpu
+          g++ --version | head -n 1
+      - name: Native ARM64 strict compile and parity suite
+        run: make -C research/detached-native-fir clean verify
+      - name: Run unpaced ARM64 Native benchmark
+        run: |
+          mkdir -p "$RUNNER_TEMP/hearlens-native-arm64"
+          node research/detached-native-fir/auto-bench.mjs \
+            --output="$RUNNER_TEMP/hearlens-native-arm64/benchmark.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-n04-linux-arm64
+          path: ${{ runner.temp }}/hearlens-native-arm64/benchmark.json
+          if-no-files-found: error
+          retention-days: 30
+
+  android-ndk-arm64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build API 29 arm64-v8a headless executable and JS oracle fixture
+        run: bash research/detached-native-fir/build-android.sh "$RUNNER_TEMP/hearlens-android-arm64"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-n04-android-arm64-v8a
+          path: ${{ runner.temp }}/hearlens-android-arm64
+          if-no-files-found: error
+          retention-days: 30

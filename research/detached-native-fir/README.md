@@ -66,3 +66,59 @@ Earlier runs on the same host recorded 0 and 4 misses out of 2,000 64-frame call
 The Native and JS Float32 outputs were bit-identical for 144,000 samples per ear at every partition: max error 0, RMS error 0, and 0 samples over the predeclared `1e-7` maximum / `2e-8` RMS thresholds. The largest six-band nominal-level error was `1.4210854715202004e-14` (threshold `1e-8`). Each partition processed 300 control updates at samples 480, 960, …, 144,000, with one initial FIR target and therefore 301 FIR installs. Limiter counts were 23,098 left and 27,696 right, matching the JS oracle. Callback instrumentation observed zero calls through the intercepted C++ allocation operators. Reset equivalence, stereo isolation, overlapping-buffer rejection, NaN/Inf/out-of-range rejection, fail-stop/recovery, and detector/configuration boundary checks passed.
 
 Validation on the available x86_64 host: `make clean verify`, `make sanitize-check` (AddressSanitizer and UndefinedBehaviorSanitizer), and the four focused JS detector/dynamic-FIR/Auto-FIR tests all passed. The local managed environment reports `spawnSync ... EPERM` for Node-launched child binaries while still returning status 0 and complete output; ordinary shell execution and GitHub Actions are used as independent process-launch checks. N03 establishes host-side implementation parity only. It does not establish ARM64 or Android runtime behavior, target-phone performance, audio route, SPL, MPO, acoustic latency, or safe hearing output.
+
+## Native ARM64 and Android probe (N04)
+
+N04 benchmarks only generated 48 kHz stereo PCM. The same fixture drives all three modes: fixed 513-tap FIR, Dynamic FIR with a sample-clock target update every 480 frames, and full Auto-FIR with both six-band detectors, 480-sample updates, target coefficient rebuilding/restart, convolution and limiter. Each block/mode gets 96,000 warmup samples and 1,536,000 measured samples per ear (2 and 32 seconds equivalent). The script also emits a separate deadline-paced mode; it is not conflated with the unpaced throughput run.
+
+Captured on 2026-11-24 on the managed Linux 6.18.57 x86_64 KVM host: AMD EPYC 9V74, 3 visible logical CPUs, 2 available CPUs and a cgroup quota of 2 CPUs; GCC 14.2.0, Node 24.22.3. The 15 unpaced rows completed in about 0.68–0.98 wall seconds each. P50/P95/P99/max below are callback wall time. Every full Auto-FIR row had 24,000/12,000/8,000/6,000/3,200 measured callbacks respectively and zero observed callback allocations. The 64-frame full Auto-FIR row recorded 3 deadline-sized overruns; all other full Auto-FIR block sizes recorded zero.
+
+| Frames | Deadline | P50 | P95 | P99 | Max | Deadline misses | Thread CPU | Real-time factor |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 64 | 1,333.333 µs | 35.493 µs | 63.967 µs | 141.723 µs | 3,007.630 µs | 8 / 24,000 | 0.997 s | 32.08× |
+| 128 | 2,666.667 µs | 71.217 µs | 115.915 µs | 179.329 µs | 2,483.544 µs | 0 / 12,000 | 0.936 s | 34.20× |
+| 192 | 4,000.000 µs | 106.781 µs | 157.137 µs | 253.340 µs | 2,479.979 µs | 0 / 8,000 | 0.928 s | 34.46× |
+| 256 | 5,333.333 µs | 142.384 µs | 201.302 µs | 299.740 µs | 883.278 µs | 0 / 6,000 | 0.916 s | 34.93× |
+| 480 | 10,000.000 µs | 272.167 µs | 382.142 µs | 501.441 µs | 1,270.231 µs | 0 / 3,200 | 0.930 s | 34.40× |
+
+The largest full Auto-FIR P99 deadline utilization was 10.63% (64 frames), below the exploratory 50% target on this host. Across all 15 rows, the C++ allocation probe recorded zero callback allocations; all allocation operator positive controls passed. The C++ process peak RSS was 33,079,296 bytes (31.55 MiB) for the complete benchmark process. The fixture, compiler flags, CPU quota, all percentiles, update/no-update breakdowns, checksums and per-mode results are retained in [`results/n04-host-x64-2026-11-24.json`](./results/n04-host-x64-2026-11-24.json).
+
+The fixed/Dynamic/full P99 cost attribution is:
+
+| Frames | Fixed FIR P99 / CPU / misses | Dynamic FIR P99 / CPU / misses | Full Auto-FIR P99 / CPU / misses |
+| ---: | ---: | ---: | ---: |
+| 64 | 60.902 µs / 0.690 s / 2 | 117.397 µs / 0.893 s / 2 | 141.723 µs / 0.997 s / 8 |
+| 128 | 116.435 µs / 0.679 s / 0 | 155.874 µs / 0.846 s / 1 | 179.329 µs / 0.936 s / 0 |
+| 192 | 255.164 µs / 0.727 s / 0 | 242.444 µs / 0.851 s / 0 | 253.340 µs / 0.928 s / 0 |
+| 256 | 229.755 µs / 0.688 s / 0 | 283.676 µs / 0.843 s / 0 | 299.740 µs / 0.916 s / 0 |
+| 480 | 406.181 µs / 0.691 s / 0 | 545.897 µs / 0.887 s / 0 | 501.441 µs / 0.930 s / 0 |
+
+These rows are short unpaced throughput observations, not wall-clock audio playback, mobile performance, or thermal stability. Misses are per-call execution times compared with the theoretical callback deadline while processing back-to-back; this shared VM does not support reliable attribution to algorithm vs host scheduling. The separate paced path completed a 7-second smoke run with synthetic level changes, 700 control updates, zero deadline misses and zero callback allocations. A 5-minute run was not executed because the available shared KVM has a 2-CPU quota and no meaningful target-device thermal state. To run it on a dedicated, thermally representative Linux host, from this directory use:
+
+```sh
+make auto-bench
+node auto-bench.mjs --paced-seconds=300 --paced-block=128 --output=results/paced-128-5min.json
+```
+
+Linux AArch64 cross-compile, native ARM64 parity/benchmark, and API 29 `arm64-v8a` Android NDK build are independent CI jobs using standard public GitHub-hosted runners; benchmark timings do not gate CI. The Android artifact includes an ELF executable plus a reproducible 128-frame JS-oracle fixture. `build-android.sh /tmp/hearlens-android` records ABI, API level, compiler flags, dependencies and binary SHA-256, and rejects audio output dependencies. NDK cross-compile is not Android runtime evidence. For a later authorized headless runtime check, copy the artifact directory from CI, then:
+
+```sh
+adb push hearlens-auto-check-arm64-v8a /data/local/tmp/hearlens-auto-check
+adb push portable-fixture/auto-fir-fixture.bin /data/local/tmp/auto-fir-fixture.bin
+adb exec-out /data/local/tmp/hearlens-auto-check /data/local/tmp/auto-fir-fixture.bin > native.bin
+node verify-portable-output.mjs portable-fixture/manifest.json \
+  portable-fixture/auto-fir-fixture.bin \
+  portable-fixture/auto-fir-js-oracle.bin native.bin
+```
+
+This executable only consumes synthetic PCM; no audio route or playback is present. Until CI supplies its architecture-specific evidence, status is pending. Android runtime and target-phone performance remain untested/deferred. These Native results cannot establish SPL, acoustic MPO, real routing, acoustic latency or safe hearing output.
+
+## Reproduction commands
+
+```sh
+make clean verify
+make sanitize-check
+node auto-bench.mjs --output=results/current-host.json
+# Five-minute paced run is an independent experiment and has not been run here.
+node auto-bench.mjs --paced-seconds=300 --paced-block=128 --output=results/paced-128-5min.json
+```
