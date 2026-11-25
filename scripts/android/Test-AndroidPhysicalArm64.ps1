@@ -102,6 +102,39 @@ function Save-DeviceSnapshot {
     }
 }
 
+function Get-DeadlineMissAnalysis {
+    param([object]$Result)
+    $periodUs = [double]$Result.deadlineUs
+    $threadCpuP99Us = [double]$Result.callbacks.all.threadCpuUs.p99
+    $threadCpuMaxUs = [double]$Result.callbacks.all.threadCpuUs.max
+    $missCount = [int]$Result.deadlineMisses
+    $maxConsecutiveMisses = [int]$Result.maxConsecutiveDeadlineMisses
+    $wakeLatenessMaxUs = [double]$Result.scheduledWakeLatenessUs.max
+    $deadlineOverrunMaxUs = [double]$Result.deadlineOverrunUs.max
+    $threadCpuMaximumBelowDeadline = $threadCpuMaxUs -lt $periodUs
+
+    if (!$threadCpuMaximumBelowDeadline) {
+        $interpretation = "At least one measured DSP-thread CPU duration ($threadCpuMaxUs us) reached or exceeded the $periodUs us period; compute time can account for deadline pressure in that callback. This synthetic headless run is not an Android audio-callback result."
+    } elseif ($missCount -eq 0) {
+        $interpretation = "No deadline misses were observed. Maximum DSP-thread CPU time was $threadCpuMaxUs us against a $periodUs us period. This synthetic headless run is not an Android audio-callback result."
+    } elseif ($maxConsecutiveMisses -ge 3) {
+        $interpretation = "Observed $missCount deadline misses, with up to $maxConsecutiveMisses consecutive. Maximum DSP-thread CPU time ($threadCpuMaxUs us) stayed below the $periodUs us period; maximum wake lateness was $wakeLatenessMaxUs us. Scheduling or wakeup delay may contribute, but this headless run cannot establish cause or predict an Android audio callback."
+    } else {
+        $interpretation = "Observed $missCount isolated deadline misses, with at most $maxConsecutiveMisses consecutive. Maximum DSP-thread CPU time ($threadCpuMaxUs us) stayed below the $periodUs us period; maximum wake lateness was $wakeLatenessMaxUs us. Scheduling or wakeup delay may contribute, but this headless run cannot establish cause or predict an Android audio callback."
+    }
+
+    [ordered]@{
+        threadCpuP99Us = $threadCpuP99Us
+        threadCpuMaxUs = $threadCpuMaxUs
+        callbackWallP99Us = $Result.callbacks.all.wallUs.p99
+        callbackWallMaxUs = $Result.callbacks.all.wallUs.max
+        scheduledWakeLatenessMaxUs = $wakeLatenessMaxUs
+        deadlineOverrunMaxUs = $deadlineOverrunMaxUs
+        threadCpuMaximumBelowDeadline = $threadCpuMaximumBelowDeadline
+        interpretation = $interpretation
+    }
+}
+
 New-Item -ItemType Directory -Force -Path @(
     $ResultRoot, $resultDirectory, $fixtureRoot, $headlessRoot, $apkRoot, $benchmarkRoot
 ) | Out-Null
@@ -343,6 +376,7 @@ try {
         throw "Paced benchmark report did not meet duration/callback-count/allocation/finite-output checks: $($benchmarkResult | ConvertTo-Json -Depth 8 -Compress)"
     }
     $afterSnapshot = Save-DeviceSnapshot -Label 'after-benchmark'
+    $deadlineMissAnalysis = Get-DeadlineMissAnalysis -Result $benchmarkResult
     $report['thermalAfter'] = $afterSnapshot
     $report['syntheticPacedBenchmark'] = 'PASS'
     $report['benchmark'] = @{
@@ -364,16 +398,7 @@ try {
         monitoredCallbackAllocations = $benchmarkResult.allocationCount
         dspThreadCpuSeconds = $benchmarkResult.threadCpuSeconds
         dspThreadCpuPercentOfWall = 100 * $benchmarkResult.threadCpuToWallRatio
-        deadlineMissAnalysis = @{
-            threadCpuP99Us = $benchmarkResult.callbacks.all.threadCpuUs.p99
-            threadCpuMaxUs = $benchmarkResult.callbacks.all.threadCpuUs.max
-            callbackWallP99Us = $benchmarkResult.callbacks.all.wallUs.p99
-            callbackWallMaxUs = $benchmarkResult.callbacks.all.wallUs.max
-            scheduledWakeLatenessMaxUs = $benchmarkResult.scheduledWakeLatenessUs.max
-            deadlineOverrunMaxUs = $benchmarkResult.deadlineOverrunUs.max
-            threadCpuMaximumBelowDeadline = ($benchmarkResult.callbacks.all.threadCpuUs.max -lt $benchmarkResult.deadlineUs)
-            interpretation = 'Observed misses are sparse and coincide with large wake-lateness/wall-time outliers; measured DSP-thread CPU stayed below one period. This is consistent with host scheduling or wake delay, but the headless benchmark cannot attribute cause or predict an Android audio callback.'
-        }
+        deadlineMissAnalysis = $deadlineMissAnalysis
         autoBenchElfSha256 = (Get-FileHash -Algorithm SHA256 $benchmarkExe).Hash.ToLowerInvariant()
         fixtureSha256 = (Get-FileHash -Algorithm SHA256 $benchmarkFixture).Hash.ToLowerInvariant()
         resultSha256 = (Get-FileHash -Algorithm SHA256 $benchmarkResultPath).Hash.ToLowerInvariant()

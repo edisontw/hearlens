@@ -45,6 +45,11 @@ test("physical ARM64 runner requires a serial and has no audio-device path", () 
   assert.match(script, /hearingOutputAuthorized = \$false/);
   assert.match(script, /callbackCountDelta -gt 1/);
   assert.match(script, /wallElapsedSeconds/);
+  assert.match(script, /function Get-DeadlineMissAnalysis/);
+  assert.match(script, /if \(!\$threadCpuMaximumBelowDeadline\)/);
+  assert.match(script, /elseif \(\$missCount -eq 0\)/);
+  assert.match(script, /elseif \(\$maxConsecutiveMisses -ge 3\)/);
+  assert.doesNotMatch(script, /Observed misses are sparse/);
   assert.doesNotMatch(script, /AudioRecord|AudioTrack|AAudio|Oboe|MediaRecorder/i);
 });
 
