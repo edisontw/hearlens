@@ -158,6 +158,7 @@ function makeFixture() {
 const outputArgument = process.argv.find(arg => arg.startsWith("--output="));
 const fixtureInputArgument = process.argv.find(arg => arg.startsWith("--fixture="));
 const fixtureOutputArgument = process.argv.find(arg => arg.startsWith("--fixture-output="));
+const fixtureOnlyArgument = process.argv.includes("--fixture-only");
 const pacedSecondsArgument = process.argv.find(arg => arg.startsWith("--paced-seconds="));
 const pacedBlockArgument = process.argv.find(arg => arg.startsWith("--paced-block="));
 const stallAfterArgument = process.argv.find(arg => arg.startsWith("--stall-after-callbacks="));
@@ -193,6 +194,12 @@ if (fixtureOutputArgument) {
   const fixtureOutputPath = fixtureOutputArgument.slice("--fixture-output=".length);
   mkdirSync(dirname(fixtureOutputPath), { recursive: true });
   writeFileSync(fixtureOutputPath, fixture);
+}
+if (fixtureOnlyArgument) {
+  assert(fixtureOutputArgument, "--fixture-only requires --fixture-output");
+  process.stdout.write(JSON.stringify({ result: "FIXTURE_READY",
+    bytes: fixture.length, sha256: fixtureHash }) + "\n");
+  process.exit(0);
 }
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "hearlens-autofir-bench-"));
 try {
