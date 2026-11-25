@@ -120,7 +120,14 @@ bool overlappingCallbacksFailClosed() {
     firstResult = core.processOutput(firstOutput.data(), 128, 48'000,
                                      Clock::time_point{}, &fixedClock);
   });
-  while (!gate.entered.load(std::memory_order_acquire)) std::this_thread::yield();
+  const auto gateDeadline = Clock::now() + std::chrono::seconds(2);
+  while (!gate.entered.load(std::memory_order_acquire) &&
+         Clock::now() < gateDeadline) std::this_thread::yield();
+  if (!gate.entered.load(std::memory_order_acquire)) {
+    gate.release.store(true, std::memory_order_release);
+    first.join();
+    return false;
+  }
   const auto secondResult = core.processOutput(secondOutput.data(), 128, 48'000,
                                                 Clock::time_point{}, &fixedClock);
   gate.release.store(true, std::memory_order_release);
