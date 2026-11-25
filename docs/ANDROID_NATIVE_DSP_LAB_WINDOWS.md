@@ -54,7 +54,7 @@ From the repository root in PowerShell:
 ## Test scope and limits
 
 - API 29 x86_64 Android emulator runtime: the existing C++17 Auto-FIR executable processes the canonical synthetic fixture. `verify-portable-output.mjs` checks the complete protocol and authoritative thresholds: 144,000 samples per ear, 300 control updates per ear, exact diagnostics and control indices, zero PCM error, limiter/reset/fail-stop behavior, SHA-256 and no authorized output route.
-- Android instrumentation: five tests cover JNI loading, fixture parity, session lifecycle/fault handling, reset without reauthorization, activity recreation and background invalidation. The APK requests no permissions and includes no microphone or output API.
+- Android instrumentation: six tests cover JNI loading, fixture parity, serialized concurrent fault-matrix invocations, session lifecycle/fault handling, reset without reauthorization, activity recreation and background invalidation. The APK requests no permissions and includes no microphone or output API.
 - C++ sanitizers: Android NDK AddressSanitizer and UndefinedBehaviorSanitizer run on the Auto-FIR and Native session executables. Leak detection is disabled for the shell runtime; UBSan `vptr` is excluded because NDK libc++ reports an internal `ostreambuf_iterator` virtual-base cast when using `std::cout`. Other ASan and UBSan checks remain enabled. ThreadSanitizer is not run on this Android runtime.
 - `arm64-v8a`: the headless executable and app APK are cross-built and ABI-checked. No isolated Android ARM64 runtime was available, so ARM64 runtime correctness is **NOT RUN**.
 - Physical phone performance, acoustic output, SPL/MPO, latency, Bluetooth routing and physical hard-mute evidence remain **NOT RUN**. M04 remains blocked.

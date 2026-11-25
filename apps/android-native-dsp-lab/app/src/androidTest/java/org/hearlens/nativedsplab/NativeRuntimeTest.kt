@@ -12,6 +12,9 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class NativeRuntimeTest {
@@ -58,6 +61,23 @@ class NativeRuntimeTest {
     }
 
     @Test
+    fun concurrentNativeFaultMatricesAreSerialized() {
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val futures = List(2) {
+                executor.submit(Callable { NativeBridge.nativeRunSessionMatrix() })
+            }
+            for (future in futures) {
+                val summary = future.get(30, TimeUnit.SECONDS)
+                assertNotNull(summary)
+                assertTrue(summary!!.contains("2000 concurrent invalidations PASS"))
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun startResetRouteChangesAndFaultsFailClosed() {
         val session = NativeSessionController()
         val cleanPcm = FloatArray(256) { 0.02f }
@@ -66,7 +86,13 @@ class NativeRuntimeTest {
             assertEquals(0, session.processSynthetic(cleanPcm))
             assertFalse(session.startSynthetic(0L))
             assertTrue(session.startSynthetic(42L))
+            assertTrue(session.startSynthetic(42L))
             assertEquals(128, session.processSynthetic(cleanPcm))
+
+            assertFalse(session.startSynthetic(43L))
+            assertFalse(session.isAuthorized)
+            assertEquals(0, session.processSynthetic(cleanPcm))
+            assertTrue(session.startSynthetic(43L))
 
             val startedGeneration = session.generation
             session.reset()

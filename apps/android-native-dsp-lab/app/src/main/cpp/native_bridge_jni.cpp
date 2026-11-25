@@ -118,6 +118,17 @@ Java_org_hearlens_nativedsplab_NativeBridge_nativeStartSession(
   if (session == nullptr || expectedGeneration < 0 || routeStamp <= 0) {
     return JNI_FALSE;
   }
+  if (session->authorized) {
+    if (session->session.isCurrent(session->ticket)) {
+      if (session->routeStamp == static_cast<std::uint64_t>(routeStamp)) {
+        return JNI_TRUE;
+      }
+      session->session.invalidate(session->ticket);
+      session->authorized = false;
+      return JNI_FALSE;
+    }
+    session->authorized = false;
+  }
   session->ticket = session->session.authorizeSynthetic(
       static_cast<std::uint64_t>(expectedGeneration),
       static_cast<std::uint64_t>(routeStamp), true);

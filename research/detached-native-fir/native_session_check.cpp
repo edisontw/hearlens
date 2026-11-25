@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 namespace {
@@ -81,6 +82,8 @@ void stress(NativeSession& session, const Buffer& pcm) {
 }  // namespace
 
 int runNativeSessionCheck(std::ostream& result) {
+  static std::mutex regressionMutex;
+  const std::lock_guard<std::mutex> lock(regressionMutex);
   BandBasis basis{};
   basis[0][kUniqueTapCount - 1] = 1.0;
   const std::array<BandTargets, 2> targets{};

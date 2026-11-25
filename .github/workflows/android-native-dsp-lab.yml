@@ -32,20 +32,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Configure the hosted Android SDK
-        run: |
-          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          test -x "$sdk_root/cmdline-tools/latest/bin/sdkmanager"
-          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
-          echo "$sdk_root/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
-          "$sdk_root/cmdline-tools/latest/bin/sdkmanager" --version
+      - uses: android-actions/setup-android@v3
       - name: Install pinned Android build packages
         run: |
           yes | sdkmanager --licenses >/dev/null
           sdkmanager --install \
-            --sdk_root="$ANDROID_HOME" \
             'platforms;android-35' \
             'build-tools;35.0.0' \
             'ndk;27.2.12479018' \
