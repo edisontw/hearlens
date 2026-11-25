@@ -35,6 +35,10 @@ jobs:
           node-version: 24
       - name: Strict Native Release compile and parity suite
         run: make -C research/detached-native-fir clean verify
+      - name: Run Native address, undefined-behavior and thread sanitizers
+        run: |
+          make -C research/detached-native-fir sanitize-check
+          make -C research/detached-native-fir session-tsan-check
       - name: Generate and verify portable JS-oracle fixture
         run: |
           fixture="$RUNNER_TEMP/hearlens-portable-fixture"
