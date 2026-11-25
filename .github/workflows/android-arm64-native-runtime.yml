@@ -19,7 +19,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
       - name: Probe official SDK, ARM64 host acceleration and API 29 guest
         id: probe
         shell: bash
