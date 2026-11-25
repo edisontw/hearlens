@@ -57,14 +57,18 @@ jobs:
           "$sdkmanager" --version 2>&1 | tee "$evidence/sdkmanager-version.txt"
           echo "Android SDK licenses accepted by setup-android." >"$evidence/sdk-licenses.txt"
           set +e
-          "$sdkmanager" --install --sdk_root="$sdk_root" emulator \
+          "$sdkmanager" --verbose --install --sdk_root="$sdk_root" emulator \
             >"$evidence/emulator-install.txt" 2>&1
           emulator_install_status=$?
           set -e
           echo "sdkmanager_emulator_install_exit=$emulator_install_status" \
             | tee -a "$evidence/runner-probe.txt"
+          cat "$evidence/emulator-install.txt" || true
 
           emulator_bin="$sdk_root/emulator/emulator"
+          if [[ ! -x "$emulator_bin" ]] && command -v emulator >/dev/null 2>&1; then
+            emulator_bin="$(command -v emulator)"
+          fi
           if [[ -x "$emulator_bin" ]]; then
             file "$emulator_bin" | tee "$evidence/emulator-host-file.txt"
             readelf -h "$emulator_bin" >"$evidence/emulator-host-elf.txt" 2>&1 || true
