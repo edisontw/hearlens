@@ -23,6 +23,7 @@ enum class Kind : std::size_t {
 std::array<std::size_t, static_cast<std::size_t>(Kind::count)> counts{};
 bool tracking = false;
 
+#ifndef HEARLENS_DISABLE_ALLOCATION_PROBE
 void record(Kind kind) noexcept {
   if (tracking) ++counts[static_cast<std::size_t>(kind)];
 }
@@ -45,6 +46,7 @@ void* allocateAligned(std::size_t size, std::size_t alignment, Kind kind) {
   if (void* memory = std::aligned_alloc(alignment, rounded)) return memory;
   throw std::bad_alloc();
 }
+#endif
 
 }  // namespace allocation_probe
 
@@ -277,6 +279,7 @@ bool writeOutput(std::ostream& output, const StereoAutoFirResearch& processor,
   return static_cast<bool>(output);
 }
 
+#ifndef HEARLENS_DISABLE_ALLOCATION_PROBE
 bool checkAllocationPositiveControls() {
   using allocation_probe::Kind;
   const auto before = allocation_probe::counts;
@@ -333,8 +336,9 @@ bool checkAllocationPositiveControls() {
   }
   return true;
 }
+#endif
 
-bool run(std::istream& fixture) {
+bool run(std::istream& fixture, std::ostream& result) {
   static_assert(sizeof(double) == sizeof(std::uint64_t));
   static_assert(sizeof(float) == sizeof(std::uint32_t));
   if (!std::numeric_limits<double>::is_iec559 ||
@@ -406,8 +410,13 @@ bool run(std::istream& fixture) {
       {sampleIndices[0].data(), levelLogs[0].data(), logCapacity},
       {sampleIndices[1].data(), levelLogs[1].data(), logCapacity},
   }};
-  if (!checkAllocationPositiveControls() ||
-      !checkDetectorResetAndFailure() || !checkStereoContract(basis, targets)) {
+#ifndef HEARLENS_DISABLE_ALLOCATION_PROBE
+  const bool allocationControlsValid = checkAllocationPositiveControls();
+#else
+  const bool allocationControlsValid = true;
+#endif
+  if (!allocationControlsValid || !checkDetectorResetAndFailure() ||
+      !checkStereoContract(basis, targets)) {
     std::fprintf(stderr, "detector or stereo fail-stop/reset controls failed\n");
     return false;
   }
@@ -419,7 +428,9 @@ bool run(std::istream& fixture) {
     std::fprintf(stderr, "Native Auto-FIR rejected fixture config\n");
     return false;
   }
+#ifndef HEARLENS_DISABLE_ALLOCATION_PROBE
   const auto allocationsBefore = allocation_probe::counts;
+#endif
   for (std::size_t position = 0; position < sampleCount;) {
     const std::size_t frames =
         std::min<std::size_t>(callbackFrames, sampleCount - position);
@@ -436,6 +447,7 @@ bool run(std::istream& fixture) {
     position += frames;
   }
   std::size_t callbackAllocations = 0;
+#ifndef HEARLENS_DISABLE_ALLOCATION_PROBE
   for (std::size_t index = 0; index < allocationsBefore.size(); ++index) {
     callbackAllocations += allocation_probe::counts[index] - allocationsBefore[index];
   }
@@ -444,6 +456,11 @@ bool run(std::istream& fixture) {
                  callbackAllocations);
     return false;
   }
+#else
+  // The JNI library deliberately avoids replacing process-wide operator new.
+  // Mark its protocol field as unavailable instead of reporting a false zero.
+  callbackAllocations = std::numeric_limits<std::size_t>::max();
+#endif
   if (processor.acceptedSamples() != sampleCount ||
       processor.left().updates() != expectedUpdates ||
       processor.right().updates() != expectedUpdates ||
@@ -454,12 +471,17 @@ bool run(std::istream& fixture) {
     std::fprintf(stderr, "Native Auto-FIR diagnostic invariant failed\n");
     return false;
   }
-  return writeOutput(std::cout, processor, output, sampleIndices, levelLogs,
+  return writeOutput(result, processor, output, sampleIndices, levelLogs,
                      callbackAllocations);
 }
 
 }  // namespace
 
+bool runPortableFixture(std::istream& fixture, std::ostream& result) {
+  return run(fixture, result);
+}
+
+#ifndef HEARLENS_DISABLE_ALLOCATION_PROBE
 void* operator new(std::size_t size) {
   return allocation_probe::allocate(size, allocation_probe::Kind::scalar);
 }
@@ -514,7 +536,9 @@ void operator delete(void* memory, std::align_val_t, const std::nothrow_t&) noex
 void operator delete[](void* memory, std::align_val_t, const std::nothrow_t&) noexcept {
   std::free(memory);
 }
+#endif
 
+#ifndef HEARLENS_ANDROID_JNI
 int main(int argc, char** argv) {
   if (argc != 2) {
     std::fprintf(stderr, "usage: auto-check FIXTURE.bin\n");
@@ -525,5 +549,6 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "failed to open Native Auto-FIR fixture\n");
     return 1;
   }
-  return run(fixture) ? 0 : 1;
+  return runPortableFixture(fixture, std::cout) ? 0 : 1;
 }
+#endif

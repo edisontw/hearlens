@@ -1,0 +1,88 @@
+name: Android Native DSP Lab
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-native-dsp-lab.yml'
+      - 'apps/android-native-dsp-lab/**'
+      - 'research/detached-native-fir/**'
+      - 'scripts/android/**'
+      - 'tools/android-native-dsp-lab-contract.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-native-dsp-lab.yml'
+      - 'apps/android-native-dsp-lab/**'
+      - 'research/detached-native-fir/**'
+      - 'scripts/android/**'
+      - 'tools/android-native-dsp-lab-contract.test.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configure the hosted Android SDK
+        run: |
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          test -x "$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
+          echo "$sdk_root/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
+          "$sdk_root/cmdline-tools/latest/bin/sdkmanager" --version
+      - name: Install pinned Android build packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager --install \
+            --sdk_root="$ANDROID_HOME" \
+            'platforms;android-35' \
+            'build-tools;35.0.0' \
+            'ndk;27.2.12479018' \
+            'cmake;3.22.1'
+      - name: Verify the synthetic-only source contract
+        run: node --test tools/android-native-dsp-lab-contract.test.mjs
+      - name: Generate the canonical JS-oracle instrumentation fixture
+        run: |
+          fixture="$RUNNER_TEMP/hearlens-portable-fixture"
+          node research/detached-native-fir/auto-check.mjs "--export-portable=$fixture"
+          mkdir -p apps/android-native-dsp-lab/app/build/generated/androidTestAssets/portable-fixture
+          cp "$fixture"/* apps/android-native-dsp-lab/app/build/generated/androidTestAssets/portable-fixture/
+      - name: Build x86_64 APK and instrumentation package
+        working-directory: apps/android-native-dsp-lab
+        run: |
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest -PtargetAbis=x86_64
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/hearlens-native-dsp-lab-x86_64-debug.apk"
+      - name: Build arm64-v8a APK
+        working-directory: apps/android-native-dsp-lab
+        run: |
+          ./gradlew --no-daemon :app:assembleDebug -PtargetAbis=arm64-v8a
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/hearlens-native-dsp-lab-arm64-v8a-debug.apk"
+      - name: Check APK permissions and packaged ABIs
+        run: |
+          set -euo pipefail
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          x86="$RUNNER_TEMP/hearlens-native-dsp-lab-x86_64-debug.apk"
+          arm="$RUNNER_TEMP/hearlens-native-dsp-lab-arm64-v8a-debug.apk"
+          ! "$aapt" dump permissions "$x86" | grep -Ei 'RECORD_AUDIO|MODIFY_AUDIO_SETTINGS|BLUETOOTH'
+          ! "$aapt" dump permissions "$arm" | grep -Ei 'RECORD_AUDIO|MODIFY_AUDIO_SETTINGS|BLUETOOTH'
+          unzip -Z1 "$x86" | grep -qx 'lib/x86_64/libhearlens_native.so'
+          unzip -Z1 "$arm" | grep -qx 'lib/arm64-v8a/libhearlens_native.so'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-android-native-dsp-lab-debug
+          path: |
+            ${{ runner.temp }}/hearlens-native-dsp-lab-x86_64-debug.apk
+            ${{ runner.temp }}/hearlens-native-dsp-lab-arm64-v8a-debug.apk
+          if-no-files-found: error
+          retention-days: 30

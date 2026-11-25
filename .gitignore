@@ -1,4 +1,9 @@
 node_modules/
+**/.gradle/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+local.properties
 .DS_Store
 *.log
 .env

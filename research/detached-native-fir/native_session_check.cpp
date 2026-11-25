@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 namespace {
@@ -80,7 +81,9 @@ void stress(NativeSession& session, const Buffer& pcm) {
 }
 }  // namespace
 
-int main() {
+int runNativeSessionCheck(std::ostream& result) {
+  static std::mutex regressionMutex;
+  const std::lock_guard<std::mutex> lock(regressionMutex);
   BandBasis basis{};
   basis[0][kUniqueTapCount - 1] = 1.0;
   const std::array<BandTargets, 2> targets{};
@@ -101,10 +104,12 @@ int main() {
   auto arm = [&] { return session.authorizeSynthetic(session.generation(), route, true); };
 
   auto ticket = arm();
+  assert(session.isCurrent(ticket));
   const auto candidate = process(ticket);
   assert(candidate.frames == 128 && session.isCurrent(candidate));
   assert(invalid.process(ticket, route, pcm.data(), pcm.size(), deadline).frames == 0);
   session.invalidate(); // stop/reset/settings change
+  assert(!session.isCurrent(ticket));
   assert(!session.isCurrent(candidate) && process(ticket).frames == 0);
   assert(process(session.authorizeSynthetic(muted, route, true)).frames == 0);
 
@@ -147,6 +152,13 @@ int main() {
   checkInFlight(session, pcm, false);
   checkInFlight(session, pcm, true);
   stress(session, pcm);
-  std::cout << "Native synthetic session fault matrix, two in-flight invalidations, "
-               "and 2000 concurrent invalidations PASS\n";
+  result << "Native synthetic session fault matrix, two in-flight invalidations, "
+            "and 2000 concurrent invalidations PASS\n";
+  return 0;
 }
+
+#ifndef HEARLENS_ANDROID_JNI
+int main() {
+  return runNativeSessionCheck(std::cout);
+}
+#endif

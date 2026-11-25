@@ -72,6 +72,10 @@ class NativeSession {
     return candidate.frames != 0 && isArmed(candidate.ticket);
   }
 
+  bool isCurrent(const Ticket& ticket) const noexcept {
+    return isArmed(ticket);
+  }
+
   Candidate process(const Ticket& ticket, std::uint64_t observedRouteStamp,
                     const float* interleaved, std::size_t sampleCount,
                     Clock::time_point deadline,
