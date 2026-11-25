@@ -167,3 +167,7 @@ Also collect:
 - response latency.
 
 Use counterbalanced order and parallel sentence lists.
+
+## Detached Native session regression
+
+Use the [Native session regression commands](./NATIVE_SESSION_INTEGRATION.md) for synthetic PCM, deterministic in-flight invalidation and sanitizer runs. The [M04-D2 manifest](./M04D2_PHYSICAL_OUTPUT_EVIDENCE_GATE_2026-10-16.md) defines offline artifact verification and the evidence still required from any separately authorized target-device or acoustic study.
