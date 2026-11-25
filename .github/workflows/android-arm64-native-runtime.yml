@@ -55,7 +55,7 @@ jobs:
             exit 0
           fi
           "$sdkmanager" --version 2>&1 | tee "$evidence/sdkmanager-version.txt"
-          yes | "$sdkmanager" --licenses >"$evidence/sdk-licenses.txt" 2>&1
+          echo "Android SDK licenses accepted by setup-android." >"$evidence/sdk-licenses.txt"
           set +e
           "$sdkmanager" --install --sdk_root="$sdk_root" emulator \
             >"$evidence/emulator-install.txt" 2>&1
