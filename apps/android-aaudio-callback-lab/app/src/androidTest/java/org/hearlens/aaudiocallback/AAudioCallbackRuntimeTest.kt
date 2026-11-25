@@ -43,7 +43,8 @@ class AAudioCallbackRuntimeTest {
         assertTrue(report.toString(), report.getString("status") in setOf(
             "PASS", "NOT_RUN", "EARLY_FAIL_STOP", "FAULT_INJECTED",
             "STREAM_ERROR", "INCOMPLETE", "CALLBACK_OVERLAP",
-            "CALLBACK_LOG_OVERFLOW",
+            "CALLBACK_LOG_OVERFLOW", "STREAM_STOP_TIMEOUT",
+            "STREAM_CLOSE_ERROR",
         ))
         if (report.getBoolean("actual_callback_observed")) {
             if (report.getBoolean("zero_output_verification_enabled")) {
@@ -54,10 +55,12 @@ class AAudioCallbackRuntimeTest {
                 assertEquals(0L, report.getLong("nonzero_output_samples_observed"))
             }
             assertEquals(0L, report.getLong("callback_overlap_count"))
+            assertEquals(0L, report.getLong("callbacks_in_flight_after_close"))
             when (report.getString("run_completion")) {
                 "COMPLETE" -> {
                     assertEquals("PASS", report.getString("status"))
                     assertTrue(report.toString(), report.getBoolean("duration_complete"))
+                    assertTrue(report.toString(), report.getBoolean("stream_stop_confirmed"))
                 }
                 "EARLY_FAIL_STOP" -> {
                     assertEquals("EARLY_FAIL_STOP", report.getString("status"))
@@ -80,6 +83,12 @@ class AAudioCallbackRuntimeTest {
                 "CALLBACK_LOG_OVERFLOW" -> assertTrue(
                     report.toString(), report.getLong("callback_log_overflow") > 0L,
                 )
+                "STREAM_STOP_TIMEOUT" -> assertFalse(
+                    report.toString(), report.getBoolean("stream_stop_confirmed"),
+                )
+                "STREAM_CLOSE_ERROR" -> assertTrue(
+                    report.toString(), report.getInt("aaudio_close_result") != 0,
+                )
                 "INCOMPLETE" -> assertFalse(report.toString(), report.getBoolean("duration_complete"))
                 else -> throw AssertionError("unknown callback run outcome: $report")
             }
@@ -101,7 +110,8 @@ class AAudioCallbackRuntimeTest {
         assertTrue("duration must be in 100..300000 ms", durationMs in 100..300_000)
         val report = run(durationMs, verifyZero = verifyZero)
         assertSilentCallbackIfObserved(report)
-        if (report.getBoolean("actual_callback_observed")) {
+        if (report.getBoolean("actual_callback_observed") &&
+            report.getString("run_completion") == "COMPLETE") {
             assertTrue(report.toString(), report.getLong("run_wall_ns") >= durationMs * 900_000L)
         }
         if (report.getBoolean("actual_callback_observed")) {

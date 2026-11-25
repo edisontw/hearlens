@@ -159,6 +159,7 @@ struct RunContext {
 
   CallbackCore core;
   std::unique_ptr<CallbackRecord[]> records;
+  std::atomic<std::uint32_t> callbacksInFlight{0};
   std::atomic<std::uint32_t> recordCount{0};
   std::array<std::uint64_t, kMaximumCallbackFrames + 1> frameCounts{};
   std::uint64_t frameCountOverflow = 0;
@@ -175,11 +176,23 @@ struct RunContext {
   std::atomic<std::int32_t> errorCallbackCode{AAUDIO_OK};
   const bool verifyZeroOutput;
 };
+static_assert(std::atomic<std::uint32_t>::is_always_lock_free);
+
+struct CallbackInFlight {
+  explicit CallbackInFlight(std::atomic<std::uint32_t>& count) noexcept
+      : count_(count) {
+    count_.fetch_add(1, std::memory_order_acq_rel);
+  }
+  ~CallbackInFlight() { count_.fetch_sub(1, std::memory_order_acq_rel); }
+
+  std::atomic<std::uint32_t>& count_;
+};
 
 aaudio_data_callback_result_t dataCallback(
     AAudioStream*, void* userData, void* audioData, std::int32_t numFrames) {
   auto* context = static_cast<RunContext*>(userData);
   if (context == nullptr) return AAUDIO_CALLBACK_RESULT_STOP;
+  const CallbackInFlight inFlight(context->callbacksInFlight);
   const auto callbackStart = Clock::now();
   bool cpuStartAvailable = false;
   const auto cpuStart = threadCpuNow(cpuStartAvailable);
@@ -257,6 +270,7 @@ aaudio_data_callback_result_t dataCallback(
 void errorCallback(AAudioStream*, void* userData, aaudio_result_t error) {
   auto* context = static_cast<RunContext*>(userData);
   if (context == nullptr) return;
+  const CallbackInFlight inFlight(context->callbacksInFlight);
   context->errorCallbackCode.store(error, std::memory_order_release);
   context->core.invalidateStreamDisconnect();
 }
@@ -284,6 +298,27 @@ struct Quantiles {
   std::uint64_t p99 = 0;
   std::uint64_t maximum = 0;
 };
+
+struct StreamSnapshot {
+  std::int32_t sampleRate = 0;
+  std::int32_t framesPerBurst = 0;
+  std::int32_t bufferSize = 0;
+  aaudio_performance_mode_t performance = AAUDIO_PERFORMANCE_MODE_NONE;
+  aaudio_sharing_mode_t sharing = AAUDIO_SHARING_MODE_SHARED;
+  std::int32_t xrunCount = -1;
+};
+
+StreamSnapshot snapshotStream(AAudioStream* stream) noexcept {
+  if (stream == nullptr) return {};
+  return {
+      AAudioStream_getSampleRate(stream),
+      AAudioStream_getFramesPerBurst(stream),
+      AAudioStream_getBufferSizeInFrames(stream),
+      AAudioStream_getPerformanceMode(stream),
+      AAudioStream_getSharingMode(stream),
+      AAudioStream_getXRunCount(stream),
+  };
+}
 
 Quantiles quantiles(RunContext& context, std::uint32_t count,
                     std::uint64_t CallbackRecord::*field) {
@@ -313,11 +348,12 @@ void appendQuantiles(std::ostringstream& json, const char* name,
 }
 
 std::string buildReport(const char* status, const char* reason,
-                        RunContext& context, AAudioStream* stream,
+                        RunContext& context, const StreamSnapshot& stream,
                         int durationMs, int faultMode, int faultAfterMs,
                         aaudio_result_t openResult, aaudio_result_t startResult,
                         aaudio_result_t stopResult, std::uint64_t runWallNs,
-                        std::int32_t errorCode) {
+                        std::int32_t errorCode, bool streamStopConfirmed,
+                        aaudio_result_t closeResult) {
   const auto count = std::min<std::uint32_t>(
       context.recordCount.load(std::memory_order_acquire),
       static_cast<std::uint32_t>(kMaximumRecords));
@@ -344,18 +380,6 @@ std::string buildReport(const char* status, const char* reason,
   const char* runCompletion =
       std::strcmp(status, "PASS") == 0 ? "COMPLETE" : status;
 
-  const auto actualSampleRate = stream == nullptr ? 0 :
-      AAudioStream_getSampleRate(stream);
-  const auto framesPerBurst = stream == nullptr ? 0 :
-      AAudioStream_getFramesPerBurst(stream);
-  const auto bufferSize = stream == nullptr ? 0 :
-      AAudioStream_getBufferSizeInFrames(stream);
-  const auto performance = stream == nullptr ? AAUDIO_PERFORMANCE_MODE_NONE :
-      AAudioStream_getPerformanceMode(stream);
-  const auto sharing = stream == nullptr ? AAUDIO_SHARING_MODE_SHARED :
-      AAudioStream_getSharingMode(stream);
-  const auto xrunCount = stream == nullptr ? -1 : AAudioStream_getXRunCount(stream);
-
   std::ostringstream json;
   json << "{\"status\":\"" << status << "\",\"reason\":\"" << reason
        << "\",\"requested_duration_ms\":" << durationMs
@@ -368,6 +392,11 @@ std::string buildReport(const char* status, const char* reason,
        << ",\"aaudio_open_result\":" << openResult
        << ",\"aaudio_start_result\":" << startResult
        << ",\"aaudio_stop_result\":" << stopResult
+       << ",\"aaudio_close_result\":" << closeResult
+       << ",\"stream_stop_confirmed\":" <<
+          (streamStopConfirmed ? "true" : "false")
+       << ",\"callbacks_in_flight_after_close\":" <<
+          context.callbacksInFlight.load(std::memory_order_acquire)
        << ",\"actual_callback_observed\":" << (count > 0 ? "true" : "false")
        << ",\"callback_records\":" << count
        << ",\"successful_dsp_callbacks\":" << context.core.callbackCount()
@@ -383,21 +412,21 @@ std::string buildReport(const char* status, const char* reason,
        << ",\"callback_cpu_unavailable_samples\":" <<
           context.cpuUnavailableSamples
        << ",\"dsp_thread_cpu_percent\":" << cpuPercent
-       << ",\"actual_sample_rate\":" << actualSampleRate
+       << ",\"actual_sample_rate\":" << stream.sampleRate
        << ",\"requested_sample_rate\":" << kFixtureSampleRate
        << ",\"dsp_fixture_sample_rate\":" << kFixtureSampleRate
        << ",\"sample_rate_matches_fixture\":"
-       << (actualSampleRate == kFixtureSampleRate ? "true" : "false")
-       << ",\"frames_per_burst\":" << framesPerBurst
-       << ",\"buffer_size_frames\":" << bufferSize
+       << (stream.sampleRate == kFixtureSampleRate ? "true" : "false")
+       << ",\"frames_per_burst\":" << stream.framesPerBurst
+       << ",\"buffer_size_frames\":" << stream.bufferSize
        << ",\"requested_performance_mode\":\"LOW_LATENCY\""
        << ",\"actual_performance_mode\":\""
-       << performanceModeName(performance) << "\""
+       << performanceModeName(stream.performance) << "\""
        << ",\"requested_sharing_mode\":\"SHARED\""
-       << ",\"actual_sharing_mode\":\"" << sharingModeName(sharing)
+       << ",\"actual_sharing_mode\":\"" << sharingModeName(stream.sharing)
        << "\",\"format\":\"FLOAT\",\"channels\":2"
        << ",\"callback_frames_request\":\"UNSPECIFIED_VARIABLE\""
-       << ",\"xrun_count\":" << xrunCount
+       << ",\"xrun_count\":" << stream.xrunCount
        << ",\"xrun_source\":\"AAudioStream_getXRunCount on output stream\""
        << ",\"allocation_monitor\":\"callback source path contains no allocation/I/O/JNI/mutex/sleep; AAudio and Bionic internal allocations are not instrumented\""
        << ",\"zero_output_verification_enabled\":"
@@ -556,7 +585,6 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
   const auto runWallNs = static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           callbacksEnd - runStart).count());
-  context.core.stop();
   const auto stopResult = AAudioStream_requestStop(stream);
   const auto waitDeadline = Clock::now() + std::chrono::seconds(1);
   auto state = AAudioStream_getState(stream);
@@ -566,36 +594,64 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
     AAudioStream_waitForStateChange(stream, state, &next, 100'000'000LL);
     state = next;
   }
+  const bool terminalStateReached = state == AAUDIO_STREAM_STATE_STOPPED ||
+      state == AAUDIO_STREAM_STATE_DISCONNECTED;
+  const auto drainDeadline = Clock::now() + std::chrono::seconds(1);
+  while (context.callbacksInFlight.load(std::memory_order_acquire) > 0 &&
+         Clock::now() < drainDeadline) std::this_thread::yield();
+  const bool streamStopConfirmed = terminalStateReached &&
+      context.callbacksInFlight.load(std::memory_order_acquire) == 0;
+  const auto streamSnapshot = snapshotStream(stream);
+  const auto closeResult = AAudioStream_close(stream);
+  // Close outside both callback functions, then wait for their guards before
+  // retiring the NativeSession generation or reading callback-owned metrics.
+  while (context.callbacksInFlight.load(std::memory_order_acquire) > 0) {
+    std::this_thread::yield();
+  }
+  context.core.stop();
   const auto errorCode = context.errorCallbackCode.load(std::memory_order_acquire);
   const auto count = context.recordCount.load(std::memory_order_acquire);
+  const auto logOverflow = context.logOverflow.load(std::memory_order_relaxed);
+  const auto overlapCount = context.core.overlapCount();
+  const auto failStopCount = context.core.failStopCount();
   const bool durationComplete = count > 0 && runWallNs >=
       (static_cast<std::uint64_t>(durationMs) * 1'000'000ULL * 99ULL) / 100ULL;
-  const char* status = count == 0 ? "NOT_RUN" :
-      (context.logOverflow.load(std::memory_order_relaxed) > 0 ?
-       "CALLBACK_LOG_OVERFLOW" :
-       (context.core.overlapCount() > 0 ? "CALLBACK_OVERLAP" :
-        (faultInjected ? "FAULT_INJECTED" :
-         (context.core.failStopCount() > 0 ? "EARLY_FAIL_STOP" :
-          (errorCode != AAUDIO_OK ? "STREAM_ERROR" :
-           (durationComplete ? "PASS" : "INCOMPLETE"))))));
-  const char* reason = count == 0 ?
-      "stream started without an observed AAudio data callback" :
-      (context.logOverflow.load(std::memory_order_relaxed) > 0 ?
-       "callback stopped after the preallocated metrics record capacity was exhausted" :
-       (context.core.overlapCount() > 0 ?
-        "AAudio delivered overlapping callbacks; callback core failed closed" :
-        (faultInjected ? "callback observed; lifecycle fault injection completed" :
-         (context.core.failStopCount() > 0 ?
-          (context.deadlineMisses > 0 ?
-           "callback stream stopped by NativeSession deadline fail-stop" :
-           "callback stream stopped by NativeSession fail-stop") :
-          (errorCode != AAUDIO_OK ? "AAudio error callback stopped the stream" :
-           (durationComplete ? "AAudio data callback observed for requested duration" :
-            "callback stopped before requested duration without an injected fault"))))));
-  const auto report = buildReport(status, reason, context, stream, durationMs,
+  const char* status = "INCOMPLETE";
+  const char* reason = "callback stopped before requested duration without an injected fault";
+  if (count == 0) {
+    status = "NOT_RUN";
+    reason = "stream started without an observed AAudio data callback";
+  } else if (!streamStopConfirmed) {
+    status = "STREAM_STOP_TIMEOUT";
+    reason = "AAudio stream did not reach a drained STOPPED or DISCONNECTED state before close";
+  } else if (closeResult != AAUDIO_OK) {
+    status = "STREAM_CLOSE_ERROR";
+    reason = "AAudioStream_close returned an error";
+  } else if (logOverflow > 0) {
+    status = "CALLBACK_LOG_OVERFLOW";
+    reason = "callback stopped after the preallocated metrics record capacity was exhausted";
+  } else if (overlapCount > 0) {
+    status = "CALLBACK_OVERLAP";
+    reason = "AAudio delivered overlapping callbacks; callback core failed closed";
+  } else if (faultInjected) {
+    status = "FAULT_INJECTED";
+    reason = "callback observed; lifecycle fault injection completed";
+  } else if (failStopCount > 0) {
+    status = "EARLY_FAIL_STOP";
+    reason = context.deadlineMisses > 0 ?
+        "callback stream stopped by NativeSession deadline fail-stop" :
+        "callback stream stopped by NativeSession fail-stop";
+  } else if (errorCode != AAUDIO_OK) {
+    status = "STREAM_ERROR";
+    reason = "AAudio error callback stopped the stream";
+  } else if (durationComplete) {
+    status = "PASS";
+    reason = "AAudio data callback observed for requested duration";
+  }
+  const auto report = buildReport(status, reason, context, streamSnapshot, durationMs,
                                   faultMode, faultAfterMs, openResult,
-                                  startResult, stopResult, runWallNs, errorCode);
-  AAudioStream_close(stream);
+                                  startResult, stopResult, runWallNs, errorCode,
+                                  streamStopConfirmed, closeResult);
   return report;
 }
 

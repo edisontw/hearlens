@@ -147,6 +147,9 @@ try {
     if ($runtimeResults.Count -lt 5) {
         throw 'Instrumentation did not return all AAudio run records; report and logs were preserved.'
     }
+    if ($reportResult -eq 'INCOMPLETE') {
+        throw "AAudio benchmark outcome is $benchmarkOutcome; report and logs were preserved."
+    }
 } finally {
     if ($startedHere -and !$KeepEmulator) { & "$repoRoot\scripts\android\Stop-HearLensEmulator.ps1" }
 }

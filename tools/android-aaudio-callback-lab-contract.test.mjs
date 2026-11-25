@@ -69,7 +69,12 @@ test("unscanned performance runs and fail-stop outcomes remain accurately report
   assert.match(instrumentation, /if \(report\.getBoolean\("zero_output_verification_enabled"\)\)/);
   assert.match(instrumentation, /"EARLY_FAIL_STOP" ->/);
   assert.match(instrumentation, /report\.getLong\("deadline_misses"\) > 0L/);
+  assert.match(instrumentation, /report\.getString\("run_completion"\) == "COMPLETE"/);
   assert.ok(runner.indexOf("$instrumentExitCode = $LASTEXITCODE") < runner.indexOf("measurement-logcat.log"));
   assert.match(runner, /RECORDED_FAIL_STOP/);
   assert.match(runner, /report \| ConvertTo-Json[\s\S]*?instrumentation failed/);
+  const drainPoint = native.indexOf("const bool streamStopConfirmed");
+  const closePoint = native.indexOf("AAudioStream_close(stream)", drainPoint);
+  const invalidatePoint = native.indexOf("context.core.stop();", closePoint);
+  assert.ok(drainPoint >= 0 && closePoint > drainPoint && invalidatePoint > closePoint);
 });
