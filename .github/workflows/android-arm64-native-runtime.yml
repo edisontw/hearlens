@@ -1,0 +1,171 @@
+name: Android ARM64 emulator runtime
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/android-arm64-native-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Probe official SDK, ARM64 host acceleration and API 29 guest
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence=probe-evidence
+          sdk_root="$(printenv ANDROID_HOME 2>/dev/null || true)"
+          if [[ -z "$sdk_root" ]]; then sdk_root=/usr/local/lib/android/sdk; fi
+          mkdir -p "$evidence"
+          {
+            echo "runner=$(uname -a)"
+            echo "machine=$(uname -m)"
+            echo "runner_image=$ImageOS $ImageVersion"
+            echo "sdk_root=$sdk_root"
+            echo "sdkmanager_path=$(command -v sdkmanager || true)"
+            echo "serial=emulator-5554"
+            echo "audio_arguments=-no-audio"
+            echo "kvm_device:"
+            ls -l /dev/kvm 2>&1 || true
+            echo "kvm_accessible=$([[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] && echo true || echo false)"
+          } | tee "$evidence/runner-probe.txt"
+
+          sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$sdkmanager" ]] && command -v sdkmanager >/dev/null 2>&1; then
+            sdkmanager="$(command -v sdkmanager)"
+          fi
+          if [[ ! -x "$sdkmanager" ]]; then
+            echo "NOT RUN: Android SDK manager is unavailable on ubuntu-24.04-arm." \
+              | tee "$evidence/runtime-status.txt"
+            echo "runtime_supported=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          "$sdkmanager" --version 2>&1 | tee "$evidence/sdkmanager-version.txt"
+          yes | "$sdkmanager" --licenses >"$evidence/sdk-licenses.txt" 2>&1
+          set +e
+          "$sdkmanager" --install --sdk_root="$sdk_root" emulator \
+            >"$evidence/emulator-install.txt" 2>&1
+          emulator_install_status=$?
+          set -e
+          echo "sdkmanager_emulator_install_exit=$emulator_install_status" \
+            | tee -a "$evidence/runner-probe.txt"
+
+          emulator_bin="$sdk_root/emulator/emulator"
+          if [[ -x "$emulator_bin" ]]; then
+            file "$emulator_bin" | tee "$evidence/emulator-host-file.txt"
+            readelf -h "$emulator_bin" >"$evidence/emulator-host-elf.txt" 2>&1 || true
+            "$emulator_bin" -version >"$evidence/emulator-version.txt" 2>&1 || true
+            set +e
+            "$emulator_bin" -accel-check >"$evidence/emulator-accel-check.txt" 2>&1
+            accel_status=$?
+            set -e
+          else
+            echo "No executable at $emulator_bin" | tee "$evidence/emulator-host-file.txt"
+            echo "emulator binary unavailable" >"$evidence/emulator-accel-check.txt"
+            accel_status=127
+          fi
+          echo "emulator_accel_check_exit=$accel_status" \
+            | tee -a "$evidence/runner-probe.txt"
+          cat "$evidence/emulator-accel-check.txt" || true
+
+          set +e
+          "$sdkmanager" --list --sdk_root="$sdk_root" \
+            >"$evidence/sdkmanager-package-list.txt" 2>&1
+          package_list_status=$?
+          set -e
+          echo "sdkmanager_list_exit=$package_list_status" \
+            | tee -a "$evidence/runner-probe.txt"
+          grep -F 'system-images;android-29;default;arm64-v8a' \
+            "$evidence/sdkmanager-package-list.txt" \
+            >"$evidence/api29-aosp-arm64-package.txt" || true
+
+          host_arch="$(uname -m)"
+          emulator_is_arm64=false
+          if [[ -x "$emulator_bin" ]] && file "$emulator_bin" | grep -Eiq 'ARM aarch64|AArch64'; then
+            emulator_is_arm64=true
+          fi
+          kvm_accessible=false
+          if [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then
+            kvm_accessible=true
+          fi
+          accel_usable=false
+          if [[ "$accel_status" -eq 0 ]] && grep -Eiq 'usable' "$evidence/emulator-accel-check.txt"; then
+            accel_usable=true
+          fi
+          image_listed=false
+          if grep -q 'system-images;android-29;default;arm64-v8a' "$evidence/sdkmanager-package-list.txt"; then
+            image_listed=true
+          fi
+          echo "host_arch=$host_arch emulator_host_arm64=$emulator_is_arm64 kvm_accessible=$kvm_accessible accel_usable=$accel_usable api29_aosp_arm64_listed=$image_listed" \
+            | tee -a "$evidence/runner-probe.txt"
+
+          if [[ "$host_arch" != "aarch64" && "$host_arch" != "arm64" ]] ||
+             [[ "$emulator_install_status" -ne 0 || "$emulator_is_arm64" != true ||
+                "$kvm_accessible" != true || "$accel_usable" != true || "$image_listed" != true ]]; then
+            {
+              echo "NOT RUN: official Android ARM64 host emulator or usable KVM acceleration is unavailable."
+              echo "Android guest boot and Native ELF execution were not attempted."
+            } | tee "$evidence/runtime-status.txt"
+            echo "runtime_supported=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          "$sdkmanager" --install --sdk_root="$sdk_root" \
+            'system-images;android-29;default;arm64-v8a' \
+            >"$evidence/system-image-install.txt" 2>&1
+          echo "system_image_install=PASS" | tee -a "$evidence/runner-probe.txt"
+          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
+          adb="$sdk_root/platform-tools/adb"
+          avdmanager="$sdk_root/cmdline-tools/latest/bin/avdmanager"
+          "$avdmanager" create avd --force --name hearlens_api29_arm64 \
+            --package 'system-images;android-29;default;arm64-v8a' \
+            --device pixel_2 >"$evidence/avdmanager-create.txt" 2>&1
+          echo "avd_name=hearlens_api29_arm64" | tee -a "$evidence/runner-probe.txt"
+
+          serial=emulator-5554
+          "$emulator_bin" -avd hearlens_api29_arm64 -port 5554 -accel on \
+            -no-window -no-audio -no-snapshot -gpu swiftshader_indirect \
+            >"$evidence/emulator.log" 2>&1 &
+          echo $! > "$evidence/emulator.pid"
+          timeout 240 "$adb" -s "$serial" wait-for-device
+          boot_complete=false
+          for attempt in $(seq 1 120); do
+            if [[ "$("$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" == "1" ]]; then
+              boot_complete=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$boot_complete" != true ]]; then
+            echo "Android guest boot did not complete." | tee "$evidence/runtime-status.txt"
+            exit 1
+          fi
+          guest_arch="$("$adb" -s "$serial" shell uname -m | tr -d '\\r')"
+          guest_abi="$("$adb" -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\\r')"
+          guest_api="$("$adb" -s "$serial" shell getprop ro.build.version.sdk | tr -d '\\r')"
+          printf 'guest_arch=%s\\nguest_abi=%s\\nguest_api=%s\\nboot_complete=true\\n' \
+            "$guest_arch" "$guest_abi" "$guest_api" | tee "$evidence/guest-probe.txt"
+          [[ "$guest_arch" == "aarch64" && "$guest_abi" == "arm64-v8a" && "$guest_api" == "29" ]]
+          echo "runtime_status=ENVIRONMENT_READY" | tee "$evidence/runtime-status.txt"
+          echo "runtime_supported=true" >> "$GITHUB_OUTPUT"
+          "$adb" -s "$serial" emu kill || true
+      - name: Upload ARM64 host and Android runtime probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-android-arm64-emulator-runtime-probe
+          path: probe-evidence
+          if-no-files-found: warn
+          retention-days: 30
