@@ -121,7 +121,16 @@ test("offline artifact verification requires matching bytes and rejects symlinks
   assert.ok(verify().physical_unresolved.length>0);
   rmSync(artifactPath);
   writeFileSync(actualPath,mockBytes);
-  symlinkSync(actualPath,artifactPath);
+  try {
+    symlinkSync(actualPath,artifactPath);
+  } catch (error) {
+    if (process.platform === "win32" && error?.code === "EPERM") {
+      t.diagnostic("Windows denied symlink creation (EPERM); symlink-specific security assertions were not executed.");
+      t.skip("Symlink test not run because this Windows account cannot create symlinks.");
+      return;
+    }
+    throw error;
+  }
   assert.ok(verify().physical_unresolved.length>0);
   rmSync(artifactPath);
   writeFileSync(artifactPath,mockBytes);
