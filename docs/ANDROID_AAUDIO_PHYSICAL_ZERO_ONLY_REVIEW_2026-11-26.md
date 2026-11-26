@@ -1,31 +1,88 @@
 # Moto g62 zero-only AAudio test — owner review package
 
-**Status: PREPARED, NOT APPROVED, NOT RUN.** This document does not authorize an AAudio stream. The emulator-only callback lab still rejects physical devices in native code, Android instrumentation, and the fixed-serial PowerShell runner. Do not remove those checks to perform a phone test.
+**Status: ORIGINAL EXACT-APK OWNER AUTHORIZATION RECORDED; OWNER WAIVED INDEPENDENT HUMAN REVIEW FOR THAT BOUNDED RUN; PHYSICAL STREAM NOT RUN.** The runner installed and launched the authorized APK, but the visible Start control was disabled by its route guard, so it opened no AAudio stream. The runner removed the APK and captured evidence. A diagnostic update is being prepared; any rebuilt APK requires fresh exact-hash owner authorization. The waiver is not represented as a completed review. The emulator-only callback lab still rejects physical devices in native code, Android instrumentation and its fixed-serial PowerShell runner; those checks remain unchanged.
 
 ## Proposed bounded test
 
 Target only the already identified Moto g62 5G: model `Moto g62 5G`, Android 13 / API 33, `arm64-v8a`, ADB serial `ZY22FWGQTB`. The physical-device test must be a separate zero-only research build and runner. It must not reuse an emulator bypass flag or mutate the existing emulator runner's serial.
 
 1. Before installation, verify `adb -s ZY22FWGQTB get-state`, model, API, ABI, exact APK SHA-256 and that no other target serial can be selected by the invocation. Every ADB command must include `-s ZY22FWGQTB`.
-2. The app declares no permissions. It must not use microphone capture, `AudioRecord`, Bluetooth APIs, network, or production Web caption code. It may use output-only AAudio and read-only `AudioManager` capability diagnostics.
-3. Run a zero-only output callback first, then (only if separately included in the approved APK and signed test record) a synthetic NativeSession workload whose PCM scratch is private and discarded. For every callback, clear the entire provided output buffer to zero before validation or work. Never pass the output-buffer pointer to DSP or copy DSP scratch into it. Scan all output samples and stop/fail-stop if any sample is nonzero.
-4. Do not auto-select Bluetooth or request a Bluetooth route. Record AAudio device ID and Android output-device type using platform audio-device metadata only; refuse to start if the route is Bluetooth, wired/unrecognized, or cannot be identified as the owner-approved built-in route. Do not call a Bluetooth API to make this decision.
-5. Hard cap the session at 60 seconds, with an owner-approved shorter maximum if requested. Provide an explicit visible Stop action and external `am force-stop` recovery command. Stop on NaN/Inf, NativeSession failure, deadline overrun, callback overlap, stream error/disconnect, lifecycle/background invalidation, unexpected route, nonzero output, timeout or missing callback. Stop, drain callbacks, close the stream, then persist evidence outside the callback.
-6. Capture requested and negotiated rate, performance/sharing modes, usage, frames per burst, buffer size/capacity, frame histogram, callback wall/thread-CPU/inter-arrival statistics, DSP misses versus complete-callback overruns, XRun count, fail-stop reason, stop/close/drain outcomes, logcat and audio diagnostics. Record APK, fixture, result and log SHA-256 in a fresh timestamped directory. Do not claim Android callback allocations are zero; report the source-level allocation audit and its blind spots.
+2. The separate physical app declares no permissions and has no microphone capture, `AudioRecord`, Bluetooth APIs, network, production Web caption code, NativeSession, Auto-FIR or fixture. It uses output-only AAudio and read-only built-in speaker metadata from `AudioManager`.
+3. This build supports only `ZERO_ONLY`. For every callback, it clears the full provided stereo output buffer to zero, scans every sample and fail-stops on invalid data or a nonzero sample. There is no DSP or synthetic PCM component in the APK.
+4. Do not auto-select Bluetooth or request a Bluetooth route. The app refuses to start if any external output device appears in read-only `AudioManager` metadata. It requests the exact built-in speaker device ID, then verifies `AAudioStream_getDeviceId()` before starting. It refuses to start on any mismatch and stops if the selected built-in speaker disappears. It does not call a Bluetooth API.
+5. The native session is hard capped at 60 seconds. The visible screen has Start and Stop controls; leaving the foreground requests stop, and `adb -s ZY22FWGQTB shell am force-stop org.hearlens.physicalzero` is the external recovery command. It stops on callback deadline overrun, callback overlap, invalid callback data, stream error/disconnect, unexpected route, nonzero output, XRun or metric capacity exhaustion. It requests stop, waits for terminal state and zero callbacks in flight, closes the stream, then persists evidence from the application thread.
+6. The report captures requested and negotiated rate, format, route, performance/sharing modes, usage, frames per burst, buffer size/capacity, frame histogram, callback wall/thread-CPU/inter-arrival statistics, callback overruns, XRun count and observations, fail-stop reason, stop/close/drain outcomes, logcat and audio diagnostics. APK, result and log SHA-256 values are saved to a fresh timestamped directory. There is no fixture SHA because this zero-only APK contains no fixture. Runtime callback allocation monitoring is not claimed; the report gives a source-level audit and its limits.
 
-This is a silent-output callback experiment, not listening, hearing assistance, a safety proof for any future nonzero output, or a release of the M04 gate. Do not wear headphones or connect the phone to AIR31/Bluetooth for this test. The synthetic DSP result must never reach any physical output path.
+This is a digital-zero callback experiment, not a listening test, hearing assistance, a safety proof for any future nonzero output, or a release of the M04 gate. Do not wear headphones or connect the phone to AIR31/Bluetooth for this test. The callback emits only zero-valued samples; startup/shutdown acoustic transients are not measured or certified.
 
-## Approval required before implementation is enabled on the phone
+## Authorization and review gate
 
 The owner must explicitly approve all of the following in the test record:
 
 - Opening an output-only AAudio stream on the named Moto g62 (serial and device identity above), including routing it to the built-in output device for up to 60 seconds.
-- Whether the run includes only ZERO_ONLY or also the full private-scratch NativeSession workload.
-- The exact APK SHA-256, fixture SHA-256, test source commit, maximum duration and the stop/fail-stop behavior described above.
-- Confirmation that this is a zero-sample callback research test and does not authorize microphone use, Bluetooth APIs/routes, audible playback, headphone listening, or live hearing output.
+- The exact APK SHA-256, test source commit, maximum duration and the stop/fail-stop behavior described above. This APK's only workload is ZERO_ONLY; no NativeSession workload can be selected.
+- Confirmation that this is a zero-sample callback research test and does not authorize microphone use, Bluetooth APIs/routes, audible playback, headphone listening or live hearing output.
 
-An independent reviewer must then record review of the isolated build, the zero-only output path, route refusal behavior, device-specific scope, timeout, stop/drain/close path, and evidence capture. The test runner must refuse to invoke the device until both owner authorization and independent review are recorded for the exact APK and serial. Neither approval has been granted by this preparation work.
+The exact-APK owner authorization record is present. The owner then explicitly instructed us to skip the separate independent human review for this one bounded run. The resulting waiver record is bound to the same APK SHA-256, source commit, device serial and zero-only scope. No independent review is claimed or recorded as PASS. The runner accepts either a valid independent review or this explicit owner-waiver record; it always requires exact-hash owner authorization and retains the device, permission, route, duration, zero-output and teardown checks. The waiver does not authorize microphone use, Bluetooth, audible content, DSP output, listening, or any future hearing test.
+
+The records stay in the local evidence directory and should not be committed with the app. Use these field shapes after reviewing the final APK:
+
+```json
+{
+  "owner": "owner identity",
+  "approved": true,
+  "approvedAtUtc": "ISO-8601 UTC timestamp",
+  "authorizationText": "I approve the zero-only, built-in-speaker AAudio callback test on Moto g62 serial ZY22FWGQTB for at most 60 seconds using this exact APK SHA-256 and source commit.",
+  "deviceSerial": "ZY22FWGQTB",
+  "model": "Moto g62 5G",
+  "api": 33,
+  "abi": "arm64-v8a",
+  "testMode": "ZERO_ONLY",
+  "maxDurationSeconds": 60,
+  "requestedRoute": "BUILTIN_SPEAKER_ONLY",
+  "apkSha256": "64 lowercase hexadecimal characters",
+  "sourceCommit": "40-character commit SHA",
+  "allowMicrophone": false,
+  "allowBluetooth": false,
+  "allowAudiblePlayback": false,
+  "allowDspOutput": false
+}
+```
+
+```json
+{
+  "reviewer": "independent reviewer identity, different from owner",
+  "reviewStatus": "PASS",
+  "reviewedAtUtc": "ISO-8601 UTC timestamp",
+  "reviewEvidence": "PR review URL or durable review record ID",
+  "deviceSerial": "ZY22FWGQTB",
+  "apkSha256": "same 64-character APK SHA-256",
+  "sourceCommit": "same 40-character commit SHA",
+  "reviewedAreas": [
+    "isolated_arm64_build",
+    "permissionless_manifest",
+    "zero_output_callback",
+    "builtin_speaker_route_refusal",
+    "fixed_device_scope",
+    "hard_duration_cap",
+    "visible_stop_and_background_stop",
+    "callback_allocation_audit",
+    "stop_drain_close",
+    "evidence_capture"
+  ]
+}
+```
+
+For this run, the records are stored outside the repository under `D:\Dev\Android\test-results\hearlens\physical-zero-callback\github-artifact-pr164-707ff5a-830ff182d3e4467a96e5747d7e437bf4`:
+
+- APK SHA-256: `afd6eca9bb54b288998fcef5ec1245ca912ba6e8a8233cb302d1dcc532fcf194`
+- Source commit: `707ff5a58ce46234d1adae271d74d30a7a32c5ab`
+- Device serial: `ZY22FWGQTB`
+- Owner authorization record SHA-256: `c88ee9cbc006e3d5a19cc96098bd20a5c264fe5ad779110bc567629fe02889fc`
+- Owner review-waiver record SHA-256: `1a20cfa9898da6e4ebac2d2dbd49c6925fe5d60fc0a6cd7e7c4805743099f3bf`
+
+These records authorize only the bounded zero-only test above for the listed APK and commit. That APK was installed and launched, but its route guard disabled Start; no physical stream was opened. The APK was removed after the attempt. A rebuilt APK is not covered by these records.
 
 ## Current state
 
-No physical APK was installed and no physical AAudio stream was opened during this task. The emulator matrix and its evidence are documented in [AAudio callback diagnostics](./ANDROID_AAUDIO_CALLBACK_DIAGNOSTICS_2026-11-26.md). M04 REAL HEARING remains **BLOCKED / DEFERRED**.
+The separate ARM64 APK and hash-gated runner are implemented. The first physical attempt is recorded at `D:\Dev\Android\test-results\hearlens\physical-zero-callback\20261126-205108-051-device-59aaf1a2`; the exact-hash APK was installed and launched, the UI route guard refused Start, and cleanup uninstalled the APK. No physical AAudio stream was opened. System audio diagnostics listed no connected audio devices, so the source is not yet identified; the current source update exposes non-intrusive output type/id details and refreshes route inventory when the Activity resumes. The original exact-hash records do not authorize a rebuilt APK. The emulator matrix and its evidence are documented in [AAudio callback diagnostics](./ANDROID_AAUDIO_CALLBACK_DIAGNOSTICS_2026-11-26.md). M04 REAL HEARING remains **BLOCKED / DEFERRED**.
