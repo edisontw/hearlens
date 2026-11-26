@@ -88,4 +88,6 @@ test("physical runner pins the serial and requires matching owner and independen
   assert.match(workflow, /Build permissionless physical zero-only ARM64 APK/);
   assert.match(workflow, /hearlens-physical-zero-aaudio-arm64-apk/);
   assert.match(workflow, /physical_zero_output_core_test\.cpp/);
+  assert.match(workflow, /SOURCE_COMMIT: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(workflow, /source_commit="\$SOURCE_COMMIT"/);
 });

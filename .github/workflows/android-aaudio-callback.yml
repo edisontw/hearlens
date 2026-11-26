@@ -114,6 +114,8 @@ jobs:
           cp apps/android-aaudio-callback-lab/app/build/outputs/apk/debug/app-debug.apk \
             "$RUNNER_TEMP/hearlens-aaudio-callback-arm64-v8a-debug.apk"
       - name: Build permissionless physical zero-only ARM64 APK
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           apps/android-native-dsp-lab/gradlew --no-daemon \
@@ -128,7 +130,7 @@ jobs:
           unzip -Z1 "$apk" | grep -qx 'lib/arm64-v8a/libhearlens_physical_zero.so'
           ! unzip -Z1 "$apk" | grep -Eq '^lib/(armeabi|armeabi-v7a|x86|x86_64)/'
           sha256=$(sha256sum "$apk" | cut -d ' ' -f 1)
-          source_commit=$(git rev-parse HEAD)
+          source_commit="$SOURCE_COMMIT"
           cat > "$RUNNER_TEMP/physical-zero-build-info.json" <<EOF
           {
             "sourceCommit": "$source_commit",
