@@ -76,6 +76,12 @@ class NativeSession {
     return isArmed(ticket);
   }
 
+  // Read only after a callback returns or the caller has drained all callbacks.
+  // Both ears share the same control cadence and are advanced as one stereo block.
+  std::uint64_t controlUpdateCount() const noexcept {
+    return dsp_.left().updates();
+  }
+
   Candidate process(const Ticket& ticket, std::uint64_t observedRouteStamp,
                     const float* interleaved, std::size_t sampleCount,
                     Clock::time_point deadline,

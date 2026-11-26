@@ -11,5 +11,10 @@ internal object NativeBridge {
         verifyZeroOutput: Boolean,
         faultMode: Int,
         faultAfterMs: Int,
+        runNativeSession: Boolean,
+        requestedSampleRate: Int,
+        sharingMode: Int,
+        usage: Int,
+        bufferPolicy: Int,
     ): String
 }
