@@ -13,7 +13,7 @@ test("AAudio callback research APK is separate and requests no permissions", () 
   assert.doesNotMatch(manifest, /RECORD_AUDIO|BLUETOOTH|MODIFY_AUDIO_SETTINGS/i);
   assert.match(gradle, /applicationId 'org\.hearlens\.aaudiocallback'/);
   assert.match(native, /AAUDIO_DIRECTION_OUTPUT/);
-  assert.match(native, /AAudioStreamBuilder_setSampleRate\(builder, kFixtureSampleRate\)/);
+  assert.match(native, /AAudioStreamBuilder_setSampleRate\(builder, requested\.sampleRate\)/);
   assert.match(native, /AAUDIO_FORMAT_PCM_FLOAT/);
   assert.match(native, /AAUDIO_SHARING_MODE_SHARED/);
   assert.match(native, /AAUDIO_PERFORMANCE_MODE_LOW_LATENCY/);
@@ -43,10 +43,16 @@ test("every native callback zeroes the output before private DSP and has no resu
 test("callback harness records actual negotiation and labels the five-minute design", () => {
   for (const field of [
     "actual_sample_rate", "requested_sample_rate", "sample_rate_matches_fixture",
-    "frames_per_burst", "buffer_size_frames", "deadline_budget_basis",
+    "frames_per_burst", "buffer_size_frames", "buffer_capacity_frames",
+    "dsp_deadline_budget_basis", "callback_overrun_budget_basis",
+    "deadline_events", "xrun_observations", "xrun_start_count", "xrun_delta",
+    "requested_buffer_policy", "actual_usage",
     "actual_performance_mode", "actual_sharing_mode", "deadline_misses",
+    "callback_overrun_count", "dsp_deadline_failure_count",
     "frame_count_distribution", "callback_interarrival_jitter",
-    "callback_thread_cpu", "dsp_fail_stop_count", "xrun_count",
+    "callback_thread_cpu", "native_session_fail_stop_count",
+    "callback_core_fail_stop_count", "xrun_count",
+    "native_session_invocations", "native_control_updates",
     "allocation_monitor", "requested_equivalent_frames\\\":128",
     "requested_equivalent_duration_ms\\\":300000",
   ]) assert.ok(native.includes(field), field);
@@ -70,9 +76,18 @@ test("unscanned performance runs and fail-stop outcomes remain accurately report
   assert.match(instrumentation, /"EARLY_FAIL_STOP" ->/);
   assert.match(instrumentation, /report\.getLong\("deadline_misses"\) > 0L/);
   assert.match(instrumentation, /report\.getString\("run_completion"\) == "COMPLETE"/);
-  assert.ok(runner.indexOf("$instrumentExitCode = $LASTEXITCODE") < runner.indexOf("measurement-logcat.log"));
-  assert.match(runner, /RECORDED_FAIL_STOP/);
-  assert.match(runner, /report \| ConvertTo-Json[\s\S]*?instrumentation failed/);
+  assert.match(runner, /\$testStamp = Get-Date/);
+  assert.match(runner, /\$scenarioDir = Join-Path \$runDir/);
+  assert.match(runner, /ANDROID_ADB -s \$serial @adbArguments/);
+  assert.match(runner, /Save-TargetDiagnostics/);
+  assert.match(runner, /dumpsys-media-audio-flinger/);
+  assert.match(runner, /dumpsys-media-audio-policy/);
+  assert.match(runner, /Get-FileHash -LiteralPath[\s\S]*?sha256\.manifest/);
+  assert.match(runner, /Test-ClearImprovement/);
+  assert.match(runner, /Duration 300000/);
+  assert.match(runner, /baseline-zero-only/);
+  assert.match(runner, /baseline-native-session/);
+  assert.match(runner, /diagnostic-matrix-report\.json/);
   const drainPoint = native.indexOf("const bool streamStopConfirmed");
   const closePoint = native.indexOf("AAudioStream_close(stream)", drainPoint);
   const invalidatePoint = native.indexOf("context.core.stop();", closePoint);

@@ -78,7 +78,8 @@ class CallbackCore {
       float* outputBuffer, std::int32_t frames, std::int32_t sampleRate,
       Clock::time_point callbackStart = Clock::now(),
       ReadClock now = &Clock::now,
-      std::int32_t deadlineFrameBudget = 0) noexcept {
+      std::int32_t deadlineFrameBudget = 0,
+      bool executeNativeSession = true) noexcept {
     // Output is zeroed before validation or DSP work. The pointer is never
     // passed to NativeSession, and DSP scratch is never copied to this buffer.
     if (outputBuffer != nullptr && frames > 0) {
@@ -109,6 +110,11 @@ class CallbackCore {
     }
     if (afterEnter_ != nullptr) afterEnter_(hookContext_);
 
+    if (!executeNativeSession) {
+      callbackCount_.fetch_add(1, std::memory_order_relaxed);
+      return CallbackDisposition::kContinue;
+    }
+
     const auto fixtureFrames = fixturePcm_.size() / kChannels;
     for (std::int32_t frame = 0; frame < frames; ++frame) {
       const auto sourceFrame = (fixtureCursor_ + static_cast<std::size_t>(frame)) %
@@ -130,7 +136,14 @@ class CallbackCore {
     const auto candidate = session_.process(
         ticket_, kSyntheticRouteStamp, inputScratch_.data(),
         static_cast<std::size_t>(frames) * kChannels, deadline, now);
+    nativeSessionInvocations_.fetch_add(1, std::memory_order_relaxed);
+    nativeControlUpdates_.store(session_.controlUpdateCount(),
+                                std::memory_order_relaxed);
     if (!session_.isCurrent(candidate)) {
+      if (now != nullptr && now() >= deadline) {
+        dspDeadlineFailures_.fetch_add(1, std::memory_order_relaxed);
+      }
+      nativeSessionFailStops_.fetch_add(1, std::memory_order_relaxed);
       failStops_.fetch_add(1, std::memory_order_relaxed);
       active_.store(false, std::memory_order_release);
       return CallbackDisposition::kRejected;
@@ -141,6 +154,18 @@ class CallbackCore {
 
   auto callbackCount() const noexcept -> std::uint64_t {
     return callbackCount_.load(std::memory_order_relaxed);
+  }
+  auto nativeSessionInvocations() const noexcept -> std::uint64_t {
+    return nativeSessionInvocations_.load(std::memory_order_relaxed);
+  }
+  auto nativeControlUpdates() const noexcept -> std::uint64_t {
+    return nativeControlUpdates_.load(std::memory_order_relaxed);
+  }
+  auto dspDeadlineFailureCount() const noexcept -> std::uint64_t {
+    return dspDeadlineFailures_.load(std::memory_order_relaxed);
+  }
+  auto nativeSessionFailStopCount() const noexcept -> std::uint64_t {
+    return nativeSessionFailStops_.load(std::memory_order_relaxed);
   }
   auto failStopCount() const noexcept -> std::uint64_t {
     return failStops_.load(std::memory_order_relaxed);
@@ -171,6 +196,10 @@ class CallbackCore {
   std::atomic_flag busy_ = ATOMIC_FLAG_INIT;
   std::atomic<bool> active_{false};
   std::atomic<std::uint64_t> callbackCount_{0};
+  std::atomic<std::uint64_t> nativeSessionInvocations_{0};
+  std::atomic<std::uint64_t> nativeControlUpdates_{0};
+  std::atomic<std::uint64_t> dspDeadlineFailures_{0};
+  std::atomic<std::uint64_t> nativeSessionFailStops_{0};
   std::atomic<std::uint64_t> failStops_{0};
   std::atomic<std::uint64_t> overlaps_{0};
 };

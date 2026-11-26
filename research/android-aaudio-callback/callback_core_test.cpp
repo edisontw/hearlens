@@ -62,6 +62,30 @@ bool variableFrameCountsStayZeroAndAllocationFree() {
   return core.callbackCount() == 5 && core.failStopCount() == 0;
 }
 
+bool zeroOnlyWorkloadSkipsNativeSessionAndRemainsSilent() {
+  CallbackCore core(basis, targets, fixture());
+  if (!core.start()) return false;
+  for (const auto frames : {64, 128, 192, 256, 480}) {
+    std::vector<float> output(static_cast<std::size_t>(frames) * 2, 0.7F);
+    const auto result = core.processOutput(output.data(), frames, 48'000,
+        Clock::time_point{}, &fixedClock, 0, false);
+    if (result != CallbackDisposition::kContinue || !isZero(output)) return false;
+  }
+  return core.callbackCount() == 5 && core.nativeSessionInvocations() == 0 &&
+      core.nativeControlUpdates() == 0 && core.failStopCount() == 0;
+}
+
+bool nativeSessionDiagnosticsCountCallsAndControlUpdates() {
+  CallbackCore core(basis, targets, fixture());
+  if (!core.start()) return false;
+  std::vector<float> output(1024 * 2, 0.7F);
+  const auto result = core.processOutput(output.data(), 1024, 48'000,
+      Clock::time_point{}, &fixedClock, 1024, true);
+  return result == CallbackDisposition::kContinue && isZero(output) &&
+      core.nativeSessionInvocations() == 1 &&
+      core.nativeControlUpdates() == 2 && core.dspDeadlineFailureCount() == 0;
+}
+
 bool partialCallbackUsesNegotiatedBurstDeadlineQuantum() {
   CallbackCore core(basis, targets, fixture());
   if (!core.start()) return false;
@@ -83,7 +107,8 @@ bool nonFiniteInputsFailStopAndRemainSilent() {
     const auto result = core.processOutput(output.data(), 128, 48'000,
                                            Clock::time_point{}, &fixedClock);
     if (result != CallbackDisposition::kRejected || !isZero(output) ||
-        core.isActive() || core.failStopCount() != 1) return false;
+        core.isActive() || core.failStopCount() != 1 ||
+        core.nativeSessionFailStopCount() != 1) return false;
   }
   return true;
 }
@@ -95,7 +120,9 @@ bool deadlineOverrunFailsStopAndRemainsSilent() {
   const auto result = core.processOutput(output.data(), 256, 48'000,
                                          Clock::time_point{}, &expiredClock);
   return result == CallbackDisposition::kRejected && isZero(output) &&
-      !core.isActive() && core.failStopCount() == 1;
+      !core.isActive() && core.failStopCount() == 1 &&
+      core.nativeSessionFailStopCount() == 1 &&
+      core.dspDeadlineFailureCount() == 1;
 }
 
 struct OverlapGate {
@@ -203,6 +230,8 @@ void operator delete[](void* memory, std::size_t) noexcept { std::free(memory); 
 int main() {
   const bool checks[] = {
       variableFrameCountsStayZeroAndAllocationFree(),
+      zeroOnlyWorkloadSkipsNativeSessionAndRemainsSilent(),
+      nativeSessionDiagnosticsCountCallsAndControlUpdates(),
       partialCallbackUsesNegotiatedBurstDeadlineQuantum(),
       nonFiniteInputsFailStopAndRemainSilent(),
       deadlineOverrunFailsStopAndRemainsSilent(),
@@ -217,7 +246,8 @@ int main() {
       return 1;
     }
   }
-  std::cout << "Android AAudio callback core: variable frames, zero-only output, "
+  std::cout << "Android AAudio callback core: variable frames, isolated zero-only "
+               "and NativeSession workloads, control-update diagnostics, "
                "allocation probe, NaN/Inf, deadline, overlap, stale generation, "
                "stop/restart, disconnect, background invalidation and negotiated "
                "burst deadline quantum PASS\n";

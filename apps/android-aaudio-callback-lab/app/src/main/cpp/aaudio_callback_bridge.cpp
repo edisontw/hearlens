@@ -32,6 +32,20 @@ constexpr std::size_t kMaximumRecords = 1'000'000;
 constexpr int kFaultNone = 0;
 constexpr int kFaultBackground = 1;
 constexpr int kFaultDisconnect = 2;
+constexpr int kSharingShared = 0;
+constexpr int kSharingExclusive = 1;
+constexpr int kUsageMedia = 0;
+constexpr int kUsageGame = 1;
+constexpr int kBufferDefault = 0;
+constexpr int kBufferTwoBursts = 1;
+
+struct RequestedConfig {
+  bool runNativeSession = true;
+  std::int32_t sampleRate = kFixtureSampleRate;
+  int sharingMode = kSharingShared;
+  int usage = kUsageMedia;
+  int bufferPolicy = kBufferDefault;
+};
 
 struct FixtureData {
   BandBasis basis{};
@@ -130,8 +144,20 @@ struct CallbackRecord {
   std::uint64_t wallNs = 0;
   std::uint64_t cpuNs = 0;
   std::uint64_t jitterNs = 0;
+  std::uint64_t callbackBudgetNs = 0;
+  std::uint64_t dspBudgetNs = 0;
+  std::uint64_t controlUpdatesBefore = 0;
+  std::uint64_t controlUpdatesAfter = 0;
   std::uint32_t frames = 0;
   std::uint32_t deadlineBudgetFrames = 0;
+  bool callbackOverrun = false;
+  bool dspDeadlineFailure = false;
+};
+
+struct XrunObservation {
+  std::uint64_t elapsedNs = 0;
+  std::int32_t cumulativeCount = -1;
+  bool sampledAfterStop = false;
 };
 
 std::uint64_t threadCpuNow(bool& available) noexcept {
@@ -152,13 +178,18 @@ std::uint64_t timePointNs(Clock::time_point value) noexcept {
 }
 
 struct RunContext {
-  RunContext(const FixtureData& fixture, bool verifyOutput)
+  RunContext(const FixtureData& fixture, bool verifyOutput,
+             const RequestedConfig& requested, int durationMs)
       : core(fixture.basis, fixture.targets, fixture.pcm),
         records(new CallbackRecord[kMaximumRecords]{}),
-        verifyZeroOutput(verifyOutput) {}
+        xrunObservations(static_cast<std::size_t>(durationMs / 5) + 8),
+        verifyZeroOutput(verifyOutput), requestedConfig(requested),
+        runNativeSession(requested.runNativeSession) {}
 
   CallbackCore core;
   std::unique_ptr<CallbackRecord[]> records;
+  std::vector<XrunObservation> xrunObservations;
+  std::size_t xrunObservationCount = 0;
   std::atomic<std::uint32_t> callbacksInFlight{0};
   std::atomic<std::uint32_t> recordCount{0};
   std::array<std::uint64_t, kMaximumCallbackFrames + 1> frameCounts{};
@@ -166,6 +197,7 @@ struct RunContext {
   std::uint64_t zeroSamplesVerified = 0;
   std::uint64_t nonZeroSamplesObserved = 0;
   std::uint64_t deadlineMisses = 0;
+  std::uint64_t callbackOverruns = 0;
   std::uint64_t cpuSamples = 0;
   std::uint64_t cpuUnavailableSamples = 0;
   std::atomic<std::uint64_t> logOverflow{0};
@@ -173,8 +205,13 @@ struct RunContext {
   std::uint32_t previousFrames = 0;
   std::int32_t sampleRate = 0;
   std::int32_t framesPerBurst = 0;
+  std::int32_t xrunStartCount = -1;
+  std::int32_t requestedBufferFrames = 0;
+  aaudio_result_t setBufferSizeResult = AAUDIO_OK;
   std::atomic<std::int32_t> errorCallbackCode{AAUDIO_OK};
   const bool verifyZeroOutput;
+  const RequestedConfig requestedConfig;
+  bool runNativeSession;
 };
 static_assert(std::atomic<std::uint32_t>::is_always_lock_free);
 
@@ -196,10 +233,17 @@ aaudio_data_callback_result_t dataCallback(
   const auto callbackStart = Clock::now();
   bool cpuStartAvailable = false;
   const auto cpuStart = threadCpuNow(cpuStartAvailable);
+  const auto controlUpdatesBefore = context->core.nativeControlUpdates();
+  const auto dspDeadlineFailuresBefore =
+      context->core.dspDeadlineFailureCount();
   const auto disposition = context->core.processOutput(
       static_cast<float*>(audioData), numFrames, context->sampleRate,
       callbackStart, &Clock::now,
-      std::max(numFrames, context->framesPerBurst));
+      std::max(numFrames, context->framesPerBurst),
+      context->runNativeSession);
+  // An overlapping invocation must not touch callback-owned histograms,
+  // timestamps, or percentile records. The core has already zeroed this
+  // output buffer and invalidated the active generation.
   if (disposition == CallbackDisposition::kOverlap) {
     return AAUDIO_CALLBACK_RESULT_STOP;
   }
@@ -236,6 +280,8 @@ aaudio_data_callback_result_t dataCallback(
     record.deadlineBudgetFrames = numFrames > 0
         ? static_cast<std::uint32_t>(std::max(numFrames, context->framesPerBurst))
         : 0;
+    record.controlUpdatesBefore = controlUpdatesBefore;
+    record.controlUpdatesAfter = context->core.nativeControlUpdates();
     if (cpuStartAvailable && cpuEndAvailable && cpuEnd >= cpuStart) {
       record.cpuNs = cpuEnd - cpuStart;
       ++context->cpuSamples;
@@ -257,7 +303,16 @@ aaudio_data_callback_result_t dataCallback(
       const auto budgetNs = static_cast<std::uint64_t>(
           static_cast<double>(record.deadlineBudgetFrames) * 1'000'000'000.0 /
           static_cast<double>(context->sampleRate));
-      if (record.wallNs > budgetNs) ++context->deadlineMisses;
+      const auto callbackBudgetNs = static_cast<std::uint64_t>(
+          static_cast<double>(record.frames) * 1'000'000'000.0 /
+          static_cast<double>(context->sampleRate));
+      record.dspBudgetNs = budgetNs;
+      record.callbackBudgetNs = callbackBudgetNs;
+      record.dspDeadlineFailure =
+          context->core.dspDeadlineFailureCount() > dspDeadlineFailuresBefore;
+      record.callbackOverrun = record.wallNs > callbackBudgetNs;
+      if (record.dspDeadlineFailure) ++context->deadlineMisses;
+      if (record.callbackOverrun) ++context->callbackOverruns;
     }
   } else {
     context->logOverflow.fetch_add(1, std::memory_order_relaxed);
@@ -303,8 +358,10 @@ struct StreamSnapshot {
   std::int32_t sampleRate = 0;
   std::int32_t framesPerBurst = 0;
   std::int32_t bufferSize = 0;
+  std::int32_t bufferCapacity = 0;
   aaudio_performance_mode_t performance = AAUDIO_PERFORMANCE_MODE_NONE;
   aaudio_sharing_mode_t sharing = AAUDIO_SHARING_MODE_SHARED;
+  aaudio_usage_t usage = AAUDIO_USAGE_MEDIA;
   std::int32_t xrunCount = -1;
 };
 
@@ -314,10 +371,36 @@ StreamSnapshot snapshotStream(AAudioStream* stream) noexcept {
       AAudioStream_getSampleRate(stream),
       AAudioStream_getFramesPerBurst(stream),
       AAudioStream_getBufferSizeInFrames(stream),
+      AAudioStream_getBufferCapacityInFrames(stream),
       AAudioStream_getPerformanceMode(stream),
       AAudioStream_getSharingMode(stream),
+      AAudioStream_getUsage(stream),
       AAudioStream_getXRunCount(stream),
   };
+}
+
+const char* usageName(aaudio_usage_t usage) noexcept {
+  switch (usage) {
+    case AAUDIO_USAGE_MEDIA: return "MEDIA";
+    case AAUDIO_USAGE_GAME: return "GAME";
+    default: return "OTHER";
+  }
+}
+
+const char* requestedUsageName(int usage) noexcept {
+  return usage == kUsageGame ? "GAME" : "MEDIA";
+}
+
+const char* requestedSharingName(int mode) noexcept {
+  return mode == kSharingExclusive ? "EXCLUSIVE" : "SHARED";
+}
+
+const char* bufferPolicyName(int policy) noexcept {
+  return policy == kBufferTwoBursts ? "TWO_BURSTS" : "DEFAULT";
+}
+
+const char* workloadName(bool runNativeSession) noexcept {
+  return runNativeSession ? "NATIVE_SESSION" : "ZERO_ONLY";
 }
 
 Quantiles quantiles(RunContext& context, std::uint32_t count,
@@ -379,6 +462,20 @@ std::string buildReport(const char* status, const char* reason,
       (requestedRunNs * 99ULL) / 100ULL;
   const char* runCompletion =
       std::strcmp(status, "PASS") == 0 ? "COMPLETE" : status;
+  const bool sampleRateMatches = stream.sampleRate == kFixtureSampleRate;
+  const auto sessionCalls = context.core.nativeSessionInvocations();
+  const char* dspStatus = !context.requestedConfig.runNativeSession
+      ? "NOT_REQUESTED_ZERO_ONLY"
+      : !sampleRateMatches ? "SKIPPED_SAMPLE_RATE_MISMATCH"
+      : sessionCalls == 0 ? "NOT_RUN" :
+          context.core.failStopCount() > 0 ? "FAIL_STOP" : "EXECUTED";
+  const auto xrunDelta = context.xrunStartCount >= 0 && stream.xrunCount >=
+          context.xrunStartCount
+      ? stream.xrunCount - context.xrunStartCount : -1;
+  const bool bufferPolicyAchieved =
+      context.requestedConfig.bufferPolicy == kBufferDefault ||
+      (context.requestedBufferFrames > 0 &&
+       stream.bufferSize == context.requestedBufferFrames);
 
   std::ostringstream json;
   json << "{\"status\":\"" << status << "\",\"reason\":\"" << reason
@@ -388,6 +485,14 @@ std::string buildReport(const char* status, const char* reason,
        << ",\"run_completion\":\"" << runCompletion << "\""
        << ",\"requested_equivalent_frames\":128"
        << ",\"requested_equivalent_duration_ms\":300000"
+       << ",\"workload\":\"" << workloadName(context.requestedConfig.runNativeSession)
+       << "\",\"dsp_execution_status\":\"" << dspStatus << "\""
+       << ",\"dsp_measurement_eligible\":"
+       << (context.requestedConfig.runNativeSession && sampleRateMatches
+               ? "true" : "false")
+       << ",\"dsp_benchmark_valid\":"
+       << (context.requestedConfig.runNativeSession && sampleRateMatches &&
+                   sessionCalls > 0 ? "true" : "false")
        << ",\"run_wall_ns\":" << runWallNs
        << ",\"aaudio_open_result\":" << openResult
        << ",\"aaudio_start_result\":" << startResult
@@ -399,11 +504,22 @@ std::string buildReport(const char* status, const char* reason,
           context.callbacksInFlight.load(std::memory_order_acquire)
        << ",\"actual_callback_observed\":" << (count > 0 ? "true" : "false")
        << ",\"callback_records\":" << count
-       << ",\"successful_dsp_callbacks\":" << context.core.callbackCount()
-       << ",\"dsp_fail_stop_count\":" << context.core.failStopCount()
+       << ",\"callback_workload_iterations\":" << context.core.callbackCount()
+       << ",\"successful_dsp_callbacks\":"
+       << (context.runNativeSession ? context.core.callbackCount() : 0)
+       << ",\"zero_only_callbacks\":"
+       << (context.runNativeSession ? 0 : context.core.callbackCount())
+       << ",\"native_session_invocations\":" << sessionCalls
+       << ",\"native_control_updates\":" << context.core.nativeControlUpdates()
+       << ",\"native_session_fail_stop_count\":"
+       << context.core.nativeSessionFailStopCount()
+       << ",\"callback_core_fail_stop_count\":" << context.core.failStopCount()
        << ",\"callback_overlap_count\":" << context.core.overlapCount()
+       << ",\"dsp_deadline_failure_count\":" << context.deadlineMisses
        << ",\"deadline_misses\":" << context.deadlineMisses
-       << ",\"deadline_budget_basis\":\"max(callback numFrames, negotiated framesPerBurst)\""
+       << ",\"callback_overrun_count\":" << context.callbackOverruns
+       << ",\"dsp_deadline_budget_basis\":\"max(callback numFrames, negotiated framesPerBurst) / negotiated sample rate\""
+       << ",\"callback_overrun_budget_basis\":\"callback numFrames / negotiated sample rate\""
        << ",\"deadline_budget_min_frames\":" << minimumBudgetFrames
        << ",\"deadline_budget_max_frames\":" << maximumBudgetFrames
        << ",\"callback_log_overflow\":" <<
@@ -411,23 +527,53 @@ std::string buildReport(const char* status, const char* reason,
        << ",\"callback_cpu_samples\":" << context.cpuSamples
        << ",\"callback_cpu_unavailable_samples\":" <<
           context.cpuUnavailableSamples
-       << ",\"dsp_thread_cpu_percent\":" << cpuPercent
+       << ",\"callback_thread_cpu_percent\":" << cpuPercent
        << ",\"actual_sample_rate\":" << stream.sampleRate
-       << ",\"requested_sample_rate\":" << kFixtureSampleRate
+       << ",\"requested_sample_rate\":" << context.requestedConfig.sampleRate
+       << ",\"requested_sample_rate_policy\":\""
+       << (context.requestedConfig.sampleRate == AAUDIO_UNSPECIFIED
+               ? "SYSTEM_NATIVE_UNSPECIFIED" : "EXPLICIT") << "\""
        << ",\"dsp_fixture_sample_rate\":" << kFixtureSampleRate
        << ",\"sample_rate_matches_fixture\":"
-       << (stream.sampleRate == kFixtureSampleRate ? "true" : "false")
+       << (sampleRateMatches ? "true" : "false")
        << ",\"frames_per_burst\":" << stream.framesPerBurst
        << ",\"buffer_size_frames\":" << stream.bufferSize
+       << ",\"buffer_capacity_frames\":" << stream.bufferCapacity
+       << ",\"requested_buffer_policy\":\""
+       << bufferPolicyName(context.requestedConfig.bufferPolicy) << "\""
+       << ",\"requested_buffer_size_frames\":" << context.requestedBufferFrames
+       << ",\"buffer_size_set_result_frames\":" << context.setBufferSizeResult
+       << ",\"requested_buffer_policy_achieved\":"
+       << (bufferPolicyAchieved ? "true" : "false")
        << ",\"requested_performance_mode\":\"LOW_LATENCY\""
        << ",\"actual_performance_mode\":\""
        << performanceModeName(stream.performance) << "\""
-       << ",\"requested_sharing_mode\":\"SHARED\""
+       << ",\"requested_performance_mode_achieved\":"
+       << (stream.performance == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+               ? "true" : "false")
+       << ",\"requested_sharing_mode\":\""
+       << requestedSharingName(context.requestedConfig.sharingMode) << "\""
        << ",\"actual_sharing_mode\":\"" << sharingModeName(stream.sharing)
-       << "\",\"format\":\"FLOAT\",\"channels\":2"
+       << "\",\"requested_sharing_mode_achieved\":"
+       << ((context.requestedConfig.sharingMode == kSharingExclusive &&
+            stream.sharing == AAUDIO_SHARING_MODE_EXCLUSIVE) ||
+           (context.requestedConfig.sharingMode == kSharingShared &&
+            stream.sharing == AAUDIO_SHARING_MODE_SHARED) ? "true" : "false")
+       << ",\"requested_usage\":\""
+       << requestedUsageName(context.requestedConfig.usage) << "\""
+       << ",\"actual_usage\":\"" << usageName(stream.usage)
+       << "\",\"requested_usage_achieved\":"
+       << ((context.requestedConfig.usage == kUsageGame &&
+            stream.usage == AAUDIO_USAGE_GAME) ||
+           (context.requestedConfig.usage == kUsageMedia &&
+            stream.usage == AAUDIO_USAGE_MEDIA) ? "true" : "false")
+       << ",\"format\":\"FLOAT\",\"channels\":2"
        << ",\"callback_frames_request\":\"UNSPECIFIED_VARIABLE\""
        << ",\"xrun_count\":" << stream.xrunCount
+       << ",\"xrun_start_count\":" << context.xrunStartCount
+       << ",\"xrun_delta\":" << xrunDelta
        << ",\"xrun_source\":\"AAudioStream_getXRunCount on output stream\""
+       << ",\"xrun_timestamp_resolution\":\"control-thread cumulative-count snapshots every 5 ms; AAudio exposes no per-event timestamps\""
        << ",\"allocation_monitor\":\"callback source path contains no allocation/I/O/JNI/mutex/sleep; AAudio and Bionic internal allocations are not instrumented\""
        << ",\"zero_output_verification_enabled\":"
        << (context.verifyZeroOutput ? "true" : "false")
@@ -440,7 +586,48 @@ std::string buildReport(const char* status, const char* reason,
   appendQuantiles(json, "callback_wall", wall);
   appendQuantiles(json, "callback_thread_cpu", cpu);
   appendQuantiles(json, "callback_interarrival_jitter", jitter);
-  json << "\"frame_count_distribution\":{";
+  std::uint64_t deadlineEventCount = 0;
+  for (std::uint32_t index = 0; index < count; ++index) {
+    const auto& record = context.records[index];
+    if (record.callbackOverrun || record.dspDeadlineFailure) {
+      ++deadlineEventCount;
+    }
+  }
+  json << "\"deadline_event_count\":" << deadlineEventCount
+       << ",\"deadline_events\":[";
+  bool firstDeadlineEvent = true;
+  std::uint64_t reportedDeadlineEvents = 0;
+  for (std::uint32_t index = 0; index < count; ++index) {
+    const auto& record = context.records[index];
+    if (!record.callbackOverrun && !record.dspDeadlineFailure) continue;
+    if (reportedDeadlineEvents >= 128 && !record.dspDeadlineFailure) continue;
+    if (!firstDeadlineEvent) json << ',';
+    firstDeadlineEvent = false;
+    ++reportedDeadlineEvents;
+    json << "{\"callback_index\":" << index
+         << ",\"frame_count\":" << record.frames
+         << ",\"control_updates_before\":" << record.controlUpdatesBefore
+         << ",\"control_updates_after\":" << record.controlUpdatesAfter
+         << ",\"dsp_deadline_budget_ns\":" << record.dspBudgetNs
+         << ",\"callback_budget_ns\":" << record.callbackBudgetNs
+         << ",\"callback_wall_ns\":" << record.wallNs
+         << ",\"dsp_deadline_failure\":"
+         << (record.dspDeadlineFailure ? "true" : "false")
+         << ",\"callback_overrun\":"
+         << (record.callbackOverrun ? "true" : "false") << '}';
+  }
+  json << "],\"deadline_events_truncated\":"
+       << (reportedDeadlineEvents < deadlineEventCount ? "true" : "false")
+       << ",\"xrun_observations\":[";
+  for (std::size_t index = 0; index < context.xrunObservationCount; ++index) {
+    if (index > 0) json << ',';
+    const auto& observation = context.xrunObservations[index];
+    json << "{\"elapsed_ns\":" << observation.elapsedNs
+         << ",\"cumulative_count\":" << observation.cumulativeCount
+         << ",\"sampled_after_stop\":"
+         << (observation.sampledAfterStop ? "true" : "false") << '}';
+  }
+  json << "],\"frame_count_distribution\":{";
   bool first = true;
   for (std::size_t frames = 1; frames < context.frameCounts.size(); ++frames) {
     if (context.frameCounts[frames] == 0) continue;
@@ -459,7 +646,8 @@ std::string buildReport(const char* status, const char* reason,
 
 std::string simpleReport(const char* reason, int durationMs,
                          aaudio_result_t openResult,
-                         aaudio_result_t startResult = AAUDIO_ERROR_INVALID_STATE) {
+                         aaudio_result_t startResult = AAUDIO_ERROR_INVALID_STATE,
+                         const RequestedConfig* requested = nullptr) {
   std::ostringstream json;
   json << "{\"status\":\"NOT_RUN\",\"reason\":\"" << reason
        << "\",\"requested_duration_ms\":" << durationMs
@@ -469,8 +657,21 @@ std::string simpleReport(const char* reason, int durationMs,
        << ",\"actual_callback_observed\":false"
        << ",\"physical_audio_stream_started\":false"
        << ",\"microphone_used\":false,\"bluetooth_api_used\":false"
-       << ",\"dsp_to_audio_buffer_path\":false}"
-       ;
+       << ",\"dsp_to_audio_buffer_path\":false";
+  if (requested != nullptr) {
+    json << ",\"workload\":\"" << workloadName(requested->runNativeSession)
+         << "\",\"requested_sample_rate\":" << requested->sampleRate
+         << ",\"requested_sample_rate_policy\":\""
+         << (requested->sampleRate == AAUDIO_UNSPECIFIED
+                 ? "SYSTEM_NATIVE_UNSPECIFIED" : "EXPLICIT") << "\""
+         << ",\"requested_sharing_mode\":\""
+         << requestedSharingName(requested->sharingMode) << "\""
+         << ",\"requested_usage\":\"" << requestedUsageName(requested->usage)
+         << "\",\"requested_buffer_policy\":\""
+         << bufferPolicyName(requested->bufferPolicy) << "\""
+         << ",\"dsp_benchmark_valid\":false";
+  }
+  json << '}';
   return json.str();
 }
 
@@ -481,22 +682,33 @@ bool isAndroidEmulator() noexcept {
 }
 
 std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
-                       bool verifyZeroOutput, int faultMode, int faultAfterMs) {
+                       bool verifyZeroOutput, int faultMode, int faultAfterMs,
+                       const RequestedConfig& requested) {
   if (!isAndroidEmulator()) {
     return simpleReport("physical-device AAudio stream is disabled in this harness",
-                        durationMs, AAUDIO_ERROR_UNAVAILABLE);
+                        durationMs, AAUDIO_ERROR_UNAVAILABLE,
+                        AAUDIO_ERROR_INVALID_STATE, &requested);
   }
   if (fixtureBytes == nullptr || durationMs < 100 || durationMs > 300'000 ||
       faultMode < kFaultNone || faultMode > kFaultDisconnect ||
       (faultMode != kFaultNone &&
-       (faultAfterMs < 100 || faultAfterMs >= durationMs))) {
+       (faultAfterMs < 100 || faultAfterMs >= durationMs)) ||
+      (requested.sampleRate != AAUDIO_UNSPECIFIED &&
+       requested.sampleRate != kFixtureSampleRate) ||
+      (requested.sharingMode != kSharingShared &&
+       requested.sharingMode != kSharingExclusive) ||
+      (requested.usage != kUsageMedia && requested.usage != kUsageGame) ||
+      (requested.bufferPolicy != kBufferDefault &&
+       requested.bufferPolicy != kBufferTwoBursts)) {
     return simpleReport("invalid benchmark arguments", durationMs,
-                        AAUDIO_ERROR_ILLEGAL_ARGUMENT);
+                        AAUDIO_ERROR_ILLEGAL_ARGUMENT,
+                        AAUDIO_ERROR_INVALID_STATE, &requested);
   }
   const auto byteCount = env->GetArrayLength(fixtureBytes);
   if (byteCount <= 0) {
     return simpleReport("empty portable fixture", durationMs,
-                        AAUDIO_ERROR_ILLEGAL_ARGUMENT);
+                        AAUDIO_ERROR_ILLEGAL_ARGUMENT,
+                        AAUDIO_ERROR_INVALID_STATE, &requested);
   }
   std::vector<std::uint8_t> fixtureBuffer(static_cast<std::size_t>(byteCount));
   env->GetByteArrayRegion(fixtureBytes, 0, byteCount,
@@ -504,32 +716,39 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     return simpleReport("failed reading fixture bytes", durationMs,
-                        AAUDIO_ERROR_INTERNAL);
+                        AAUDIO_ERROR_INTERNAL, AAUDIO_ERROR_INVALID_STATE,
+                        &requested);
   }
   FixtureData fixture;
   if (!parseFixture(fixtureBuffer.data(), fixtureBuffer.size(), fixture)) {
     return simpleReport("portable fixture rejected", durationMs,
-                        AAUDIO_ERROR_INVALID_FORMAT);
+                        AAUDIO_ERROR_INVALID_FORMAT,
+                        AAUDIO_ERROR_INVALID_STATE, &requested);
   }
 
-  RunContext context(fixture, verifyZeroOutput);
+  RunContext context(fixture, verifyZeroOutput, requested, durationMs);
   if (!context.core.start()) {
     return simpleReport("NativeSession authorization failed", durationMs,
-                        AAUDIO_ERROR_INVALID_STATE);
+                        AAUDIO_ERROR_INVALID_STATE,
+                        AAUDIO_ERROR_INVALID_STATE, &requested);
   }
   AAudioStreamBuilder* builder = nullptr;
   const auto builderResult = AAudio_createStreamBuilder(&builder);
   if (builderResult != AAUDIO_OK || builder == nullptr) {
     context.core.stop();
     return simpleReport("AAudio builder unavailable", durationMs,
-                        builderResult);
+                        builderResult, AAUDIO_ERROR_INVALID_STATE, &requested);
   }
   AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
-  AAudioStreamBuilder_setSampleRate(builder, kFixtureSampleRate);
+  AAudioStreamBuilder_setSampleRate(builder, requested.sampleRate);
   AAudioStreamBuilder_setChannelCount(builder, 2);
   AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
-  AAudioStreamBuilder_setUsage(builder, AAUDIO_USAGE_MEDIA);
-  AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED);
+  AAudioStreamBuilder_setUsage(builder, requested.usage == kUsageGame
+                                            ? AAUDIO_USAGE_GAME
+                                            : AAUDIO_USAGE_MEDIA);
+  AAudioStreamBuilder_setSharingMode(
+      builder, requested.sharingMode == kSharingExclusive
+          ? AAUDIO_SHARING_MODE_EXCLUSIVE : AAUDIO_SHARING_MODE_SHARED);
   AAudioStreamBuilder_setPerformanceMode(builder,
                                          AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
   // Sample rate and callback frame count remain unspecified. We record the
@@ -542,7 +761,7 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
   if (openResult != AAUDIO_OK || stream == nullptr) {
     context.core.stop();
     return simpleReport("AAudio output stream open failed", durationMs,
-                        openResult);
+                        openResult, AAUDIO_ERROR_INVALID_STATE, &requested);
   }
   context.sampleRate = AAudioStream_getSampleRate(stream);
   context.framesPerBurst = AAudioStream_getFramesPerBurst(stream);
@@ -551,18 +770,32 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
     context.core.stop();
     AAudioStream_close(stream);
     return simpleReport("unsupported negotiated AAudio format", durationMs,
-                        openResult);
+                        openResult, AAUDIO_ERROR_INVALID_STATE, &requested);
   }
+
+  context.runNativeSession = requested.runNativeSession &&
+      context.sampleRate == kFixtureSampleRate;
+  if (requested.bufferPolicy == kBufferTwoBursts &&
+      context.framesPerBurst > 0 && context.framesPerBurst <=
+          std::numeric_limits<std::int32_t>::max() / 2) {
+    context.requestedBufferFrames = context.framesPerBurst * 2;
+    context.setBufferSizeResult = AAudioStream_setBufferSizeInFrames(
+        stream, context.requestedBufferFrames);
+  } else if (requested.bufferPolicy == kBufferTwoBursts) {
+    context.setBufferSizeResult = AAUDIO_ERROR_OUT_OF_RANGE;
+  }
+  context.xrunStartCount = AAudioStream_getXRunCount(stream);
 
   const auto startResult = AAudioStream_requestStart(stream);
   if (startResult != AAUDIO_OK) {
     context.core.stop();
     AAudioStream_close(stream);
     return simpleReport("AAudio stream start failed", durationMs, openResult,
-                        startResult);
+                        startResult, &requested);
   }
   const auto runStart = Clock::now();
   const auto runDeadline = runStart + std::chrono::milliseconds(durationMs);
+  auto previousXrunCount = context.xrunStartCount;
   bool faultInjected = false;
   while (Clock::now() < runDeadline) {
     const auto error = context.errorCallbackCode.load(std::memory_order_acquire);
@@ -576,6 +809,18 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
       if (faultMode == kFaultDisconnect) context.core.invalidateStreamDisconnect();
       faultInjected = true;
       break;
+    }
+    const auto observedXrunCount = AAudioStream_getXRunCount(stream);
+    if (observedXrunCount >= 0 && previousXrunCount >= 0 &&
+        observedXrunCount != previousXrunCount) {
+      if (context.xrunObservationCount < context.xrunObservations.size()) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            Clock::now() - runStart).count();
+        context.xrunObservations[context.xrunObservationCount++] = {
+            static_cast<std::uint64_t>(std::max<std::int64_t>(elapsed, 0)),
+            observedXrunCount, false};
+      }
+      previousXrunCount = observedXrunCount;
     }
     // This is the control-plane wait. Only AAudio's data callback processes
     // PCM; no timer or worker thread simulates callback frames.
@@ -603,6 +848,13 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
       context.callbacksInFlight.load(std::memory_order_acquire) == 0;
   const auto streamSnapshot = snapshotStream(stream);
   const auto closeResult = AAudioStream_close(stream);
+  const auto finalXrunCount = streamSnapshot.xrunCount;
+  if (finalXrunCount >= 0 && previousXrunCount >= 0 &&
+      finalXrunCount != previousXrunCount &&
+      context.xrunObservationCount < context.xrunObservations.size()) {
+    context.xrunObservations[context.xrunObservationCount++] = {
+        runWallNs, finalXrunCount, true};
+  }
   // Close outside both callback functions, then wait for their guards before
   // retiring the NativeSession generation or reading callback-owned metrics.
   while (context.callbacksInFlight.load(std::memory_order_acquire) > 0) {
@@ -660,9 +912,14 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_hearlens_aaudiocallback_NativeBridge_nativeRunFixture(
     JNIEnv* env, jobject, jbyteArray fixture, jint durationMs,
-    jboolean verifyZeroOutput, jint faultMode, jint faultAfterMs) {
+    jboolean verifyZeroOutput, jint faultMode, jint faultAfterMs,
+    jboolean runNativeSession, jint requestedSampleRate, jint sharingMode,
+    jint usage, jint bufferPolicy) {
+  const RequestedConfig requested{
+      runNativeSession == JNI_TRUE, requestedSampleRate, sharingMode, usage,
+      bufferPolicy};
   const auto report = runFixture(env, fixture, durationMs,
                                  verifyZeroOutput == JNI_TRUE, faultMode,
-                                 faultAfterMs);
+                                 faultAfterMs, requested);
   return env->NewStringUTF(report.c_str());
 }
