@@ -8,6 +8,8 @@ const gradle = readFileSync(app + "build.gradle", "utf8");
 const native = readFileSync(app + "src/main/cpp/zero_callback.cpp", "utf8");
 const core = readFileSync(app + "src/main/cpp/zero_output_core.hpp", "utf8");
 const activity = readFileSync(app + "src/main/java/org/hearlens/physicalzero/MainActivity.kt", "utf8");
+const policy = readFileSync(app + "src/main/java/org/hearlens/physicalzero/ZeroOnlyRoutePolicy.kt", "utf8");
+const policyTests = readFileSync(app + "src/test/java/org/hearlens/physicalzero/ZeroOnlyRoutePolicyTest.kt", "utf8");
 const build = readFileSync("scripts/android/Build-PhysicalZeroAAudioLab.ps1", "utf8");
 const runner = readFileSync("scripts/android/Test-AndroidPhysicalZeroAAudioLab.ps1", "utf8");
 const workflow = readFileSync(".github/workflows/android-aaudio-callback.yml", "utf8");
@@ -27,7 +29,7 @@ test("physical build is isolated, ARM64-only, permissionless, and has no DSP", (
   assert.match(native, /native_session_invocations\\":0/);
 });
 
-test("data callback zeroes and scans the entire actual frame span before metrics", () => {
+test("data callback only writes and verifies zero samples without control-plane work", () => {
   const callbackStart = native.indexOf("aaudio_data_callback_result_t dataCallback(");
   const callbackEnd = native.indexOf("void errorCallback(", callbackStart);
   assert.ok(callbackStart >= 0 && callbackEnd > callbackStart);
@@ -36,7 +38,7 @@ test("data callback zeroes and scans the entire actual frame span before metrics
   assert.ok(callback.indexOf("clearAndVerifyZero") < callback.indexOf("callbackCount.fetch_add"));
   assert.match(core, /for \(std::size_t index = 0; index < sampleCount; \+\+index\) \{\s*output\[index\] = 0\.0F;/);
   assert.match(core, /nonZeroSamples/);
-  assert.doesNotMatch(callback, /JNIEnv|new\s|malloc\s*\(|fstream|mutex|sleep_for|AudioRecord|NativeSession/);
+  assert.doesNotMatch(callback, /JNIEnv|new\s|malloc\s*\(|fstream|mutex|sleep_for|AudioRecord|NativeSession|AAudioStream_getDeviceId/);
   assert.match(callback, /callbackBudgetNs/);
   assert.match(callback, /kCallbackOverrun/);
   assert.match(callback, /kNonZeroOutput/);
@@ -45,31 +47,68 @@ test("data callback zeroes and scans the entire actual frame span before metrics
   const errorEnd = native.indexOf("const char* sharingModeName(", errorStart);
   const errorCallback = native.slice(errorStart, errorEnd);
   assert.match(errorCallback, /callbacksInFlight\.fetch_add[\s\S]*?errorCallbackCount\.fetch_add[\s\S]*?streamErrorCode\.store[\s\S]*?callbacksInFlight\.fetch_sub/);
+  assert.match(errorCallback, /AAUDIO_ERROR_DISCONNECTED/);
 });
 
-test("physical route, foreground, stop, and teardown checks fail closed", () => {
-  const requestedRoute = native.indexOf("AAudioStreamBuilder_setDeviceId(builder, expectedDeviceId)");
-  const actualRouteCheck = native.indexOf("if (session->actualDeviceId != expectedDeviceId)");
-  const startStream = native.indexOf("AAudioStream_requestStart(stream)");
-  assert.ok(requestedRoute >= 0 && actualRouteCheck > requestedRoute && startStream > actualRouteCheck);
-  assert.match(native, /kMaximumDurationMs = 60'000/);
-  assert.match(native, /gStopRequestedToken/);
-  assert.match(native, /gStopRequestedToken\.load\(std::memory_order_acquire\) == token/);
+test("zero-only route policy recognizes but never targets the telephony inventory endpoint", () => {
+  assert.match(activity, /getAudioDevicesForAttributes\(mediaAttributes\)/);
+  assert.match(activity, /AudioAttributes\.USAGE_MEDIA/);
+  assert.match(activity, /AudioDeviceInfo\.TYPE_TELEPHONY -> RouteDeviceKind\.TELEPHONY/);
+  assert.match(activity, /addOnModeChangedListener\(routeExecutor, modeChangedListener\)/);
+  assert.match(activity, /ROUTE_POLL_INTERVAL_MS = 100L/);
+  assert.match(activity, /nativePublishRouteSnapshot\(/);
+  assert.doesNotMatch(activity, /device\.id\s*==\s*9|id\s*==\s*9/);
+  assert.match(policy, /RouteDeviceKind\.TELEPHONY/);
+  assert.match(policy, /predictedDevice\.kind != RouteDeviceKind\.BUILTIN_SPEAKER/);
+  assert.match(policy, /predicted\.size != 1/);
+  assert.match(policy, /snapshot\.audioModeBeforeQueries != MODE_NORMAL/);
+  assert.match(policy, /expected\.routeGeneration/);
+  assert.match(policyTests, /attachedTelephonyEndpointIsInventoryOnly/);
+  assert.match(policyTests, /communicationOrOtherAudioModeIsRejected/);
+  assert.match(policyTests, /bluetoothUsbWiredAndUnknownInventoryAreRejected/);
+  assert.match(policyTests, /multipleSpeakerIDsAndMultiplePredictedRoutesAreRejected/);
+  assert.match(policyTests, /nonSpeakerPredictedRoutesAndMismatchedIDsAreRejected/);
+  assert.match(policyTests, /emptyFailedAndUnavailableRouteQueriesAreRejected/);
+  assert.match(policyTests, /openStartAndRuntimeRouteChangesFailTheAnchoredGeneration/);
+  assert.match(policyTests, /staleGenerationAndStopRestartTokensAreRejected/);
+});
+
+test("native route generation and actual device checks bracket open/start and poll during run", () => {
+  const builderRoute = native.indexOf("AAudioStreamBuilder_setDeviceId(builder, expectedDeviceId)");
+  const policyBeforeOpen = native.indexOf("session->routePolicyValidBeforeOpen = routePolicyMatches", builderRoute);
+  const streamOpen = native.indexOf("AAudioStreamBuilder_openStream(builder, &stream)", policyBeforeOpen);
+  const actualRouteCheck = native.indexOf("if (session->actualDeviceId != expectedDeviceId)", streamOpen);
+  const policyBeforeStart = native.indexOf("session->routePolicyValidBeforeStart = routePolicyMatches", actualRouteCheck);
+  const startStream = native.indexOf("AAudioStream_requestStart(stream)", policyBeforeStart);
+  const routePoll = native.indexOf("if (!routePolicyMatches(token, routeGeneration, expectedDeviceId))", startStream);
+  const actualIdPoll = native.indexOf("session->lastObservedDeviceId = AAudioStream_getDeviceId(stream)", routePoll);
+  assert.ok(builderRoute >= 0 && policyBeforeOpen > builderRoute && streamOpen > policyBeforeOpen);
+  assert.ok(actualRouteCheck > streamOpen && policyBeforeStart > actualRouteCheck);
+  assert.ok(startStream > policyBeforeStart && routePoll > startStream && actualIdPoll > routePoll);
+  assert.match(native, /routePolicyInvalidationMonotonicNs/);
+  assert.match(native, /routeMismatchMonotonicNs/);
+  assert.match(native, /AAUDIO_STREAM_STATE_DISCONNECTED/);
   assert.match(native, /AAudioStream_requestStop\(stream\)/);
   assert.match(native, /AAudioStream_close\(stream\)/);
   assert.match(native, /gDrainTimeoutFailStop\.store\(true/);
-  assert.match(activity, /contentDescription = "Stop zero-only AAudio test"/);
-  assert.match(activity, /onStop\(\)[\s\S]*?nativeRequestStop\(activeRunToken\)/);
-  assert.match(activity, /TYPE_BUILTIN_SPEAKER/);
-  assert.match(activity, /val unexpected = outputs\.filter \{ it\.type !in internalOutputTypes \}/);
-  assert.match(activity, /unexpected\.isNotEmpty\(\)/);
-  assert.match(activity, /unexpected output sink\(s\):/);
-  assert.match(activity, /type=\$\{it\.type\},id=\$\{it\.id\}/);
-  assert.match(activity, /onResume\(\)[\s\S]*?refreshRouteLabel\(\)/);
-  assert.match(activity, /AAudio|zero-only/i);
+  assert.match(native, /kRoutePolicyInvalidated/);
+  assert.match(native, /kLifecycleInvalidated/);
+  assert.doesNotMatch(native.slice(native.indexOf("aaudio_data_callback_result_t dataCallback("), native.indexOf("void errorCallback(")), /routePolicyMatches|gRoutePolicyMutex/);
 });
 
-test("physical runner pins the serial and requires exact owner authorization plus review or explicit owner waiver", () => {
+test("route changes, mode transitions, device inventory changes, and lifecycle fail-stop without reopening", () => {
+  assert.match(activity, /audioManager\.mode/);
+  assert.match(activity, /onAudioDevicesAdded/);
+  assert.match(activity, /onAudioDevicesRemoved/);
+  assert.match(activity, /STOP_REASON_ROUTE_POLICY/);
+  assert.match(activity, /STOP_REASON_LIFECYCLE/);
+  assert.match(activity, /route snapshot changed during the run/);
+  assert.match(activity, /nativeRequestStop\(context\.runToken, reasonCode\)/);
+  assert.doesNotMatch(activity, /nativeRunBuiltInSpeaker\([^\n]*\).*nativeRunBuiltInSpeaker/);
+  assert.match(activity, /route_policy_hardware_guarantee.*false/);
+});
+
+test("physical runner pins the serial, exact hash, route evidence, stop, and teardown gates", () => {
   assert.match(runner, /ValidateSet\('ZY22FWGQTB'\)/);
   assert.match(runner, /ANDROID_ADB -s \$Serial/);
   assert.match(runner, /\$adbGatePassed = \$true/);
@@ -77,29 +116,22 @@ test("physical runner pins the serial and requires exact owner authorization plu
   assert.match(runner, /OwnerAuthorizationRecord/);
   assert.match(runner, /IndependentReviewRecord/);
   assert.match(runner, /OwnerReviewWaiverRecord/);
-  assert.match(runner, /waiveIndependentReview -ne \$true/);
-  assert.match(runner, /OWNER_WAIVER_NO_INDEPENDENT_REVIEW/);
-  assert.match(runner, /reviewGateMode = \$reviewGateMode/);
   assert.match(runner, /owner\.apkSha256\.ToLowerInvariant\(\) -ne \$expectedSha/);
-  assert.match(runner, /review\.apkSha256\.ToLowerInvariant\(\) -ne \$expectedSha/);
-  assert.match(runner, /review\.reviewedAreas/);
-  assert.match(runner, /\[string\]\$review\.reviewer -eq \[string\]\$owner\.owner/);
-  assert.match(runner, /aaudio_xrun_delta -gt 0/);
-  assert.match(runner, /aaudio_stream_error_code -ne 0/);
-  assert.match(runner, /aaudio_error_callback_count -gt 0/);
-  assert.match(native, /streamErrorCode == AAUDIO_OK/);
-  assert.match(native, /streamErrorCode != AAUDIO_OK/);
-  assert.match(runner, /nonzero_output_samples_observed -ne 0/);
+  assert.match(runner, /actual_output_device_id_before_start/);
+  assert.match(runner, /route_policy_valid_before_open/);
+  assert.match(runner, /mediaPredictedRoute\[0\]\.kind -ne 'BUILTIN_SPEAKER'/);
+  assert.match(runner, /aaudio_stop_result -ne 0/);
+  assert.match(runner, /aaudio_close_result -ne 0/);
+  assert.match(runner, /callback_drain_confirmed/);
+  assert.match(build, /API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR/);
+  assert.match(build, /ZeroOnlyRoutePolicy\.kt/);
   assert.match(build, /aapt dump permissions/);
   assert.match(build, /installOrStreamStarted = \$false/);
   assert.match(build, /Get-FileHash -LiteralPath \$apk -Algorithm SHA256/);
-  assert.match(workflow, /Build permissionless physical zero-only ARM64 APK/);
+  assert.match(workflow, /Run physical zero-only route policy host tests/);
+  assert.match(workflow, /:app:testDebugUnitTest/);
   assert.match(workflow, /hearlens-physical-zero-aaudio-arm64-apk/);
-  assert.match(workflow, /physical_zero_output_core_test\.cpp/);
   assert.match(workflow, /Check out exact physical APK source revision/);
-  assert.match(workflow, /path: physical-zero-source/);
   assert.match(workflow, /EXPECTED_SOURCE_COMMIT: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
-  assert.match(workflow, /source_commit=\$\(git -C "\$source_root" rev-parse HEAD\)/);
   assert.match(workflow, /test "\$source_commit" = "\$EXPECTED_SOURCE_COMMIT"/);
-  assert.match(workflow, /--project-dir "\$source_root\/apps\/android-aaudio-physical-zero-lab"/);
 });

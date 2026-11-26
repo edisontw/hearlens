@@ -68,7 +68,8 @@ $sourceFiles = @(
     'apps/android-aaudio-physical-zero-lab/app/src/main/cpp/zero_callback.cpp',
     'apps/android-aaudio-physical-zero-lab/app/src/main/cpp/zero_output_core.hpp',
     'apps/android-aaudio-physical-zero-lab/app/src/main/java/org/hearlens/physicalzero/MainActivity.kt',
-    'apps/android-aaudio-physical-zero-lab/app/src/main/java/org/hearlens/physicalzero/NativeBridge.kt'
+    'apps/android-aaudio-physical-zero-lab/app/src/main/java/org/hearlens/physicalzero/NativeBridge.kt',
+    'apps/android-aaudio-physical-zero-lab/app/src/main/java/org/hearlens/physicalzero/ZeroOnlyRoutePolicy.kt'
 )
 $fileHashes = foreach ($relativePath in $sourceFiles) {
     $file = Join-Path $repoRoot $relativePath
@@ -84,7 +85,7 @@ $buildInfo = [ordered]@{
     packageName = 'org.hearlens.physicalzero'
     maxDurationMs = 60000
     testWorkload = 'ZERO_ONLY'
-    routePolicy = 'BUILTIN_SPEAKER_ONLY_EXACT_DEVICE_ID'
+    routePolicy = 'API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR'
     permissionsDeclared = @()
     nativeSourceFiles = @($fileHashes)
     installOrStreamStarted = $false

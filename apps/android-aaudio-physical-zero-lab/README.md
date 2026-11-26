@@ -1,6 +1,6 @@
 # Physical zero-only AAudio research lab
 
-This is a separate ARM64-only research APK for one bounded Moto g62 callback experiment. Its native library contains no Auto-FIR, NativeSession, PCM fixture, microphone capture or Bluetooth API. It requests one Android built-in speaker device ID, verifies AAudio negotiated that same ID before starting, writes zero to every sample in each callback buffer, and scans the complete buffer for nonzero values.
+This is a separate ARM64-only research APK for one bounded Moto g62 callback experiment. Its native library contains no Auto-FIR, NativeSession, PCM fixture, microphone capture or Bluetooth API. The route policy requires `MODE_NORMAL`, a successful API 33 `USAGE_MEDIA` predicted route containing exactly the same single built-in speaker ID selected from the output inventory, and no unknown or external sink. The inventory may identify `TYPE_TELEPHONY` as a system communication endpoint, but it can never be the predicted route or AAudio target. AAudio is pinned to the speaker ID and the control thread checks the reported ID before start and during the run. The callback writes zero to every sample and scans the complete buffer for nonzero values.
 
 The existing [AAudio callback lab](../android-aaudio-callback-lab/README.md) stays emulator-only. This module does not remove or bypass any of its physical-device checks. The physical runner is a separate script that requires an exact owner authorization record and a passing independent safety review record for the same APK SHA-256, source commit and device serial. The APK build alone never installs the app or opens a stream.
 
@@ -9,7 +9,9 @@ The existing [AAudio callback lab](../android-aaudio-callback-lab/README.md) sta
 - The only workload is `ZERO_ONLY`; this APK does not link the DSP implementation.
 - The stream is output-only, stereo `PCM_FLOAT`, system-native sample rate, `MEDIA`, `SHARED`, and requests `LOW_LATENCY`. The report records negotiated values; no mode is assumed achieved.
 - The app shows a visible Start control and a visible Stop control. It starts no stream on launch. The stream has a native 60-second hard cap.
-- The app refuses to start if any external audio output device is present. It pins AAudio to the exact built-in speaker ID from `AudioManager` metadata and refuses to start if AAudio reports a different ID. It stops on route disappearance, leaving the foreground, a stream error, any callback deadline overrun, an XRun, callback overlap, invalid callback data, nonzero sample observation or metric capacity exhaustion.
+- Before start, the app reads `AudioManager.getMode()` on both sides of route queries and requires `MODE_NORMAL`. On API 33+, `getAudioDevicesForAttributes(USAGE_MEDIA)` must return exactly one `TYPE_BUILTIN_SPEAKER`, and that ID must match the sole inventory speaker. Empty, multiple, telephony, earpiece, external, unknown or failed predictions are refused. Inventory may contain a built-in earpiece and a system `TYPE_TELEPHONY` endpoint; telephony is inventory-only and never selected. Bluetooth, USB, wired, virtual, duplicate-ID and other output endpoints remain refused.
+- During a run, an API 31+ audio-mode listener and a 100 ms control-thread poll watch mode, inventory and MEDIA prediction. Device changes, mode changes, query failures, unexpected snapshots and lifecycle invalidation request fail-stop; the Native control thread checks the route generation around open/start and polls `AAudioStream_getDeviceId()` every 5 ms. The callback does no route query or JNI call. Stop, drain and close outcomes and monotonic detection timestamps are recorded. The app never reopens automatically.
+- These checks observe Android policy and the AAudio-reported ID. They do not guarantee the physical hardware route or exclude undocumented vendor behavior. AAudio's API 33 single-device ID observation cannot enumerate every possible actual route.
 - Normal teardown requests stop, waits up to one second for a terminal stream state and zero in-flight callbacks, closes the stream, then persists JSON from the app process. The callback itself does no file I/O, JNI, logging, locking or dynamic allocation.
 - ADB recovery after a stuck app: `adb -s ZY22FWGQTB shell am force-stop org.hearlens.physicalzero`.
 
@@ -22,6 +24,9 @@ From a Windows checkout with the configured Android SDK/NDK:
 ```powershell
 .\scripts\android\Test-PhysicalZeroOutputCore.ps1
 .\scripts\android\Build-PhysicalZeroAAudioLab.ps1
+.\apps\android-native-dsp-lab\gradlew.bat --no-daemon `
+  --project-dir .\apps\android-aaudio-physical-zero-lab `
+  :app:testDebugUnitTest
 ```
 
 The Windows build writes a unique directory under `D:\Dev\Android\test-results\hearlens\physical-zero-callback\`, including the ARM64 APK, complete Gradle log, permission inspection, build metadata, source-file hashes and APK SHA-256. It performs no ADB installation and opens no audio stream. The Android AAudio GitHub workflow also builds and publishes the permissionless ARM64 APK plus matching build metadata as `hearlens-physical-zero-aaudio-arm64-apk`; use that exact artifact for owner authorization and the physical runner.

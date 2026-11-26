@@ -66,7 +66,7 @@ try {
     }
     if ($buildInfo.nativeAbi -ne 'arm64-v8a' -or $buildInfo.packageName -ne $packageName -or
         $buildInfo.testWorkload -ne 'ZERO_ONLY' -or $buildInfo.maxDurationMs -ne 60000 -or
-        $buildInfo.routePolicy -ne 'BUILTIN_SPEAKER_ONLY_EXACT_DEVICE_ID' -or
+        $buildInfo.routePolicy -ne 'API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR' -or
         $buildInfo.installOrStreamStarted -ne $false) {
         throw 'Build metadata does not match the approved physical zero-only scope.'
     }
@@ -236,6 +236,7 @@ try {
         if ($native.status -ne 'PASS' -or $native.run_completion -ne 'COMPLETE' -or
             !$native.duration_complete -or !$native.physical_audio_stream_started -or
             !$native.actual_callback_observed -or !$native.stream_stop_confirmed -or
+            !$native.callback_drain_confirmed -or $native.callbacks_in_flight_after_drain -ne 0 -or
             $native.actual_sample_rate -le 0 -or $native.frames_per_burst -le 0 -or
             $native.buffer_size_frames -le 0 -or $native.buffer_capacity_frames -le 0 -or
             $native.callback_cpu_samples_available -le 0 -or
@@ -245,13 +246,28 @@ try {
             $native.zero_samples_verified -ne $histogramSamples -or
             $native.nonzero_output_samples_observed -ne 0 -or $native.zero_samples_verified -le 0 -or
             $native.actual_output_device_id -ne $native.requested_output_device_id -or
+            $native.actual_output_device_id_before_start -ne $native.requested_output_device_id -or
             $native.actual_output_device_type -ne 'TYPE_BUILTIN_SPEAKER' -or
+            !$native.route_policy_valid_before_open -or !$native.route_policy_valid_before_start -or
+            $native.route_policy_generation -le 0 -or
+            $native.route_policy_control_checks -le 0 -or
+            $native.actual_output_device_id_control_checks -le 0 -or
+            $native.route_policy_scope -ne 'STANDALONE_ZERO_ONLY_APK' -or
+            $native.route_policy_hardware_guarantee -ne $false -or
+            $native.route_policy_poll_count -le 0 -or
+            $native.route_policy_final_snapshot.audioModeBeforeQueries -ne 0 -or
+            $native.route_policy_final_snapshot.audioModeAfterQueries -ne 0 -or
+            $native.route_policy_final_snapshot.mediaPredictedRoute.Count -ne 1 -or
+            $native.route_policy_final_snapshot.mediaPredictedRoute[0].kind -ne 'BUILTIN_SPEAKER' -or
+            $native.route_policy_final_snapshot.mediaPredictedRoute[0].id -ne $native.requested_output_device_id -or
             $native.callback_overlap_count -ne 0 -or $native.native_session_invocations -ne 0 -or
             $native.dsp_to_audio_buffer_path -ne $false -or $native.microphone_used -ne $false -or
             $native.bluetooth_api_used -ne $false -or $native.aaudio_xrun_delta -gt 0 -or
             $native.callback_overrun_count -gt 0 -or
             $native.aaudio_stream_error_code -ne 0 -or
-            $native.aaudio_error_callback_count -gt 0) {
+            $native.aaudio_error_callback_count -gt 0 -or
+            $native.stream_disconnect_observed -ne $false -or
+            $native.aaudio_stop_result -ne 0 -or $native.aaudio_close_result -ne 0) {
             $errors.Add('Native report did not satisfy the zero-output physical acceptance checks.')
         }
     }
