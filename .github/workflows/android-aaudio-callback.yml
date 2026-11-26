@@ -152,7 +152,7 @@ jobs:
             "packageName": "org.hearlens.physicalzero",
             "maxDurationMs": 60000,
             "testWorkload": "ZERO_ONLY",
-            "routePolicy": "BUILTIN_SPEAKER_ONLY_EXACT_DEVICE_ID",
+            "routePolicy": "API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR",
             "permissionsDeclared": [],
             "installOrStreamStarted": false
           }

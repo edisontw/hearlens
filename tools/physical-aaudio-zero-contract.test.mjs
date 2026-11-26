@@ -124,6 +124,7 @@ test("physical runner pins the serial, exact hash, route evidence, stop, and tea
   assert.match(runner, /aaudio_close_result -ne 0/);
   assert.match(runner, /callback_drain_confirmed/);
   assert.match(build, /API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR/);
+  assert.match(workflow, /"routePolicy": "API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR"/);
   assert.match(build, /ZeroOnlyRoutePolicy\.kt/);
   assert.match(build, /aapt dump permissions/);
   assert.match(build, /installOrStreamStarted = \$false/);
