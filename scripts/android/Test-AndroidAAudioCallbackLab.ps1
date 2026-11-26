@@ -179,22 +179,33 @@ function Test-ClearImprovement {
 
     if (!$Candidate -or !$Baseline -or !$Candidate.dsp_benchmark_valid -or
         $Candidate.run_completion -ne 'COMPLETE' -or
+        $Baseline.run_completion -ne 'COMPLETE' -or
+        $Candidate.run_wall_ns -le 0 -or $Baseline.run_wall_ns -le 0 -or
+        $Candidate.xrun_delta -lt 0 -or $Baseline.xrun_delta -lt 0 -or
         !$Candidate.requested_performance_mode_achieved -or
         !$Candidate.requested_sharing_mode_achieved -or
         !$Candidate.requested_usage_achieved -or
         !$Candidate.requested_buffer_policy_achieved -or
         $Candidate.dsp_deadline_failure_count -ne 0) { return $false }
 
-    $fewerXruns = $Candidate.xrun_delta -ge 0 -and $Baseline.xrun_delta -ge 0 -and
-        $Candidate.xrun_delta -lt $Baseline.xrun_delta
+    $candidateRunNs = [double]$Candidate.run_wall_ns
+    $baselineRunNs = [double]$Baseline.run_wall_ns
+    $candidateXrunRatePerSecond = [double]$Candidate.xrun_delta * 1e9 / $candidateRunNs
+    $baselineXrunRatePerSecond = [double]$Baseline.xrun_delta * 1e9 / $baselineRunNs
+    $candidateOverrunRatePerSecond = [double]$Candidate.callback_overrun_count * 1e9 / $candidateRunNs
+    $baselineOverrunRatePerSecond = [double]$Baseline.callback_overrun_count * 1e9 / $baselineRunNs
+    $baselineExposureOverrunReduction =
+        ($baselineOverrunRatePerSecond - $candidateOverrunRatePerSecond) *
+        ($baselineRunNs / 1e9)
+
+    $fewerXruns = $candidateXrunRatePerSecond -lt $baselineXrunRatePerSecond
     $fewerCallbackOverruns = $Baseline.callback_overrun_count -ge 5 -and
-        $Candidate.callback_overrun_count -le [long]($Baseline.callback_overrun_count * 0.8) -and
-        ($Baseline.callback_overrun_count - $Candidate.callback_overrun_count) -ge 5
+        $candidateOverrunRatePerSecond -le ($baselineOverrunRatePerSecond * 0.8) -and
+        $baselineExposureOverrunReduction -ge 5
     $p99Improvement = $Baseline.callback_wall.p99_ns -gt 0 -and
         $Candidate.callback_wall.p99_ns -le [long]($Baseline.callback_wall.p99_ns * 0.8)
     return ($fewerXruns -or $fewerCallbackOverruns -or $p99Improvement) -and
-        $Candidate.xrun_delta -ge 0 -and
-        ($Baseline.xrun_delta -lt 0 -or $Candidate.xrun_delta -le $Baseline.xrun_delta)
+        $candidateXrunRatePerSecond -le $baselineXrunRatePerSecond
 }
 
 New-Item -ItemType Directory -Force -Path @($runDir, $fixtureRoot, $apkRoot) | Out-Null
@@ -299,7 +310,7 @@ try {
             $longRunDecision = [ordered]@{
                 run = $true
                 selectedScenario = $selected.scenario.scenarioId
-                criteria = 'Requested LOW_LATENCY/sharing/usage achieved, compatible DSP sample rate, COMPLETE short run, zero DSP deadline failures, and fewer XRuns or callback overruns or at least 20% lower wall P99 without more XRuns.'
+                criteria = 'Requested LOW_LATENCY/sharing/usage achieved, compatible DSP sample rate, COMPLETE short run, zero DSP deadline failures, lower elapsed-time-normalized XRun or callback-overrun rate (with minimum reduction), or at least 20% lower wall P99 without a higher XRun rate.'
             }
             $long = Invoke-Scenario -ScenarioId "five-minute-$($selected.scenario.scenarioId)" `
                 -Duration 300000 -RunNativeSession $true `

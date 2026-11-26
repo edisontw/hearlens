@@ -84,6 +84,9 @@ test("unscanned performance runs and fail-stop outcomes remain accurately report
   assert.match(runner, /dumpsys-media-audio-policy/);
   assert.match(runner, /Get-FileHash -LiteralPath[\s\S]*?sha256\.manifest/);
   assert.match(runner, /Test-ClearImprovement/);
+  assert.match(runner, /candidateXrunRatePerSecond/);
+  assert.match(runner, /candidateOverrunRatePerSecond/);
+  assert.match(runner, /baselineExposureOverrunReduction/);
   assert.match(runner, /Duration 300000/);
   assert.match(runner, /baseline-zero-only/);
   assert.match(runner, /baseline-native-session/);
