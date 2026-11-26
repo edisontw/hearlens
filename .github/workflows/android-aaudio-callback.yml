@@ -113,16 +113,25 @@ jobs:
             :app:assembleDebug -PtargetAbis=arm64-v8a
           cp apps/android-aaudio-callback-lab/app/build/outputs/apk/debug/app-debug.apk \
             "$RUNNER_TEMP/hearlens-aaudio-callback-arm64-v8a-debug.apk"
+      - name: Check out exact physical APK source revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: physical-zero-source
       - name: Build permissionless physical zero-only ARM64 APK
         env:
-          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          apps/android-native-dsp-lab/gradlew --no-daemon \
-            --project-dir apps/android-aaudio-physical-zero-lab \
+          source_root="$GITHUB_WORKSPACE/physical-zero-source"
+          source_commit=$(git -C "$source_root" rev-parse HEAD)
+          test "$source_commit" = "$EXPECTED_SOURCE_COMMIT"
+          "$source_root/apps/android-native-dsp-lab/gradlew" --no-daemon \
+            --project-dir "$source_root/apps/android-aaudio-physical-zero-lab" \
             :app:assembleDebug
           apk="$RUNNER_TEMP/hearlens-physical-zero-aaudio-arm64-v8a-debug.apk"
-          cp apps/android-aaudio-physical-zero-lab/app/build/outputs/apk/debug/app-debug.apk "$apk"
+          cp "$source_root/apps/android-aaudio-physical-zero-lab/app/build/outputs/apk/debug/app-debug.apk" "$apk"
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
           permissions="$RUNNER_TEMP/physical-zero-apk-permissions.txt"
           "$aapt" dump permissions "$apk" | tee "$permissions"
@@ -130,7 +139,6 @@ jobs:
           unzip -Z1 "$apk" | grep -qx 'lib/arm64-v8a/libhearlens_physical_zero.so'
           ! unzip -Z1 "$apk" | grep -Eq '^lib/(armeabi|armeabi-v7a|x86|x86_64)/'
           sha256=$(sha256sum "$apk" | cut -d ' ' -f 1)
-          source_commit="$SOURCE_COMMIT"
           cat > "$RUNNER_TEMP/physical-zero-build-info.json" <<EOF
           {
             "sourceCommit": "$source_commit",
