@@ -24,13 +24,13 @@ From a Windows checkout with the configured Android SDK/NDK:
 .\scripts\android\Build-PhysicalZeroAAudioLab.ps1
 ```
 
-The Windows build writes a unique directory under `D:\Dev\Android\test-results\hearlens\physical-zero-callback\`, including the ARM64 APK, complete Gradle log, permission inspection, build metadata, source-file hashes and APK SHA-256. It performs no ADB installation and opens no audio stream. The Android AAudio GitHub workflow also builds and publishes the permissionless ARM64 APK plus matching build metadata as `hearlens-physical-zero-aaudio-arm64-apk`; use that exact artifact for independent review and, later, the physical runner.
+The Windows build writes a unique directory under `D:\Dev\Android\test-results\hearlens\physical-zero-callback\`, including the ARM64 APK, complete Gradle log, permission inspection, build metadata, source-file hashes and APK SHA-256. It performs no ADB installation and opens no audio stream. The Android AAudio GitHub workflow also builds and publishes the permissionless ARM64 APK plus matching build metadata as `hearlens-physical-zero-aaudio-arm64-apk`; use that exact artifact for owner authorization and the physical runner.
 
 ## Physical run gate
 
-First review the exact APK and source commit. Fill owner and independent reviewer JSON records based on the schemas in [the physical zero-only review package](../../docs/ANDROID_AAUDIO_PHYSICAL_ZERO_ONLY_REVIEW_2026-11-26.md). The reviewer must be a person other than the owner and must record a PASS for the exact APK hash, source commit and `ZY22FWGQTB` device. The runner rejects placeholders, mismatched hashes, any different ADB serial, a non-Moto target, API/ABI mismatch, existing package installation, or any declared Android permission.
+Bind all records to the exact APK hash, source commit and `ZY22FWGQTB` device. The runner accepts either a PASS from an independent reviewer who is a person other than the owner, or an explicit owner review-waiver record for the same zero-only scope. The waiver is recorded as a waiver, never as an independent review. Both paths retain the device, permission, route, stop, duration and zero-output checks. The runner rejects placeholders, mismatched hashes, any different ADB serial, a non-Moto target, API/ABI mismatch, existing package installation, or any declared Android permission.
 
-After both records exist, the exact invocation is:
+After the exact-APK owner authorization and either a matching independent review or matching owner waiver exist, the exact invocation is:
 
 ```powershell
 .\scripts\android\Test-AndroidPhysicalZeroAAudioLab.ps1 `
@@ -39,9 +39,9 @@ After both records exist, the exact invocation is:
   -ExpectedApkSha256 <reviewed-64-hex-sha256> `
   -BuildInfoPath <matching-build-info.json> `
   -OwnerAuthorizationRecord <owner-authorization.json> `
-  -IndependentReviewRecord <independent-review.json>
+  -OwnerReviewWaiverRecord <owner-review-waiver.json>
 ```
 
-The script uses `adb -s ZY22FWGQTB` for every device command, verifies the phone identity, installs only the reviewed permissionless package, opens the visible test screen, and activates its Start control only after the record gates pass. It then waits at most 75 seconds for a result, preserves logcat/audio diagnostics and all SHA-256 values in a fresh run directory, and force-stops the package on timeout or teardown. A nonzero output, route mismatch, XRun, callback overrun or unconfirmed stop is recorded as a failure, not a pass.
+The script uses `adb -s ZY22FWGQTB` for every device command, verifies the phone identity, installs only the exact-hash permissionless package, opens the visible test screen, and activates its Start control only after the record gates pass. It then waits at most 75 seconds for a result, preserves logcat/audio diagnostics and all SHA-256 values in a fresh run directory, and force-stops the package on timeout or teardown. A nonzero output, route mismatch, XRun, callback overrun or unconfirmed stop is recorded as a failure, not a pass.
 
-No physical AAudio stream has been started by building or testing this module. The exact APK hash and independent review are expected to change whenever the reviewed source changes; prior approval records cannot be reused for a new hash.
+Building this module does not start a physical AAudio stream. The exact APK hash, owner authorization and review-or-waiver record are bound to the source commit and device; prior records cannot be reused for a different artifact.

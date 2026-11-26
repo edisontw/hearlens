@@ -20,6 +20,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : Activity() {
+    private data class SpeakerRouteSnapshot(
+        val speakerId: Int?,
+        val status: String,
+    )
+
     companion object {
         private const val MAX_DURATION_MS = 60_000
     }
@@ -93,6 +98,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         foreground = true
+        refreshRouteLabel()
     }
 
     override fun onDestroy() {
@@ -148,25 +154,38 @@ class MainActivity : Activity() {
     }
 
     private fun builtInSpeakerId(): Int? {
+        return inspectSpeakerRoute().speakerId
+    }
+
+    private fun inspectSpeakerRoute(): SpeakerRouteSnapshot {
         val outputs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             .filter { it.isSink }
         val internalOutputTypes = setOf(
             AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
             AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
         )
-        if (outputs.any { it.type !in internalOutputTypes }) return null
+        val unexpected = outputs.filter { it.type !in internalOutputTypes }
+        if (unexpected.isNotEmpty()) {
+            val details = unexpected.joinToString { "type=${it.type},id=${it.id}" }
+            return SpeakerRouteSnapshot(null, "Refused: unexpected output sink(s): $details")
+        }
         val speakers = outputs.filter { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-        return speakers.singleOrNull()?.id?.takeIf { it > 0 }
+        val speaker = speakers.singleOrNull()?.takeIf { it.id > 0 }
+        if (speaker == null) {
+            val ids = speakers.joinToString { it.id.toString() }.ifEmpty { "none" }
+            return SpeakerRouteSnapshot(
+                null,
+                "Refused: expected exactly one built-in speaker; found ${speakers.size} (ids=$ids).",
+            )
+        }
+        return SpeakerRouteSnapshot(speaker.id, "Built-in speaker device id ${speaker.id} is available. The stream is not open.")
     }
 
     private fun refreshRouteLabel() {
-        val id = builtInSpeakerId()
+        val route = inspectSpeakerRoute()
+        val id = route.speakerId
         selectedSpeakerId = id
-        status.text = if (id == null) {
-            "Refused: require one built-in speaker and no external audio output devices."
-        } else {
-            "Built-in speaker device id $id is available. The stream is not open."
-        }
+        status.text = route.status
         startButton.isEnabled = id != null && !active.get()
     }
 

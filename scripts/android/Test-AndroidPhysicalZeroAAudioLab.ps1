@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$ExpectedApkSha256,
     [Parameter(Mandatory)][string]$BuildInfoPath,
     [Parameter(Mandatory)][string]$OwnerAuthorizationRecord,
-    [Parameter(Mandatory)][string]$IndependentReviewRecord
+    [string]$IndependentReviewRecord,
+    [string]$OwnerReviewWaiverRecord
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +24,7 @@ $testStarted = $false
 $resultCollected = $false
 $installedHere = $false
 $adbGatePassed = $false
+$reviewGateMode = $null
 $resultPath = $null
 $errors = [System.Collections.Generic.List[string]]::new()
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
@@ -53,7 +55,10 @@ try {
     $apk = (Resolve-Path -LiteralPath $ApkPath).Path
     $buildInfo = Get-Content -LiteralPath $BuildInfoPath -Raw | ConvertFrom-Json
     $owner = Get-Content -LiteralPath $OwnerAuthorizationRecord -Raw | ConvertFrom-Json
-    $review = Get-Content -LiteralPath $IndependentReviewRecord -Raw | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($IndependentReviewRecord) -eq
+        [string]::IsNullOrWhiteSpace($OwnerReviewWaiverRecord)) {
+        throw 'Provide exactly one of IndependentReviewRecord or OwnerReviewWaiverRecord.'
+    }
     $actualApkSha = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
     $expectedSha = $ExpectedApkSha256.ToLowerInvariant()
     if ($actualApkSha -ne $expectedSha -or $buildInfo.apkSha256.ToLowerInvariant() -ne $expectedSha) {
@@ -80,24 +85,45 @@ try {
         [string]::IsNullOrWhiteSpace([string]$owner.authorizationText)) {
         throw 'Owner authorization record must identify the owner, approval time, and explicit authorization.'
     }
-    if ($review.reviewStatus -ne 'PASS' -or $review.deviceSerial -ne $Serial -or
-        $review.apkSha256.ToLowerInvariant() -ne $expectedSha -or
-        $review.sourceCommit -ne $buildInfo.sourceCommit -or
-        [string]::IsNullOrWhiteSpace([string]$review.reviewer) -or
-        [string]$review.reviewer -eq [string]$owner.owner -or
-        [string]::IsNullOrWhiteSpace([string]$review.reviewedAtUtc)) {
-        throw 'Independent safety review record must PASS for the exact APK, commit, serial, and a different reviewer.'
-    }
-    $requiredReviewAreas = @(
-        'isolated_arm64_build', 'permissionless_manifest', 'zero_output_callback',
-        'builtin_speaker_route_refusal', 'fixed_device_scope', 'hard_duration_cap',
-        'visible_stop_and_background_stop', 'callback_allocation_audit',
-        'stop_drain_close', 'evidence_capture'
-    )
-    $missingReviewAreas = @($requiredReviewAreas | Where-Object { $_ -notin @($review.reviewedAreas) })
-    if ($missingReviewAreas.Count -gt 0 -or
-        [string]::IsNullOrWhiteSpace([string]$review.reviewEvidence)) {
-        throw "Independent safety review must cover all required areas and identify review evidence. Missing: $($missingReviewAreas -join ', ')"
+    if ($IndependentReviewRecord) {
+        $review = Get-Content -LiteralPath $IndependentReviewRecord -Raw | ConvertFrom-Json
+        if ($review.reviewStatus -ne 'PASS' -or $review.deviceSerial -ne $Serial -or
+            $review.apkSha256.ToLowerInvariant() -ne $expectedSha -or
+            $review.sourceCommit -ne $buildInfo.sourceCommit -or
+            [string]::IsNullOrWhiteSpace([string]$review.reviewer) -or
+            [string]$review.reviewer -eq [string]$owner.owner -or
+            [string]::IsNullOrWhiteSpace([string]$review.reviewedAtUtc)) {
+            throw 'Independent safety review record must PASS for the exact APK, commit, serial, and a different reviewer.'
+        }
+        $requiredReviewAreas = @(
+            'isolated_arm64_build', 'permissionless_manifest', 'zero_output_callback',
+            'builtin_speaker_route_refusal', 'fixed_device_scope', 'hard_duration_cap',
+            'visible_stop_and_background_stop', 'callback_allocation_audit',
+            'stop_drain_close', 'evidence_capture'
+        )
+        $missingReviewAreas = @($requiredReviewAreas | Where-Object { $_ -notin @($review.reviewedAreas) })
+        if ($missingReviewAreas.Count -gt 0 -or
+            [string]::IsNullOrWhiteSpace([string]$review.reviewEvidence)) {
+            throw "Independent safety review must cover all required areas and identify review evidence. Missing: $($missingReviewAreas -join ', ')"
+        }
+        $reviewGateMode = 'INDEPENDENT_HUMAN_REVIEW'
+    } else {
+        $waiver = Get-Content -LiteralPath $OwnerReviewWaiverRecord -Raw | ConvertFrom-Json
+        if ($waiver.waiveIndependentReview -ne $true -or
+            [string]$waiver.owner -ne [string]$owner.owner -or
+            $waiver.deviceSerial -ne $Serial -or
+            $waiver.apkSha256.ToLowerInvariant() -ne $expectedSha -or
+            $waiver.sourceCommit -ne $buildInfo.sourceCommit -or
+            $waiver.testMode -ne 'ZERO_ONLY' -or
+            $waiver.maxDurationSeconds -ne $maxDurationSeconds -or
+            $waiver.requestedRoute -ne 'BUILTIN_SPEAKER_ONLY' -or
+            $waiver.allowMicrophone -ne $false -or $waiver.allowBluetooth -ne $false -or
+            $waiver.allowAudiblePlayback -ne $false -or $waiver.allowDspOutput -ne $false -or
+            [string]::IsNullOrWhiteSpace([string]$waiver.waivedAtUtc) -or
+            [string]::IsNullOrWhiteSpace([string]$waiver.waiverText)) {
+            throw 'Owner review-waiver record must explicitly waive the independent review and bind this exact APK, commit, serial, and zero-only scope.'
+        }
+        $reviewGateMode = 'OWNER_WAIVER_NO_INDEPENDENT_REVIEW'
     }
 
     $adbVersion = Invoke-TargetAdb -Arguments @('version')
@@ -126,7 +152,11 @@ try {
     Copy-Item -LiteralPath $apk -Destination (Join-Path $runDir 'hearlens-physical-zero-aaudio-arm64-v8a-debug.apk')
     Copy-Item -LiteralPath $BuildInfoPath -Destination (Join-Path $runDir 'build-info.json')
     Copy-Item -LiteralPath $OwnerAuthorizationRecord -Destination (Join-Path $runDir 'owner-authorization-record.json')
-    Copy-Item -LiteralPath $IndependentReviewRecord -Destination (Join-Path $runDir 'independent-review-record.json')
+    if ($IndependentReviewRecord) {
+        Copy-Item -LiteralPath $IndependentReviewRecord -Destination (Join-Path $runDir 'independent-review-record.json')
+    } else {
+        Copy-Item -LiteralPath $OwnerReviewWaiverRecord -Destination (Join-Path $runDir 'owner-review-waiver-record.json')
+    }
     [ordered]@{
         startedUtc = $startedUtc.ToString('o')
         serial = $Serial
@@ -137,6 +167,7 @@ try {
         maxDurationSeconds = $maxDurationSeconds
         workload = 'ZERO_ONLY'
         route = 'BUILTIN_SPEAKER_ONLY'
+        reviewGateMode = $reviewGateMode
         commandsUseExplicitSerial = $true
         microphoneAllowed = $false
         bluetoothAllowed = $false
@@ -249,6 +280,7 @@ try {
     [ordered]@{
         finishedUtc = [DateTime]::UtcNow.ToString('o')
         serial = $Serial
+        reviewGateMode = $reviewGateMode
         runStarted = $testStarted
         installedByRunner = $installedHere
         outcome = if ($errors.Count -eq 0) { 'PASS' } else { 'FAIL_OR_NOT_RUN' }

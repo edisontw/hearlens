@@ -61,17 +61,25 @@ test("physical route, foreground, stop, and teardown checks fail closed", () => 
   assert.match(activity, /contentDescription = "Stop zero-only AAudio test"/);
   assert.match(activity, /onStop\(\)[\s\S]*?nativeRequestStop\(activeRunToken\)/);
   assert.match(activity, /TYPE_BUILTIN_SPEAKER/);
-  assert.match(activity, /outputs\.any\s*\{/);
+  assert.match(activity, /val unexpected = outputs\.filter \{ it\.type !in internalOutputTypes \}/);
+  assert.match(activity, /unexpected\.isNotEmpty\(\)/);
+  assert.match(activity, /unexpected output sink\(s\):/);
+  assert.match(activity, /type=\$\{it\.type\},id=\$\{it\.id\}/);
+  assert.match(activity, /onResume\(\)[\s\S]*?refreshRouteLabel\(\)/);
   assert.match(activity, /AAudio|zero-only/i);
 });
 
-test("physical runner pins the serial and requires matching owner and independent review records", () => {
+test("physical runner pins the serial and requires exact owner authorization plus review or explicit owner waiver", () => {
   assert.match(runner, /ValidateSet\('ZY22FWGQTB'\)/);
   assert.match(runner, /ANDROID_ADB -s \$Serial/);
   assert.match(runner, /\$adbGatePassed = \$true/);
   assert.match(runner, /if \(\$adbGatePassed\)\s*\{\s*try \{ Save-TargetDiagnostics/);
   assert.match(runner, /OwnerAuthorizationRecord/);
   assert.match(runner, /IndependentReviewRecord/);
+  assert.match(runner, /OwnerReviewWaiverRecord/);
+  assert.match(runner, /waiveIndependentReview -ne \$true/);
+  assert.match(runner, /OWNER_WAIVER_NO_INDEPENDENT_REVIEW/);
+  assert.match(runner, /reviewGateMode = \$reviewGateMode/);
   assert.match(runner, /owner\.apkSha256\.ToLowerInvariant\(\) -ne \$expectedSha/);
   assert.match(runner, /review\.apkSha256\.ToLowerInvariant\(\) -ne \$expectedSha/);
   assert.match(runner, /review\.reviewedAreas/);

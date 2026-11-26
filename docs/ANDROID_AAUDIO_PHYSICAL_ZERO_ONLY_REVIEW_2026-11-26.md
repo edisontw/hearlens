@@ -1,6 +1,6 @@
 # Moto g62 zero-only AAudio test — owner review package
 
-**Status: SEPARATE ZERO-ONLY APK IMPLEMENTED; EXACT-APK AUTHORIZATION AND INDEPENDENT REVIEW REQUIRED; NOT RUN.** The owner replied to proceed with this task, but the test runner requires the approval record to bind the exact APK SHA-256, source commit and serial. That record and the independent review are not yet present. No physical APK has been installed and no physical AAudio stream has been opened. The emulator-only callback lab still rejects physical devices in native code, Android instrumentation and its fixed-serial PowerShell runner; those checks remain unchanged.
+**Status: ORIGINAL EXACT-APK OWNER AUTHORIZATION RECORDED; OWNER WAIVED INDEPENDENT HUMAN REVIEW FOR THAT BOUNDED RUN; PHYSICAL STREAM NOT RUN.** The runner installed and launched the authorized APK, but the visible Start control was disabled by its route guard, so it opened no AAudio stream. The runner removed the APK and captured evidence. A diagnostic update is being prepared; any rebuilt APK requires fresh exact-hash owner authorization. The waiver is not represented as a completed review. The emulator-only callback lab still rejects physical devices in native code, Android instrumentation and its fixed-serial PowerShell runner; those checks remain unchanged.
 
 ## Proposed bounded test
 
@@ -15,7 +15,7 @@ Target only the already identified Moto g62 5G: model `Moto g62 5G`, Android 13 
 
 This is a digital-zero callback experiment, not a listening test, hearing assistance, a safety proof for any future nonzero output, or a release of the M04 gate. Do not wear headphones or connect the phone to AIR31/Bluetooth for this test. The callback emits only zero-valued samples; startup/shutdown acoustic transients are not measured or certified.
 
-## Authorization and independent review required before the phone runner can execute
+## Authorization and review gate
 
 The owner must explicitly approve all of the following in the test record:
 
@@ -23,7 +23,7 @@ The owner must explicitly approve all of the following in the test record:
 - The exact APK SHA-256, test source commit, maximum duration and the stop/fail-stop behavior described above. This APK's only workload is ZERO_ONLY; no NativeSession workload can be selected.
 - Confirmation that this is a zero-sample callback research test and does not authorize microphone use, Bluetooth APIs/routes, audible playback, headphone listening or live hearing output.
 
-An independent reviewer must record review of the isolated build, zero-only output path, route refusal behavior, device-specific scope, permissionless manifest, timeout, visible/manual stop, background invalidation, callback path, stop/drain/close path and evidence capture. The reviewer must be a person other than the owner. `Test-AndroidPhysicalZeroAAudioLab.ps1` refuses to install or start the app until both records match the exact APK SHA-256, source commit and serial. A user response to prepare/authorize the test does not create this exact-hash record automatically.
+The exact-APK owner authorization record is present. The owner then explicitly instructed us to skip the separate independent human review for this one bounded run. The resulting waiver record is bound to the same APK SHA-256, source commit, device serial and zero-only scope. No independent review is claimed or recorded as PASS. The runner accepts either a valid independent review or this explicit owner-waiver record; it always requires exact-hash owner authorization and retains the device, permission, route, duration, zero-output and teardown checks. The waiver does not authorize microphone use, Bluetooth, audible content, DSP output, listening, or any future hearing test.
 
 The records stay in the local evidence directory and should not be committed with the app. Use these field shapes after reviewing the final APK:
 
@@ -73,8 +73,16 @@ The records stay in the local evidence directory and should not be committed wit
 }
 ```
 
-The current chat response is recorded as approval to prepare/continue this work. Before a phone stream can run, the owner still needs to approve the final exact APK SHA-256 and source commit using the first record; the independent review must also PASS for those same values.
+For this run, the records are stored outside the repository under `D:\Dev\Android\test-results\hearlens\physical-zero-callback\github-artifact-pr164-707ff5a-830ff182d3e4467a96e5747d7e437bf4`:
+
+- APK SHA-256: `afd6eca9bb54b288998fcef5ec1245ca912ba6e8a8233cb302d1dcc532fcf194`
+- Source commit: `707ff5a58ce46234d1adae271d74d30a7a32c5ab`
+- Device serial: `ZY22FWGQTB`
+- Owner authorization record SHA-256: `c88ee9cbc006e3d5a19cc96098bd20a5c264fe5ad779110bc567629fe02889fc`
+- Owner review-waiver record SHA-256: `1a20cfa9898da6e4ebac2d2dbd49c6925fe5d60fc0a6cd7e7c4805743099f3bf`
+
+These records authorize only the bounded zero-only test above for the listed APK and commit. That APK was installed and launched, but its route guard disabled Start; no physical stream was opened. The APK was removed after the attempt. A rebuilt APK is not covered by these records.
 
 ## Current state
 
-The separate ARM64 APK and hash-gated runner are implemented. The build artifact is stored outside the repository under `D:\Dev\Android\test-results\hearlens\physical-zero-callback\`; no physical APK was installed and no physical AAudio stream was opened. The emulator matrix and its evidence are documented in [AAudio callback diagnostics](./ANDROID_AAUDIO_CALLBACK_DIAGNOSTICS_2026-11-26.md). M04 REAL HEARING remains **BLOCKED / DEFERRED**.
+The separate ARM64 APK and hash-gated runner are implemented. The first physical attempt is recorded at `D:\Dev\Android\test-results\hearlens\physical-zero-callback\20261126-205108-051-device-59aaf1a2`; the exact-hash APK was installed and launched, the UI route guard refused Start, and cleanup uninstalled the APK. No physical AAudio stream was opened. System audio diagnostics listed no connected audio devices, so the source is not yet identified; the current source update exposes non-intrusive output type/id details and refreshes route inventory when the Activity resumes. The original exact-hash records do not authorize a rebuilt APK. The emulator matrix and its evidence are documented in [AAudio callback diagnostics](./ANDROID_AAUDIO_CALLBACK_DIAGNOSTICS_2026-11-26.md). M04 REAL HEARING remains **BLOCKED / DEFERRED**.
