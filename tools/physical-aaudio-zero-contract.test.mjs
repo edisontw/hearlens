@@ -41,6 +41,10 @@ test("data callback zeroes and scans the entire actual frame span before metrics
   assert.match(callback, /kCallbackOverrun/);
   assert.match(callback, /kNonZeroOutput/);
   assert.match(callback, /kCallbackOverlap/);
+  const errorStart = native.indexOf("void errorCallback(");
+  const errorEnd = native.indexOf("const char* sharingModeName(", errorStart);
+  const errorCallback = native.slice(errorStart, errorEnd);
+  assert.match(errorCallback, /callbacksInFlight\.fetch_add[\s\S]*?errorCallbackCount\.fetch_add[\s\S]*?streamErrorCode\.store[\s\S]*?callbacksInFlight\.fetch_sub/);
 });
 
 test("physical route, foreground, stop, and teardown checks fail closed", () => {
@@ -73,6 +77,10 @@ test("physical runner pins the serial and requires matching owner and independen
   assert.match(runner, /review\.reviewedAreas/);
   assert.match(runner, /\[string\]\$review\.reviewer -eq \[string\]\$owner\.owner/);
   assert.match(runner, /aaudio_xrun_delta -gt 0/);
+  assert.match(runner, /aaudio_stream_error_code -ne 0/);
+  assert.match(runner, /aaudio_error_callback_count -gt 0/);
+  assert.match(native, /streamErrorCode == AAUDIO_OK/);
+  assert.match(native, /streamErrorCode != AAUDIO_OK/);
   assert.match(runner, /nonzero_output_samples_observed -ne 0/);
   assert.match(build, /aapt dump permissions/);
   assert.match(build, /installOrStreamStarted = \$false/);

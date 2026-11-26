@@ -218,7 +218,9 @@ try {
             $native.callback_overlap_count -ne 0 -or $native.native_session_invocations -ne 0 -or
             $native.dsp_to_audio_buffer_path -ne $false -or $native.microphone_used -ne $false -or
             $native.bluetooth_api_used -ne $false -or $native.aaudio_xrun_delta -gt 0 -or
-            $native.callback_overrun_count -gt 0) {
+            $native.callback_overrun_count -gt 0 -or
+            $native.aaudio_stream_error_code -ne 0 -or
+            $native.aaudio_error_callback_count -gt 0) {
             $errors.Add('Native report did not satisfy the zero-output physical acceptance checks.')
         }
     }

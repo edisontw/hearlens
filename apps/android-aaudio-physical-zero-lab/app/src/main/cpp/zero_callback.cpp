@@ -109,6 +109,7 @@ struct Session {
   std::array<std::atomic<std::uint64_t>, kMaximumHistogramFrames + 1> frameHistogram{};
   std::atomic<std::uint32_t> callbacksInFlight{0};
   std::atomic<std::uint64_t> callbackInvocationCount{0};
+  std::atomic<std::uint64_t> errorCallbackCount{0};
   std::atomic<std::uint64_t> callbackCount{0};
   std::atomic<std::uint64_t> zeroSamplesVerified{0};
   std::atomic<std::uint64_t> nonZeroSamplesObserved{0};
@@ -262,8 +263,11 @@ void errorCallback(AAudioStream*, void* userData,
                    aaudio_result_t error) noexcept {
   auto* session = static_cast<Session*>(userData);
   if (session == nullptr) return;
+  session->callbacksInFlight.fetch_add(1, std::memory_order_acq_rel);
+  session->errorCallbackCount.fetch_add(1, std::memory_order_relaxed);
   session->streamErrorCode.store(error, std::memory_order_release);
   requestStop(*session, StopReason::kStreamError);
+  session->callbacksInFlight.fetch_sub(1, std::memory_order_acq_rel);
 }
 
 const char* sharingModeName(aaudio_sharing_mode_t mode) noexcept {
@@ -312,6 +316,10 @@ std::string report(Session& session, const char* status,
                    bool durationComplete) {
   const auto count = session.callbackCount.load(std::memory_order_acquire);
   const auto invocations = session.callbackInvocationCount.load(std::memory_order_acquire);
+  const auto streamErrorCode = session.streamErrorCode.load(std::memory_order_acquire);
+  const auto storedStopReason = session.stopReason.load(std::memory_order_acquire);
+  const auto reportedStopReason = streamErrorCode != AAUDIO_OK
+      ? StopReason::kStreamError : storedStopReason;
   auto wall = valuesFor(session, count, &CallbackRecord::wallNs);
   auto cpu = valuesFor(session, count, &CallbackRecord::threadCpuNs);
   auto interArrival = valuesFor(session, count,
@@ -372,7 +380,9 @@ std::string report(Session& session, const char* status,
        << ",\"aaudio_stop_result\":" << session.stopResult
        << ",\"aaudio_close_result\":" << session.closeResult
        << ",\"aaudio_stream_error_code\":"
-       << session.streamErrorCode.load(std::memory_order_acquire)
+       << streamErrorCode
+       << ",\"aaudio_error_callback_count\":"
+       << session.errorCallbackCount.load(std::memory_order_acquire)
        << ",\"physical_audio_stream_started\":"
        << (session.streamStarted ? "true" : "false")
        << ",\"stream_stop_confirmed\":"
@@ -443,8 +453,8 @@ std::string report(Session& session, const char* status,
     json << "{\"elapsed_ns\":" << observation.elapsedNs
          << ",\"cumulative_count\":" << observation.cumulativeCount << '}';
   }
-  json << "],\"stop_reason\":\"" << reasonName(
-      session.stopReason.load(std::memory_order_acquire)) << "\"} ";
+  json << "],\"stop_reason\":\"" << reasonName(reportedStopReason)
+       << "\"} ";
   return json.str();
 }
 
@@ -479,6 +489,10 @@ std::string drainTimeoutReport(const Session& session, std::uint64_t elapsedNs) 
        << ",\"physical_audio_stream_started\":true"
        << ",\"stream_stop_confirmed\":false"
        << ",\"aaudio_close_result\":" << session.closeResult
+       << ",\"aaudio_stream_error_code\":"
+       << session.streamErrorCode.load(std::memory_order_acquire)
+       << ",\"aaudio_error_callback_count\":"
+       << session.errorCallbackCount.load(std::memory_order_acquire)
        << ",\"callback_count\":"
        << session.callbackInvocationCount.load(std::memory_order_acquire)
        << ",\"callback_records_count\":"
@@ -677,8 +691,10 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   }
 
   auto reason = session->stopReason.load(std::memory_order_acquire);
+  const auto streamErrorCode = session->streamErrorCode.load(std::memory_order_acquire);
   const auto callbacks = session->callbackCount.load(std::memory_order_acquire);
   bool durationComplete = reason == StopReason::kDuration && callbacks > 0 &&
+      streamErrorCode == AAUDIO_OK &&
       elapsedNs >= static_cast<std::uint64_t>(kMaximumDurationMs) * 990'000ULL;
   const char* status = "FAIL_STOP";
   const char* reasonText = reasonName(reason);
@@ -688,6 +704,9 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   } else if (session->closeResult != AAUDIO_OK) {
     status = "STREAM_CLOSE_ERROR";
     reasonText = "AAudioStream_close returned an error";
+  } else if (streamErrorCode != AAUDIO_OK) {
+    status = "STREAM_ERROR";
+    reasonText = "AAudio error callback reported a stream failure";
   } else if (reason == StopReason::kStreamError) {
     status = "STREAM_ERROR";
     reasonText = "AAudio error callback or stream setup requested fail-stop";
