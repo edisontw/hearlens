@@ -1,0 +1,22 @@
+{
+  "waiveIndependentReview": false,
+  "owner": "SAME_OWNER_AS_AUTHORIZATION",
+  "waivedAtUtc": "YYYY-MM-DDTHH:MM:SSZ",
+  "artifactId": 0,
+  "sourceCommit": "40_HEX_SOURCE_COMMIT",
+  "deviceSerial": "ZY22FWGQTB",
+  "testMode": "DSP_SHADOW_ZERO_OUTPUT",
+  "requestedRoute": "BUILTIN_SPEAKER_ONLY",
+  "maxDurationSeconds": 60,
+  "maxExtensionSeconds": 0,
+  "apkSha256": "64_HEX_APK_SHA256",
+  "archiveSha256": "64_HEX_RELEASE_ARCHIVE_SHA256",
+  "allowSyntheticDspProcessing": true,
+  "allowMicrophone": false,
+  "allowBluetooth": false,
+  "allowExternalAudioDevices": false,
+  "allowNonzeroPcmOutput": false,
+  "allowDspOutput": false,
+  "allowActualHearing": false,
+  "waiverText": "I explicitly waive independent safety review only for this exact artifact and one 60-second DSP-shadow zero-output run. This waiver is not independent review PASS."
+}

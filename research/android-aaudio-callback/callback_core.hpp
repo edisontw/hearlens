@@ -80,6 +80,7 @@ class CallbackCore {
       ReadClock now = &Clock::now,
       std::int32_t deadlineFrameBudget = 0,
       bool executeNativeSession = true) noexcept {
+    lastDspProcessingNs_.store(0, std::memory_order_relaxed);
     // Output is zeroed before validation or DSP work. The pointer is never
     // passed to NativeSession, and DSP scratch is never copied to this buffer.
     if (outputBuffer != nullptr && frames > 0) {
@@ -133,9 +134,16 @@ class CallbackCore {
         std::chrono::duration<double>(
             static_cast<double>(budgetFrames) / static_cast<double>(sampleRate)));
     const auto deadline = callbackStart + budget;
+    const auto dspStart = Clock::now();
     const auto candidate = session_.process(
         ticket_, kSyntheticRouteStamp, inputScratch_.data(),
         static_cast<std::size_t>(frames) * kChannels, deadline, now);
+    const auto dspEnd = Clock::now();
+    if (dspEnd >= dspStart) {
+      lastDspProcessingNs_.store(static_cast<std::uint64_t>(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              dspEnd - dspStart).count()), std::memory_order_relaxed);
+    }
     nativeSessionInvocations_.fetch_add(1, std::memory_order_relaxed);
     nativeControlUpdates_.store(session_.controlUpdateCount(),
                                 std::memory_order_relaxed);
@@ -160,6 +168,9 @@ class CallbackCore {
   }
   auto nativeControlUpdates() const noexcept -> std::uint64_t {
     return nativeControlUpdates_.load(std::memory_order_relaxed);
+  }
+  auto lastDspProcessingNs() const noexcept -> std::uint64_t {
+    return lastDspProcessingNs_.load(std::memory_order_relaxed);
   }
   auto dspDeadlineFailureCount() const noexcept -> std::uint64_t {
     return dspDeadlineFailures_.load(std::memory_order_relaxed);
@@ -198,6 +209,7 @@ class CallbackCore {
   std::atomic<std::uint64_t> callbackCount_{0};
   std::atomic<std::uint64_t> nativeSessionInvocations_{0};
   std::atomic<std::uint64_t> nativeControlUpdates_{0};
+  std::atomic<std::uint64_t> lastDspProcessingNs_{0};
   std::atomic<std::uint64_t> dspDeadlineFailures_{0};
   std::atomic<std::uint64_t> nativeSessionFailStops_{0};
   std::atomic<std::uint64_t> failStops_{0};
