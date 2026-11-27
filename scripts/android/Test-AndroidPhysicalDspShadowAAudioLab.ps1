@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][ValidateSet('ZY22FWGQTB')][string]$Serial,
-    [Parameter(Mandatory)][ValidateRange(1, 2147483647)][int]$ArtifactId,
+    [Parameter(Mandatory)][ValidateRange(1, 9223372036854775807)][long]$ArtifactId,
     [Parameter(Mandatory)][string]$ApkPath,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$ExpectedApkSha256,
     [Parameter(Mandatory)][string]$ReleaseArchivePath,
