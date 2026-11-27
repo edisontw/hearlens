@@ -10,13 +10,13 @@ The missing optimization flag is a plausible, reproducible contributor to the fi
 
 ## Comparison method
 
-The same source tree at main `1b00d2373a5f71229c29e08b85cddaa4ac1c8a09`, Android NDK shared library, canonical portable fixture, `CallbackCore` → `NativeSession` → stereo Auto-FIR path, and JNI no-audio harness were built twice with only the explicit optimization profile changed. O0 and O2 compile commands were read back and verified from `compile_commands.json`; O2 was `-O2 -fno-fast-math -ffp-contract=off`, with fast math rejected. The fixture was 48 kHz and the primary callback-equivalent size was 192 frames with the unchanged 4 ms deadline. The harness also ran new-generation and 64/128-frame variable partitions.
+The exact clean source commit `3f40549d33138c18912adaa53a3ff33e54374fd6`, Android NDK shared library, canonical portable fixture, `CallbackCore` → `NativeSession` → stereo Auto-FIR path, and JNI no-audio harness were built twice with only the explicit optimization profile changed. O0 and O2 compile commands were read back and verified from `compile_commands.json`; O2 was `-O2 -fno-fast-math -ffp-contract=off`, with fast math rejected. The fixture was 48 kHz and the primary callback-equivalent size was 192 frames with the unchanged 4 ms deadline. The harness also ran new-generation and 64/128-frame variable partitions.
 
 These runs used the API 29 x86_64 Android emulator, serial `emulator-5554`, not the Moto g62. The instrumentation invoked the same native callback core synchronously without opening AAudio. Both reports explicitly recorded `physical_stream_opened=false`, `aaudio_open_calls=0`, no DSP-to-output connection, and verified zero-only private output buffers. This is Android JNI/native DSP timing evidence, not AAudio scheduling, ARM64 performance or an audio callback benchmark.
 
 ## Final repeated run
 
-Run directory: `D:\Dev\Android\test-results\hearlens\n07-first-callback\20261127-233538`.
+Run directory: `D:\Dev\Android\test-results\hearlens\n07-first-callback\20261127-235144`.
 
 | Metric | O0 | O2 |
 | --- | ---: | ---: |
@@ -24,38 +24,38 @@ Run directory: `D:\Dev\Android\test-results\hearlens\n07-first-callback\20261127
 | Callback records | 32 | 32 |
 | Deadline failures / full callback overruns | 0 / 0 | 0 / 0 |
 | Verified zero samples / nonzero samples | 11,520 / 0 | 11,520 / 0 |
-| New instance, first unprofiled 192-frame wall | 0.6347 ms | 0.0958 ms |
-| New instance, first profiled wall | 0.7087 ms | 0.1989 ms |
-| New generation, first profiled wall | 0.7744 ms | 0.1978 ms |
-| 12 steady 192-frame callbacks, unprofiled wall P50 / P95 / max | 0.9786 / 1.2241 / 1.2241 ms | 0.1032 / 0.1065 / 0.1065 ms |
-| 12 steady callbacks, profiled wall P50 / P95 / max | 1.0449 / 1.8494 / 1.8494 ms | 0.1778 / 0.2446 / 0.2446 ms |
-| Four variable 64/128-frame profiled callbacks, maximum wall | 0.5829 ms | 0.1577 ms |
+| New instance, first unprofiled 192-frame wall | 0.7668 ms | 0.1015 ms |
+| New instance, first profiled wall | 0.6852 ms | 0.1935 ms |
+| New generation, first profiled wall | 0.8738 ms | 0.1995 ms |
+| 12 steady 192-frame callbacks, unprofiled wall P50 / P95 / max | 0.9673 / 1.4544 / 1.4544 ms | 0.1020 / 0.1030 / 0.1030 ms |
+| 12 steady callbacks, profiled wall P50 / P95 / max | 1.0358 / 1.8096 / 1.8096 ms | 0.1744 / 0.2381 / 0.2381 ms |
+| Four variable 64/128-frame profiled callbacks, maximum wall | 0.4553 ms | 0.1525 ms |
 
-The first unprofiled 192-frame callback was about 6.6× faster under O2 (about 85% lower wall time). In this one emulator run, the O2 first and steady callbacks were below the 2 ms research screen and well below the unchanged 4 ms deadline. These are short synchronous samples and are not statistical evidence about Moto g62 real-time scheduling.
+The first unprofiled 192-frame callback was about 7.6× faster under O2 (about 87% lower wall time). In this one emulator run, the O2 first and steady callbacks were below the 2 ms research screen and well below the unchanged 4 ms deadline. These are short synchronous samples and are not statistical evidence about Moto g62 real-time scheduling.
 
 The first profiled callback reported zero control updates in both profiles. Separate initialization timings show the FIR coefficients were synthesized on that callback:
 
 | First 192-frame profiled callback stage | O0 | O2 |
 | --- | ---: | ---: |
-| Generation reset | 8.3 µs | 6.3 µs |
-| Initial FIR coefficients, left / right | 14.2 / 13.9 µs | 6.4 / 6.4 µs |
-| Detector | 76.2 µs | 17.7 µs |
-| FIR convolution | 494.3 µs | 66.6 µs |
+| Generation reset | 7.8 µs | 5.9 µs |
+| Initial FIR coefficients, left / right | 13.8 / 13.4 µs | 6.2 / 6.1 µs |
+| Detector | 73.7 µs | 17.2 µs |
+| FIR convolution | 480.0 µs | 65.8 µs |
 | Dynamic control update | 0 µs | 0 µs |
-| Scratch validation / clear | 6.9 / 6.1 µs | 6.0 / 5.9 µs |
+| Scratch validation / clear | 6.6 / 5.9 µs | 5.7 / 6.0 µs |
 
-On the first control-update callback (192 frames, control updates 0→1), profiled O0 measured 704.0 µs convolution and 29.6 µs update work; O2 measured 84.2 µs convolution and 12.9 µs update work. FIR convolution dominated the measured stages. Stage profiling adds clock reads; use unprofiled rows for overall timing comparisons.
+On the first control-update callback (192 frames, control updates 0→1), profiled O0 measured 712.5 µs convolution and 28.9 µs update work; O2 measured 83.3 µs convolution and 12.5 µs update work. FIR convolution dominated the measured stages. Stage profiling adds clock reads; use unprofiled rows for overall timing comparisons.
 
-An earlier exploratory emulator run at `D:\Dev\Android\test-results\hearlens\n07-first-callback\20261127-220144` recorded two O0 deadline failures/overruns across 19 callback records, including a 6.41 ms wall callback with about 0.87 ms thread CPU, while its O2 sample had no misses. A repeated run was used for the table above and recorded zero misses in both profiles. The earlier observation is retained as scheduling variability, not treated as an O0-only DSP cost.
+An earlier exploratory emulator run at `D:\Dev\Android\test-results\hearlens\n07-first-callback\20261127-220144` recorded two O0 deadline failures/overruns across 19 callback records, including a 6.41 ms wall callback with about 0.87 ms thread CPU, while its O2 sample had no misses. The later clean-commit run recorded zero misses in both profiles. The earlier observation is retained as scheduling variability, not treated as an O0-only DSP cost. An intermediate repeat at `20261127-233538` was superseded: its working tree contained the candidate changes while its build-info recorded the pre-change base SHA. The primary run above uses a clean tree and the exact candidate commit.
 
 ## Build identities and evidence
 
-Both final APKs were built from `1b00d2373a5f71229c29e08b85cddaa4ac1c8a09` and use the same instrumentation APK SHA-256 `eec5895db93e9cb9b0dc550bb5d09f1a8660e879c125becafdbba73eff340bef`.
+Both final APKs were built from `3f40549d33138c18912adaa53a3ff33e54374fd6`. Both instrumentation runs exited 0 and reported 5/5 tests; the packages were uninstalled and verified absent from the emulator after the run.
 
 | Profile | APK SHA-256 | Compile database SHA-256 | Benchmark JSON SHA-256 |
 | --- | --- | --- | --- |
-| O0 | `fd2d61a1b3c0c4858ae5b927146c278e6fa67cba97d945034896967e5c3a13a6` | `146cd90848aa0e36cfb533508e7108a962600c6c91703c63f01ce8cf0813c81a` | `358d87d82ce17e057567c607942934aaf8ad7e4f8317e03aa96b9fda02c3cd19` |
-| O2 | `0c540720a20cebc0b06056d401f8588531effff2fff994fe06787d2eeac8ede6` | `b0c71844d06d5ef6a3480cdad98b51b62fd0049228094d8dce6787e68782b156` | `f62b0eeb7fc4cf26c330764ef12326522123caece835710282424421c50b5117` |
+| O0 | `3641651f7a733b9a6417e937eb890c92a78c6a324ab5a4c1efecaaf80c693aa3` | `146cd90848aa0e36cfb533508e7108a962600c6c91703c63f01ce8cf0813c81a` | `56f9409db978b661ce2bf0569e78255f6ba2e79b60d0344982118e83d7322d46` |
+| O2 | `546c87a91682687c9a20ff068a3c644b7692d7a2cadbe20c86f7b94cbf50d21f` | `b0c71844d06d5ef6a3480cdad98b51b62fd0049228094d8dce6787e68782b156` | `f43e3d52cc563f969dfadee94db0a9af7d1fa2330b86edb174e31e09a8ded2be` |
 
 The canonical fixture SHA-256 is `40ae2cdecf7f83ef11dc12302c65315cc6382f3e193b5c4b63e15bfb98bbfe3c`; JS oracle SHA-256 is `f148b30b17bab4f61f141bb37c511295574ba2983fbbb71fa10ed4673692c8c4`; fixture manifest SHA-256 is `9f804d297f22d6b869d7ba3b98935dafdd8d44b40ef08ce524b42414275b07dc`.
 
