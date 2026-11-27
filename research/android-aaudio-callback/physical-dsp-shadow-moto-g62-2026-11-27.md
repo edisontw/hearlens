@@ -41,9 +41,9 @@ Allocation assurance is source-audited only: the callback path contains no alloc
 
 There is no maximum inter-arrival event or adjacent record because the run captured only one callback. The prior ZERO_ONLY run's 98.423 ms maximum inter-arrival gap therefore remains unexplained.
 
-The prior ZERO_ONLY run negotiated the same 48 kHz, SHARED, LOW_LATENCY, 192-frame burst and 1,536-frame buffer configuration, but completed 60 seconds with zero XRuns, zero deadline misses and 5,749,248 zero samples. This DSP-shadow run added NativeSession/Auto-FIR processing and failed at the first 192-frame callback; its DSP time was 7.305 ms against a 4 ms budget. The single callback does not establish whether later callbacks would differ.
+The prior 60.001-second ZERO_ONLY run used the same negotiated 48 kHz, SHARED, LOW_LATENCY, 192-frame burst and 1,536-frame buffer configuration. It recorded 64×936, 128×936 and 192×14,036 callbacks; 5,749,248 zero samples; and zero XRuns or deadline misses. Callback wall P50/P95/P99/max was 40.052/48.750/63.125/271.510 µs, and callback thread CPU was 29.740/34.896/37.448/210.364 µs. The DSP-shadow run added Auto-FIR/NativeSession and failed on its first 192-frame callback. That single 7.359 ms callback is about 117× the ZERO_ONLY wall P99, but it is one first-callback sample versus a 60-second distribution; it does not establish steady-state DSP cost. The earlier 98.423 ms maximum inter-arrival gap remains unexplained.
 
-The five-minute ARM64 headless benchmark is a separate synthetic non-AAudio callback path. Its aggregate deadline-miss and CPU figures are not directly comparable to this single real AAudio callback. Neither headless timing nor this run measures acoustic latency or hearing output.
+The five-minute 128-frame ARM64 headless benchmark recorded 106/112,500 deadline misses (0.0942%), up to five consecutive misses, callback wall P99/max 345.052/11,995.156 µs, callback thread CPU P99 292.864 µs, aggregate DSP-thread CPU 10.06%, and zero monitored callback allocations. It uses a synthetic non-AAudio callback path and 128-frame work, while this physical run had one real 192-frame AAudio callback. The figures are not interchangeable and cannot predict real callback capacity. Neither headless timing nor this run measures acoustic latency or hearing output.
 
 ## Evidence and status
 
