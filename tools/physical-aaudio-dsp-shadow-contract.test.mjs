@@ -141,6 +141,8 @@ test("48 kHz mismatch closes before start; first-run native cap and offline arti
 
 test("physical runner requires exact artifact owner authorization and one review or waiver", () => {
   assert.match(runner, /ValidateSet\('ZY22FWGQTB'\)/);
+  assert.match(runner, /ValidateRange\(1, 9223372036854775807\)\]\[long\]\$ArtifactId/);
+  assert.ok(15198712216 > 2147483647, "GitHub artifact IDs must be accepted beyond signed 32-bit range");
   assert.match(runner, /ANDROID_ADB -s \$Serial/);
   assert.match(runner, /ExpectedArchiveSha256/);
   assert.match(runner, /owner\.artifactId -ne \$ArtifactId/);
