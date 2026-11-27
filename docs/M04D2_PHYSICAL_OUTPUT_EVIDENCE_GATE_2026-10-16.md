@@ -51,3 +51,34 @@ Once an independently protected nonhuman path exists, the existing D1 `direct/on
 - Run new metadata gate unit tests, including stale/duplicate evidence, synthetic route assertions, lacking artifact provenance and hypothetical full physical records (which STILL cannot authorize playback).
 - Check real current evidence stays `BLOCKED`. This is the expected **PASS** condition for the software test.
 - Existing Android input-only/no-output static tests and M01/M03 CI remain untouched.
+
+## P3 evidence artifacts and offline verification
+
+For each physical or calibration PASS, the existing v1 manifest now requires the raw artifact's `artifact_sha256`, a `fixture_id` (physical) or `calibration_id` (calibrated), and a `provenance` object:
+
+```json
+{
+  "repository_sha": "<same 40-character commit SHA as target.repository_sha>",
+  "run_id": "unique-run-id",
+  "setup_id": "versioned-bench-setup",
+  "procedure_id": "versioned-measurement-protocol",
+  "captured_at": "2026-10-16T12:00:00.000Z"
+}
+```
+
+Use `source` as the archival reference to the immutable raw recording, trace or bundle. Store each bundle offline under its lowercase SHA-256 filename. Include its raw recordings/traces, declared pass criteria, analysis version, acquisition metadata, relevant instrument and calibration identifiers, device build fingerprint and configuration. Record attempted and excluded trials, uncertainty and limitations. Retain unmodified originals alongside derived results within the bundle. A digest verifies bytes only. An independent reviewer must inspect what those bytes represent. Historical simulated observations retain their original labels. Physical PASS entries without verified bytes and provenance remain insufficient.
+
+```sh
+node tools/m04-output-safety-gate.mjs --evidence path/to/manifest.json --artifact-dir path/to/local-artifacts
+```
+
+| Evidence row | Minimum contents for independent review |
+| --- | --- |
+| `mic_input_spl_calibration` | Target built-in mic, input chain, reference instrument and calibration, geometry, frequency and reference level in dB SPL, digital-to-SPL mapping, repeatability, uncertainty and clipping range. |
+| `left_right_output_spl_calibration`, `left_right_ear_canal_output_and_mpo` | Calibrated ear simulator/coupler configuration and reference checks, per-ear raw traces and dB SPL by level/frequency, peaks and maximum power output for both ears at the intended settings, uncertainty and agreed limits. |
+| Actual A2DP, disconnect/fallback, queued audio and `bluetooth_earbud_hard_mute` | Synchronized actual route and fault-event logs, independent acoustic traces at both ears and phone speaker, hard-mute detector floor and timing, call/focus/reroute cases and already-queued audio. Include a positive leakage-detection control. |
+| `android_target_callback_performance` | Target device/build and session configuration, callback period and runtime distribution (including P99 and maximum), misses, stalls, queue overflow, allocations, CPU and thermal context over declared duration/load, plus start/stop and route interruption behavior. Host CI and emulator runs are excluded from this item. |
+| `acoustic_end_to_end_latency` | Synchronized stimulus and received acoustic traces, direct/echo rejection controls, per-ear latency distribution, jitter, uncertainty and missing/ambiguous trials. |
+| `direct_and_delayed_sound_usability` | Under separately authorized study conditions, document direct/processed signal levels, room and noise conditions, latency, baseline, predefined usability measures and exclusion criteria. A bench coexistence screen can document timing and interference. Worn benefit requires separately authorized evaluation. |
+
+Device/bench work remains deferred. Metadata, checksums, emulators, digital limiting and CI do not fulfill a physical measurement. The gate always returns false for both playback authorization fields.

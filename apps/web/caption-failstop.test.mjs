@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs";
 import { GoogleCloudStreamingProvider } from "./stt/providers/google-cloud-streaming.js";
 
-const main = readFileSync("apps/web/main.js", "utf8");
+// Text assertions should be independent of the checkout's CRLF/LF policy.
+const main = readFileSync("apps/web/main.js", "utf8").replace(/\r\n/g, "\n");
 const provider = readFileSync("apps/web/stt/providers/gemini-live-transcribe.js", "utf8");
 const router = readFileSync("apps/web/stt/provider.js", "utf8");
 const html = readFileSync("apps/web/index.html", "utf8");

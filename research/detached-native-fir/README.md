@@ -118,7 +118,7 @@ make auto-bench
 node auto-bench.mjs --paced-seconds=300 --paced-block=128 --output=results/paced-128-5min.json
 ```
 
-Linux AArch64 cross-compile, native ARM64 parity/benchmark and API 29 `arm64-v8a` Android NDK build all passed in workflow run [#28](https://github.com/edisontw/hearlens/actions/runs/45441634883); the full repository CI passed in [run #1448](https://github.com/edisontw/hearlens/actions/runs/45441635128). The x64 job generates and verifies one portable 128-frame JS-oracle fixture. The ARM64 runtime job downloads and executes those exact fixture bytes, and the Android artifact packages the same fixture with its ELF executable. The packaged fixture SHA-256 is `40ae2cdecf7f83ef11dc12302c65315cc6382f3e193b5c4b63e15bfb98bbfe3c`; its JS oracle SHA-256 is `f148b30b17bab4f61f141bb37c511295574ba2983fbbb71fa10ed4673692c8c4`. `build-android.sh /tmp/hearlens-android` records ABI, API level, compiler flags, dependencies and binary SHA-256, and rejects audio output dependencies. The API 29 `arm64-v8a` ELF64 AArch64 binary links only `libm.so`, `libdl.so` and `libc.so`; Android runtime was not executed. For an optional future automated headless runtime check on Android, the artifact can be run against its synthetic fixture without opening any audio route:
+Linux AArch64 cross-compile, native ARM64 parity/benchmark and API 29 `arm64-v8a` Android NDK build all passed in workflow run [#28](https://github.com/edisontw/hearlens/actions/runs/45441634883); the full repository CI passed in [run #1448](https://github.com/edisontw/hearlens/actions/runs/45441635128). The x64 job generates and verifies one portable 128-frame JS-oracle fixture. The ARM64 runtime job downloads and executes those exact fixture bytes, and the Android artifact packages the same fixture with its ELF executable. The packaged fixture SHA-256 is `40ae2cdecf7f83ef11dc12302c65315cc6382f3e193b5c4b63e15bfb98bbfe3c`; its JS oracle SHA-256 is `f148b30b17bab4f61f141bb37c511295574ba2983fbbb71fa10ed4673692c8c4`. `build-android.sh /tmp/hearlens-android` records ABI, API level, compiler flags, dependencies and binary SHA-256, and rejects audio output dependencies. The API 29 `arm64-v8a` ELF64 AArch64 binary links only `libm.so`, `libdl.so` and `libc.so`. Android physical-device execution is now recorded below; it uses an API 29-targeted ELF on an API 33 Moto g62, not an API 29 ARM64 guest.
 
 ```sh
 adb push hearlens-auto-check-arm64-v8a /data/local/tmp/hearlens-auto-check
@@ -129,7 +129,26 @@ node verify-portable-output.mjs portable-fixture/manifest.json \
   portable-fixture/auto-fir-js-oracle.bin native.bin
 ```
 
-This executable only consumes synthetic PCM; no audio route or playback is present. Native N04 engineering and hosted ARM64 evidence are complete. Android runtime and target-phone performance remain untested/deferred. These Native results cannot establish SPL, acoustic MPO, real routing, acoustic latency or safe hearing output.
+This executable only consumes synthetic PCM; no audio route or playback is present. The Windows physical-device harness below is the repeatable project-specific route for Android headless parity, Native session regression and synthetic paced timing. These Native results cannot establish SPL, acoustic MPO, real routing, Android audio-callback timing, acoustic latency or safe hearing output.
+
+### Android ARM64 physical-device headless run (2026-11-25)
+
+The repository already contained the Native Auto-FIR implementation, portable fixture generator, JS oracle, verifier and Android research APK at main `0e45c6ed45abb79ce525948e53aeb909ac4d3ce5`. The earlier Windows smoke note incorrectly stated these were absent; its standalone ELF smoke is preserved in [the corrected runtime report](../../docs/ANDROID_ARM64_RUNTIME_SMOKE_2026-11-25.md).
+
+On a Motorola moto g62 5G running Android 13/API 33 (`arm64-v8a`), the API 29-targeted Android NDK `auto-check-arm64-v8a` and `native-session-check-arm64-v8a` ELFs ran headlessly. Portable parity passed for 144,000 samples per ear and 300 control updates per ear with zero PCM error, exact diagnostics/control indices, and no authorized route. Native session regression passed, as did all six ARM64 instrumentation tests. The exact fixture, JS oracle, output and ELFs are retained outside the repository in `D:\Dev\Android\test-results\hearlens\arm64-physical-20261125-224941`; see its `build-info.json`, `manifest.json`, `android-arm64-device-report.json`, `oracle-parity.json`, device logs and SHA-256 values.
+
+The five-minute 128-frame **synthetic headless shell-thread** benchmark, not an Android audio callback, measured 112,500 callbacks and 30,000 control updates, 0.0942% deadline misses (106 total, at most five consecutive), zero monitored callback allocations, and 10.06% DSP-thread CPU. Callback wall-time P50/P95/P99/max was 272.031/310.990/345.052/11,995.156 µs; thread-CPU time was 266.667/286.354/292.864/1,887.084 µs. Maximum scheduled wake lateness was 13,287.840 µs against a 2,666.667 µs period.
+
+After the short-run frame sweep showed its highest miss rate at 64 frames, a five-minute 64-frame run recorded 473/225,000 misses (0.2102%, maximum 17 consecutive), zero monitored callback allocations and 9.916% DSP-thread CPU. Wall P50/P95/P99/max was 131.406/171.459/233.698/15,372.188 µs; thread CPU P50/P95/P99/max was 130.417/139.896/155.938/1,002.967 µs; maximum wake lateness was 16,181.253 µs against a 1,333.333 µs period. Thirty-second 192/256/480-frame runs recorded 6/2/0 misses, respectively, with zero monitored allocations at every size. Across the five-minute runs, CPU maxima stayed below the callback period, while intermittent wake and wall-time outliers account for the observed missed deadlines under the benchmark's absolute-deadline rule. This is consistent with scheduler/wakeup delay, but the experiment cannot determine root cause or predict real-time Android audio behavior. No DSP rewrite or broad parameter search followed. Per-size results, thermal artifacts and hashes are in [the runtime report](../../docs/ANDROID_ARM64_RUNTIME_SMOKE_2026-11-25.md). Thermal service reported status 0 and a 30°C sensor named `test sensor`; battery temperature was 25°C after the 128-frame run and 26°C after the 64-frame run. The sensor label does not establish a SoC or surface temperature.
+
+For reproduction from the Windows repository root, authorize the phone in ADB and pass its serial explicitly:
+
+```powershell
+& $env:ANDROID_ADB devices -l
+.\scripts\android\Test-AndroidPhysicalArm64.ps1 -DeviceSerial 'YOUR_DEVICE_SERIAL' -BenchmarkSeconds 300 -BenchmarkFrames 128
+```
+
+The script checks device identity, generates the canonical fixture, builds the API 29 ARM64 ELF and no-permission research APK, executes the existing verifier unchanged, records hashes and thermal/battery telemetry, then removes only its own package installs and device temp directory. M04 AIR31/A2DP real hearing remains **BLOCKED / DEFERRED**. No microphone, speaker, Bluetooth output, or actual Android audio callback is exercised.
 
 ## Reproduction commands
 

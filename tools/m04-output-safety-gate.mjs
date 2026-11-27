@@ -7,6 +7,7 @@
  * event log must not be promoted to physical no-speaker-fallback evidence.
  */
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
@@ -26,6 +27,12 @@ export const REQUIREMENTS = Object.freeze([
   {id:"previously_queued_audio_cannot_escape",kind:"physical",needed:"recording"},
   {id:"acoustic_feedback_bounded",kind:"physical",needed:"recording"},
   {id:"left_right_output_spl_calibration",kind:"calibration",needed:"calibration"},
+  {id:"mic_input_spl_calibration",kind:"calibration",needed:"calibration"},
+  {id:"left_right_ear_canal_output_and_mpo",kind:"physical",needed:"recording"},
+  {id:"bluetooth_earbud_hard_mute",kind:"physical",needed:"recording"},
+  {id:"android_target_callback_performance",kind:"physical",needed:"recording"},
+  {id:"acoustic_end_to_end_latency",kind:"physical",needed:"recording"},
+  {id:"direct_and_delayed_sound_usability",kind:"physical",needed:"recording"},
 ]);
 
 function wellFormedEvidence(e) {
@@ -35,19 +42,26 @@ function wellFormedEvidence(e) {
     ["PASS","FAIL","NOT_MEASURED","INCONCLUSIVE"].includes(e.result) &&
     typeof e.source==="string" && e.source.length>=4 && e.source.length<=512;
 }
-function qualified(e, r) {
+function qualified(e, r, target, verifiedArtifacts) {
   if(!e || e.result!=="PASS")return false;
-  // A developer assertion from a mock can never fulfill a physical item.
   if(r.needed==="observed")return e.basis==="observed";
   if(r.needed==="test")return e.basis==="unit";
-  if(r.needed==="recording")return e.basis==="physical" && SHA256.test(e.artifact_sha256||"") &&
-    typeof e.fixture_id==="string" && SHORT_ID.test(e.fixture_id);
-  if(r.needed==="calibration")return e.basis==="calibrated" &&
-    SHA256.test(e.artifact_sha256||"") && typeof e.calibration_id==="string" &&
-    SHORT_ID.test(e.calibration_id);
-  return false;
+
+  const identity=r.needed==="calibration" ? e.calibration_id : e.fixture_id;
+  const basis=r.needed==="calibration" ? "calibrated" : "physical";
+  const {provenance:p}=e;
+  if(e.basis!==basis || typeof identity!=="string" || !SHORT_ID.test(identity) ||
+     typeof e.artifact_sha256!=="string" || !SHA256.test(e.artifact_sha256) ||
+     !p || p.repository_sha!==target.repository_sha ||
+     ![p.run_id,p.setup_id,p.procedure_id].every(id=>typeof id==="string" && SHORT_ID.test(id)) ||
+     typeof p.captured_at!=="string" ||
+     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(p.captured_at))return false;
+  const captured=Date.parse(p.captured_at);
+  return Number.isFinite(captured) && new Date(captured).toISOString()===p.captured_at &&
+    verifiedArtifacts.has(e.artifact_sha256.toLowerCase());
 }
-export function assessM04Evidence(record) {
+
+export function assessM04Evidence(record, {verifiedArtifacts=new Set()}={}) {
   if(!record || typeof record!=="object" || Array.isArray(record) || record.schema!==SCHEMA)
     throw new TypeError("M04 evidence schema is required");
   const {target,items}=record;
@@ -64,7 +78,7 @@ export function assessM04Evidence(record) {
   }
   const rows=REQUIREMENTS.map(req=>{
     const item=accepted.get(req.id);
-    const valid=item ? qualified(item,req) : false;
+    const valid=item ? qualified(item,req,target,verifiedArtifacts) : false;
     const failure=(item?.result==="FAIL");
     return {
       id:req.id,kind:req.kind,
@@ -72,6 +86,8 @@ export function assessM04Evidence(record) {
         item?.result==="INCONCLUSIVE"?"INCONCLUSIVE":"MISSING_OR_INSUFFICIENT",
       basis:item?.basis??null,
       source:item?.source??null,
+      artifact_sha256:valid ? item.artifact_sha256??null : null,
+      provenance:valid ? item.provenance??null : null,
       note:(!item?"No evidence":!valid?"Evidence does not meet this requirement":
         "Metadata accepted for independent review, NOT safety certification")
     };
@@ -109,16 +125,49 @@ export function formatSummary(report) {
   ].join("\n");
 }
 
-function main() {
+async function verifyArtifacts(items, artifactDirectory) {
+  const verified=new Set();
+  for(const item of items){
+    if(item.result!=="PASS" || !["physical","calibrated"].includes(item.basis) ||
+       typeof item.artifact_sha256!=="string" || !SHA256.test(item.artifact_sha256))continue;
+    const expected=item.artifact_sha256.toLowerCase();
+    if(verified.has(expected))continue;
+    try {
+      const flags=fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK;
+      const handle=await fs.promises.open(resolve(artifactDirectory,expected),flags);
+      try {
+        const stat=await handle.stat();
+        if(!stat.isFile() || stat.size===0)continue;
+        const hash=createHash("sha256");
+        for await(const chunk of handle.createReadStream({autoClose:false,end:stat.size-1})){
+          hash.update(chunk);
+        }
+        if(hash.digest("hex")===expected && (await handle.stat()).size===stat.size)verified.add(expected);
+      } finally {
+        await handle.close();
+      }
+    } catch(error) {
+      if(!["ENOENT","ELOOP","ENOTDIR"].includes(error.code))throw error;
+    }
+  }
+  return verified;
+}
+
+async function main() {
   const argv=process.argv.slice(2);
-  if(argv.length!==2 || argv[0]!=="--evidence"){
-    process.stderr.write("Usage: node tools/m04-output-safety-gate.mjs --evidence <file.json>\n");
+  if(argv[0]!=="--evidence" || (argv.length!==2 &&
+      (argv.length!==4 || argv[2]!=="--artifact-dir"))){
+    process.stderr.write("Usage: node tools/m04-output-safety-gate.mjs --evidence <file.json> [--artifact-dir <directory>]\n");
     process.exitCode=2;
     return;
   }
   try {
     const input=JSON.parse(fs.readFileSync(argv[1],"utf8"));
-    const report=assessM04Evidence(input);
+    let report=assessM04Evidence(input);
+    if(argv.length===4){
+      const verifiedArtifacts=await verifyArtifacts(input.items,argv[3]);
+      report=assessM04Evidence(input,{verifiedArtifacts});
+    }
     process.stdout.write(JSON.stringify(report,null,2)+"\n");
     // Blocking is EXPECTED; the decision is reported in JSON, not process exit 1.
   } catch (error) {

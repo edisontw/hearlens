@@ -1,0 +1,191 @@
+name: Android AAudio callback research
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-aaudio-callback.yml'
+      - 'apps/android-aaudio-callback-lab/**'
+      - 'apps/android-aaudio-physical-zero-lab/**'
+      - 'apps/web/caption-failstop.test.mjs'
+      - 'package.json'
+      - 'research/android-aaudio-callback/**'
+      - 'research/detached-native-fir/**'
+      - 'scripts/android/Build-PhysicalZeroAAudioLab.ps1'
+      - 'scripts/android/Test-AndroidPhysicalZeroAAudioLab.ps1'
+      - 'scripts/android/Test-PhysicalZeroOutputCore.ps1'
+      - 'scripts/android/Test-AndroidAAudioCallbackLab.ps1'
+      - 'tools/android-aaudio-callback-lab-contract.test.mjs'
+      - 'tools/physical-aaudio-zero-contract.test.mjs'
+      - 'tools/m04-output-safety-gate.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-aaudio-callback.yml'
+      - 'apps/android-aaudio-callback-lab/**'
+      - 'apps/android-aaudio-physical-zero-lab/**'
+      - 'apps/web/caption-failstop.test.mjs'
+      - 'package.json'
+      - 'research/android-aaudio-callback/**'
+      - 'research/detached-native-fir/**'
+      - 'scripts/android/Build-PhysicalZeroAAudioLab.ps1'
+      - 'scripts/android/Test-AndroidPhysicalZeroAAudioLab.ps1'
+      - 'scripts/android/Test-PhysicalZeroOutputCore.ps1'
+      - 'scripts/android/Test-AndroidAAudioCallbackLab.ps1'
+      - 'tools/android-aaudio-callback-lab-contract.test.mjs'
+      - 'tools/physical-aaudio-zero-contract.test.mjs'
+      - 'tools/m04-output-safety-gate.test.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  host-callback-core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compile and run host callback fault matrix with allocation probe
+        run: |
+          g++ -std=c++17 -O2 -pthread -Wall -Wextra -Wpedantic -Werror \
+            research/android-aaudio-callback/callback_core_test.cpp \
+            -o "$RUNNER_TEMP/hearlens-aaudio-callback-core-test"
+          "$RUNNER_TEMP/hearlens-aaudio-callback-core-test"
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            research/android-aaudio-callback/physical_zero_output_core_test.cpp \
+            -o "$RUNNER_TEMP/hearlens-physical-zero-output-core-test"
+          "$RUNNER_TEMP/hearlens-physical-zero-output-core-test"
+      - name: Verify callback safety contract and Windows line-ending regressions
+        run: |
+          node --test \
+            tools/android-aaudio-callback-lab-contract.test.mjs \
+            tools/physical-aaudio-zero-contract.test.mjs \
+            apps/web/caption-failstop.test.mjs \
+            tools/m04-output-safety-gate.test.mjs
+
+  android-ndk-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configure the hosted Android SDK
+        run: |
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          test -x "$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
+          echo "$sdk_root/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
+          "$sdk_root/cmdline-tools/latest/bin/sdkmanager" --version
+      - name: Install pinned Android build packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager --install \
+            --sdk_root="$ANDROID_HOME" \
+            'platforms;android-35' \
+            'build-tools;35.0.0' \
+            'ndk;27.2.12479018' \
+            'cmake;3.22.1'
+      - name: Run physical zero-only route policy host tests
+        run: |
+          apps/android-native-dsp-lab/gradlew --no-daemon \
+            --project-dir apps/android-aaudio-physical-zero-lab \
+            :app:testDebugUnitTest
+      - name: Generate the canonical JS-oracle fixture
+        run: |
+          fixture="$RUNNER_TEMP/hearlens-aaudio-fixture"
+          node research/detached-native-fir/auto-check.mjs "--export-portable=$fixture"
+          mkdir -p apps/android-aaudio-callback-lab/app/build/generated/androidTestAssets/portable-fixture
+          cp "$fixture"/* apps/android-aaudio-callback-lab/app/build/generated/androidTestAssets/portable-fixture/
+      - name: Build API 29 x86_64 AAudio APK and instrumentation package
+        run: |
+          apps/android-native-dsp-lab/gradlew --no-daemon \
+            --project-dir apps/android-aaudio-callback-lab \
+            :app:assembleDebug :app:assembleDebugAndroidTest -PtargetAbis=x86_64
+          cp apps/android-aaudio-callback-lab/app/build/outputs/apk/debug/app-debug.apk \
+            "$RUNNER_TEMP/hearlens-aaudio-callback-x86_64-debug.apk"
+      - name: Build API 29 arm64-v8a AAudio APK
+        run: |
+          apps/android-native-dsp-lab/gradlew --no-daemon \
+            --project-dir apps/android-aaudio-callback-lab \
+            :app:assembleDebug -PtargetAbis=arm64-v8a
+          cp apps/android-aaudio-callback-lab/app/build/outputs/apk/debug/app-debug.apk \
+            "$RUNNER_TEMP/hearlens-aaudio-callback-arm64-v8a-debug.apk"
+      - name: Check out exact physical APK source revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: physical-zero-source
+      - name: Build permissionless physical zero-only ARM64 APK
+        env:
+          EXPECTED_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          source_root="$GITHUB_WORKSPACE/physical-zero-source"
+          source_commit=$(git -C "$source_root" rev-parse HEAD)
+          test "$source_commit" = "$EXPECTED_SOURCE_COMMIT"
+          "$source_root/apps/android-native-dsp-lab/gradlew" --no-daemon \
+            --project-dir "$source_root/apps/android-aaudio-physical-zero-lab" \
+            :app:assembleDebug
+          apk="$RUNNER_TEMP/hearlens-physical-zero-aaudio-arm64-v8a-debug.apk"
+          cp "$source_root/apps/android-aaudio-physical-zero-lab/app/build/outputs/apk/debug/app-debug.apk" "$apk"
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          permissions="$RUNNER_TEMP/physical-zero-apk-permissions.txt"
+          "$aapt" dump permissions "$apk" | tee "$permissions"
+          ! grep -q 'uses-permission:' "$permissions"
+          unzip -Z1 "$apk" | grep -qx 'lib/arm64-v8a/libhearlens_physical_zero.so'
+          ! unzip -Z1 "$apk" | grep -Eq '^lib/(armeabi|armeabi-v7a|x86|x86_64)/'
+          sha256=$(sha256sum "$apk" | cut -d ' ' -f 1)
+          cat > "$RUNNER_TEMP/physical-zero-build-info.json" <<EOF
+          {
+            "sourceCommit": "$source_commit",
+            "apkSha256": "$sha256",
+            "nativeAbi": "arm64-v8a",
+            "packageName": "org.hearlens.physicalzero",
+            "maxDurationMs": 60000,
+            "testWorkload": "ZERO_ONLY",
+            "routePolicy": "API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR",
+            "permissionsDeclared": [],
+            "installOrStreamStarted": false
+          }
+          EOF
+          (cd "$RUNNER_TEMP" && sha256sum \
+            hearlens-physical-zero-aaudio-arm64-v8a-debug.apk \
+            physical-zero-apk-permissions.txt \
+            physical-zero-build-info.json > physical-zero-sha256-manifest.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-physical-zero-aaudio-arm64-apk
+          path: |
+            ${{ runner.temp }}/hearlens-physical-zero-aaudio-arm64-v8a-debug.apk
+            ${{ runner.temp }}/physical-zero-build-info.json
+            ${{ runner.temp }}/physical-zero-apk-permissions.txt
+            ${{ runner.temp }}/physical-zero-sha256-manifest.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Check APK permissions and native ABI packaging
+        run: |
+          set -euo pipefail
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          x86="$RUNNER_TEMP/hearlens-aaudio-callback-x86_64-debug.apk"
+          arm="$RUNNER_TEMP/hearlens-aaudio-callback-arm64-v8a-debug.apk"
+          ! "$aapt" dump permissions "$x86" | grep -Ei 'RECORD_AUDIO|MODIFY_AUDIO_SETTINGS|BLUETOOTH'
+          ! "$aapt" dump permissions "$arm" | grep -Ei 'RECORD_AUDIO|MODIFY_AUDIO_SETTINGS|BLUETOOTH'
+          unzip -Z1 "$x86" | grep -qx 'lib/x86_64/libhearlens_aaudio_callback.so'
+          unzip -Z1 "$arm" | grep -qx 'lib/arm64-v8a/libhearlens_aaudio_callback.so'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearlens-android-aaudio-callback-apks
+          path: |
+            ${{ runner.temp }}/hearlens-aaudio-callback-x86_64-debug.apk
+            ${{ runner.temp }}/hearlens-aaudio-callback-arm64-v8a-debug.apk
+          if-no-files-found: error
+          retention-days: 30
