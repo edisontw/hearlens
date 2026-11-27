@@ -29,7 +29,7 @@ Because Start stayed disabled, callback timing, negotiated performance mode, fra
 
 Full device evidence, including the route inventory UI dump, AudioService/AudioPolicy/AudioFlinger diagnostics, logcat, authorization records, and updated SHA-256 manifest, is stored at `D:\Dev\Android\test-results\hearlens\physical-zero-callback\20261126-211750-824-device-9f0dc0d8`.
 
-## Next step
+## Next step from the initial refusal (superseded by the follow-up run)
 
 Do not whitelist type 18 based only on its idle state in this snapshot. Before another physical attempt, establish whether the route can be safely excluded while AAudio remains pinned to and verifies the exact built-in speaker ID, and define fail-stop behavior if telephony or another route becomes active. Until then, keep the existing refusal and defer the physical callback run.
 
@@ -39,6 +39,14 @@ A later, read-only ADB snapshot was collected from the same serial `ZY22FWGQTB`;
 
 The accompanying current `dumpsys audio` reports no call (`In ring or call: false`), `mModeOwnerPid: 0`, no connected external outputs, and the built-in earpiece as active communication device. `dumpsys media.audio_policy` labels Port ID 9 as `Telephony Tx`, shows `STRATEGY_CALL_ASSISTANT` selecting TELEPHONY_TX, and reports a zero global active count for the telephony output mix profiles. AudioDeviceInfo ID 9 from the earlier app UI and AudioPolicy Port ID 9 are distinct identifier namespaces; the matching number does not establish a shared device ID. The call-assistant selection is another reason the APK must only recognize type 18 as system communication inventory and must never target it.
 
-The new isolated ZERO_ONLY route policy therefore permits the static type-18 inventory entry only when both mode reads are `MODE_NORMAL`, the API 33 `USAGE_MEDIA` prediction returns exactly one speaker matching the unique inventory speaker, no other sink is present, and AAudio reports the same selected device ID before start and during the run. It fail-stops on mode, inventory, prediction, generation, lifecycle, disconnect, or actual-ID changes and does not reopen. This is a conditional policy, not a hardware-route guarantee. The synthetic route tests and ARM64 build do not exercise the new policy on-device. The old APK authorization and waiver do not cover a rebuild; no new stream has been authorized or started.
+At the time of this 2026-11-26 note, the revised route policy had not been exercised on-device. Its subsequent physical result is recorded below.
 
 Read-only evidence files and hashes are kept at `D:\Dev\Android\test-results\hearlens\telephony-route\20261126-231400-187`.
+
+## Updated exact-hash physical ZERO_ONLY result (2026-11-27)
+
+After the phone was unlocked, the exact artifact 15133694776 was installed and tested once on serial ZY22FWGQTB. Source commit: b955623892e212706eaec8cb47d672fc8a9389f3; APK SHA-256: 8738f264db84c08aa98a2f364a126c45894f2a0a282b39331f599137adaf0dc7; archive SHA-256: a979ee69266dcc1850aafebbc1e7037479c083da6b5b67efd62c23d6c018c0eb. The exact-hash owner authorization was used; the owner explicitly waived independent human review for this artifact. This is an owner waiver, not independent review PASS.
+
+The run completed 60.001 seconds with status PASS. AudioManager mode was MODE_NORMAL; the API 33 MEDIA prediction contained exactly BUILTIN_SPEAKER id 3; inventory contained BUILTIN_EARPIECE id 2, BUILTIN_SPEAKER id 3 and TYPE_TELEPHONY id 9, with telephony inventory-only. AAudio reported device id 3 after open, before start and throughout native control polling. Negotiated settings were 48 kHz, SHARED, LOW_LATENCY, 192 frames per burst and 1,536-frame buffer capacity/size. The callback accepted variable frame counts: 64×936, 128×936 and 192×14,036 callbacks. It verified 5,749,248 digital-zero samples; nonzero samples, XRuns and deadline overruns were all zero. Callback wall P50/P95/P99/max was 40.052/48.750/63.125/271.510 µs; thread CPU was 29.740/34.896/37.448/210.364 µs; maximum inter-arrival was 98.423 ms. Stop, drain and close succeeded; no callbacks remained in flight; the APK was uninstalled. Android route-policy/AAudio ID observations do not guarantee the physical hardware route, and startup/shutdown transients were not measured.
+
+Complete evidence and SHA-256 manifest: D:\Dev\Android\test-results\hearlens\physical-zero-callback\20261127-183347-715-device-85479390. The machine-readable result records route_policy_hardware_guarantee=false. The test used no microphone, Bluetooth, DSP, nonzero PCM or hearing output. M04 REAL HEARING remains **BLOCKED / DEFERRED**.
