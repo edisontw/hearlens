@@ -214,3 +214,105 @@ test("Edison local provider sends VAD-delimited microphone segments while listen
     else delete globalThis.navigator;
   }
 });
+
+test("stopping during startup aborts health checks without reporting an error", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let healthSignal;
+  let healthStartedResolve;
+  const healthStarted = new Promise(resolve => { healthStartedResolve = resolve; });
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: class {}, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => { throw new Error("must not request microphone"); } } },
+  });
+  globalThis.fetch = (url, options = {}) => {
+    if (url.endsWith("/health")) {
+      healthSignal = options.signal;
+      healthStartedResolve();
+      return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => {
+        reject(new DOMException("aborted", "AbortError"));
+      }, { once: true }));
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const statuses = [];
+  const errors = [];
+  try {
+    const provider = new EdisonLocalAsrProvider({
+      endpoint: "http://127.0.0.1:8765",
+      model: "breeze-asr-26-q5",
+      onStatus: value => statuses.push(value),
+      onError: value => errors.push(value),
+    });
+    const starting = provider.start();
+    await healthStarted;
+    await provider.stop();
+    await starting;
+    assert.equal(healthSignal.aborted, true);
+    assert.equal(provider.active, false);
+    assert.ok(statuses.some(value => value.state === "stopped"));
+    assert.equal(errors.length, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("stopping during microphone permission stops a stream granted later", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let resolveStream;
+  let getUserMediaStartedResolve;
+  const getUserMediaStarted = new Promise(resolve => { getUserMediaStartedResolve = resolve; });
+  let stoppedTracks = 0;
+  let contextsCreated = 0;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { contextsCreated += 1; this.sampleRate = 16_000; this.state = "running"; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { return new FakeNode(); }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: () => {
+      getUserMediaStartedResolve();
+      return new Promise(resolve => { resolveStream = resolve; });
+    } } },
+  });
+  globalThis.fetch = async url => url.endsWith("/health")
+    ? { ok: true }
+    : { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+  const statuses = [];
+  try {
+    const provider = new EdisonLocalAsrProvider({
+      endpoint: "http://127.0.0.1:8765",
+      model: "breeze-asr-26-q5",
+      onStatus: value => statuses.push(value),
+    });
+    const starting = provider.start();
+    await getUserMediaStarted;
+    await provider.stop();
+    resolveStream({ getTracks: () => [{ stop: () => { stoppedTracks += 1; } }] });
+    await starting;
+    assert.equal(stoppedTracks, 1);
+    assert.equal(contextsCreated, 0);
+    assert.equal(provider.active, false);
+    assert.ok(statuses.some(value => value.state === "stopped"));
+    assert.equal(statuses.some(value => value.state === "listening"), false);
+  } finally {
+    if (resolveStream && stoppedTracks === 0) resolveStream({ getTracks: () => [{ stop: () => { stoppedTracks += 1; } }] });
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});

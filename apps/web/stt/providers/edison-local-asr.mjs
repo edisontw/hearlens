@@ -385,6 +385,7 @@ export class EdisonLocalAsrProvider {
         await this.releaseCapture();
         this.stopping = false;
       }
+      if (generation !== this.generation || startupAbort.signal.aborted) return;
       throw error;
     } finally {
       if (this.startupAbort === startupAbort) this.startupAbort = null;
@@ -443,10 +444,20 @@ export class EdisonLocalAsrProvider {
     this.stopping = true;
     const hadCapture = this.active;
     this.active = false;
+    const startupAbort = this.startupAbort;
+    if (startupAbort) {
+      this.generation += 1;
+      startupAbort.abort();
+      if (this.startupAbort === startupAbort) this.startupAbort = null;
+    }
     if (hadCapture && this.currentChunks.length) this.finalizeSegment("user-stop");
     await this.releaseCapture();
     if (!hadCapture && !this.pendingSegments.length && !this.drainPromise) {
       this.stopping = false;
+      if (startupAbort) {
+        this.onStatus({ providerId: this.id, state: "stopped", label: "Edison 本機收音啟動已取消" });
+        this.debug("startup-cancelled", "stop-request");
+      }
       return;
     }
     if (!this.pendingSegments.length && !this.drainPromise) {
