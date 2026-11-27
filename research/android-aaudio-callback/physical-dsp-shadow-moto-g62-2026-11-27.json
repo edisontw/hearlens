@@ -116,6 +116,53 @@
     "priorZeroOnlyMaximumGapMs": 98.423,
     "priorGapCause": "unresolved"
   },
+  "comparisons": {
+    "zeroOnlyBaseline": {
+      "durationMs": 60001,
+      "sampleRate": 48000,
+      "framesPerBurst": 192,
+      "bufferSizeFrames": 1536,
+      "performanceMode": "LOW_LATENCY",
+      "sharingMode": "SHARED",
+      "callbackFrameHistogram": {
+        "64": 936,
+        "128": 936,
+        "192": 14036
+      },
+      "zeroSamplesVerified": 5749248,
+      "deadlineMisses": 0,
+      "xrunDelta": 0,
+      "callbackWallUs": {
+        "p50": 40.052,
+        "p95": 48.750,
+        "p99": 63.125,
+        "max": 271.510
+      },
+      "callbackThreadCpuUs": {
+        "p50": 29.740,
+        "p95": 34.896,
+        "p99": 37.448,
+        "max": 210.364
+      },
+      "maximumInterarrivalMs": 98.423,
+      "maximumInterarrivalCause": "unresolved"
+    },
+    "physicalDspShadowToZeroOnlyWallP99Ratio": 116.58,
+    "arm64Headless128FrameBaseline": {
+      "durationMs": 300000,
+      "callbacks": 112500,
+      "deadlineMisses": 106,
+      "deadlineMissRatePercent": 0.0942,
+      "maxConsecutiveMisses": 5,
+      "callbackWallP99Us": 345.052,
+      "callbackWallMaxUs": 11995.156,
+      "callbackThreadCpuP99Us": 292.864,
+      "aggregateDspThreadCpuPercent": 10.06,
+      "monitoredCallbackAllocations": 0,
+      "callbackType": "synthetic headless non-AAudio"
+    },
+    "interpretation": "The zero-only baseline shares the negotiated stream configuration, but the DSP-shadow value is a single first callback rather than a distribution. The headless benchmark uses a different 128-frame non-AAudio callback. Neither comparison proves steady-state physical DSP callback capacity."
+  },
   "allocationAudit": "Callback source path contains no allocation, file I/O, JNI, mutex or sleep. AAudio and Bionic internal allocations are not instrumented.",
   "interpretation": {
     "callbackPeriodMs": 4.0,
