@@ -1,6 +1,7 @@
 package org.hearlens.physicaldsp
 
 import android.content.pm.PackageManager
+import java.io.File
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -52,5 +53,21 @@ class ShadowLabRuntimeTest {
         val summary = NativeBridge.nativeRunSessionMatrix()
         assertNotNull(summary)
         assertTrue(summary!!.contains("2000 concurrent invalidations PASS"))
+    }
+
+    @Test
+    fun callbackReportIsAtomicallyPublishedOnlyAsACompleteFinalFile() {
+        val directory = File(
+            InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
+            "report-store-${System.nanoTime()}",
+        )
+        assertTrue(directory.mkdirs())
+        val fileName = "dsp-shadow-callback-result-test.json"
+        val report = "{\"status\":\"PASS\",\"callback_records\":12000}"
+        val result = PhysicalDspShadowReportStore.publish(directory, fileName, report)
+
+        assertEquals(report, result.readText(Charsets.UTF_8))
+        assertTrue(result.isFile)
+        assertTrue(directory.listFiles().orEmpty().none { it.name == ".$fileName.tmp" })
     }
 }

@@ -505,9 +505,10 @@ class MainActivity : Activity() {
             }
             val persistedReport = attachRouteEvidence(reportText, context, finalCapture)
             val stamp = Instant.now().toString().replace(':', '-')
-            val resultFile = File(filesDir, "dsp-shadow-callback-result-$stamp.json")
+            val resultFileName = "dsp-shadow-callback-result-$stamp.json"
+            val resultFile = File(filesDir, resultFileName)
             val finalText = try {
-                resultFile.writeText(persistedReport, Charsets.UTF_8)
+                PhysicalDspShadowReportStore.publish(filesDir, resultFileName, persistedReport)
                 persistedReport
             } catch (error: Throwable) {
                 JSONObject().put("status", "RESULT_PERSISTENCE_ERROR")

@@ -340,9 +340,6 @@ aaudio_data_callback_result_t dataCallback(
     context->core.invalidateBackground();
   }
 
-  bool cpuEndAvailable = false;
-  const auto cpuEnd = threadCpuNow(cpuEndAvailable);
-  const auto callbackEnd = Clock::now();
   if (numFrames > 0 && static_cast<std::size_t>(numFrames) <
           context->frameCounts.size()) {
     ++context->frameCounts[static_cast<std::size_t>(numFrames)];
@@ -354,9 +351,7 @@ aaudio_data_callback_result_t dataCallback(
   if (index < kMaximumRecords) {
     auto& record = context->records[index];
     const auto startNs = timePointNs(callbackStart);
-    const auto endNs = timePointNs(callbackEnd);
     record.startNs = startNs;
-    record.wallNs = endNs >= startNs ? endNs - startNs : 0;
     record.dspWallNs = context->core.lastDspProcessingNs();
     record.frames = numFrames > 0 ? static_cast<std::uint32_t>(numFrames) : 0;
     record.deadlineBudgetFrames = numFrames > 0
@@ -365,12 +360,6 @@ aaudio_data_callback_result_t dataCallback(
     record.controlUpdatesBefore = controlUpdatesBefore;
     record.controlUpdatesAfter = context->core.nativeControlUpdates();
     record.zeroSamplesVerified = callbackZeroSamplesVerified;
-    if (cpuStartAvailable && cpuEndAvailable && cpuEnd >= cpuStart) {
-      record.cpuNs = cpuEnd - cpuStart;
-      ++context->cpuSamples;
-    } else {
-      ++context->cpuUnavailableSamples;
-    }
     if (context->previousStartNs != 0 && context->sampleRate > 0 &&
         context->previousFrames > 0) {
       record.interArrivalNs = startNs >= context->previousStartNs
@@ -396,13 +385,29 @@ aaudio_data_callback_result_t dataCallback(
       record.callbackBudgetNs = callbackBudgetNs;
       record.dspDeadlineFailure =
           context->core.dspDeadlineFailureCount() > dspDeadlineFailuresBefore;
-      record.callbackOverrun = record.wallNs > callbackBudgetNs;
-      if (record.dspDeadlineFailure) ++context->deadlineMisses;
-      if (record.callbackOverrun) {
-        ++context->callbackOverruns;
-        context->callbackOverrunObserved.store(true, std::memory_order_release);
-        context->core.invalidateBackground();
-      }
+    }
+
+    // Stop the measurement only after frame histogram, record, jitter, and
+    // deadline-budget bookkeeping have completed. Final overrun classification
+    // and the callback-return tail necessarily follow the end-clock reads.
+    bool cpuEndAvailable = false;
+    const auto cpuEnd = threadCpuNow(cpuEndAvailable);
+    const auto callbackEnd = Clock::now();
+    const auto endNs = timePointNs(callbackEnd);
+    record.wallNs = endNs >= startNs ? endNs - startNs : 0;
+    if (cpuStartAvailable && cpuEndAvailable && cpuEnd >= cpuStart) {
+      record.cpuNs = cpuEnd - cpuStart;
+      ++context->cpuSamples;
+    } else {
+      ++context->cpuUnavailableSamples;
+    }
+    record.callbackOverrun = record.callbackBudgetNs > 0 &&
+        record.wallNs > record.callbackBudgetNs;
+    if (record.dspDeadlineFailure) ++context->deadlineMisses;
+    if (record.callbackOverrun) {
+      ++context->callbackOverruns;
+      context->callbackOverrunObserved.store(true, std::memory_order_release);
+      context->core.invalidateBackground();
     }
   } else {
     context->logOverflow.fetch_add(1, std::memory_order_relaxed);
@@ -704,6 +709,7 @@ std::string buildReport(const char* status, const char* reason,
        << ",\"xrun_source\":\"AAudioStream_getXRunCount on output stream\""
        << ",\"xrun_timestamp_resolution\":\"control-thread cumulative-count snapshots every 5 ms; AAudio exposes no per-event timestamps\""
        << ",\"allocation_monitor\":\"callback source path contains no allocation/I/O/JNI/mutex/sleep; AAudio and Bionic internal allocations are not instrumented\""
+       << ",\"callback_timing_scope\":\"wall and thread CPU clocks are read after zero scan, frame histogram, record, jitter, and budget bookkeeping; final overrun classification and callback-return tail follow the end-clock reads\""
        << ",\"zero_output_verification_enabled\":"
        << (context.verifyZeroOutput ? "true" : "false")
        << ",\"zero_samples_verified\":" << context.zeroSamplesVerified

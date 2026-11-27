@@ -10,6 +10,7 @@ const bridge = readFileSync(app + "src/main/cpp/shadow_callback_bridge.cpp", "ut
 const core = readFileSync("research/android-aaudio-callback/callback_core.hpp", "utf8");
 const activity = readFileSync(app + "src/main/java/org/hearlens/physicaldsp/MainActivity.kt", "utf8");
 const api31Listener = readFileSync(app + "src/main/java/org/hearlens/physicaldsp/AudioModeChangedListenerApi31.kt", "utf8");
+const reportStore = readFileSync(app + "src/main/java/org/hearlens/physicaldsp/PhysicalDspShadowReportStore.kt", "utf8");
 const policy = readFileSync(app + "src/main/java/org/hearlens/physicaldsp/PhysicalSpeakerRoutePolicy.kt", "utf8");
 const policyTests = readFileSync(app + "src/test/java/org/hearlens/physicaldsp/PhysicalSpeakerRoutePolicyTest.kt", "utf8");
 const instrumentation = readFileSync(app + "src/androidTest/java/org/hearlens/physicaldsp/ShadowLabRuntimeTest.kt", "utf8");
@@ -61,6 +62,11 @@ test("real AAudio callback is variable-frame, bounded, measured, and free of con
   assert.match(callback, /lastDspProcessingNs\(\)/);
   assert.match(callback, /controlUpdatesBefore/);
   assert.match(callback, /callbackOverrunObserved/);
+  assert.ok(
+    callback.indexOf("record.jitterNs =") < callback.indexOf("threadCpuNow(cpuEndAvailable)") &&
+      callback.indexOf("threadCpuNow(cpuEndAvailable)") < callback.indexOf("record.callbackOverrun ="),
+    "callback wall/CPU clocks must include histogram and record/jitter bookkeeping",
+  );
   assert.doesNotMatch(callback, /JNIEnv|\bnew\s|malloc\s*\(|fstream|mutex|sleep_for|AudioRecord|Bluetooth/);
   assert.match(bridge, /callback_frames_request[^\n]*UNSPECIFIED_VARIABLE/);
   assert.match(bridge, /callback_records_detail/);
@@ -70,6 +76,7 @@ test("real AAudio callback is variable-frame, bounded, measured, and free of con
   assert.match(bridge, /dsp_processing_wall_ns/);
   assert.match(bridge, /xrun_timestamp_resolution/);
   assert.match(bridge, /allocation_monitor/);
+  assert.match(bridge, /callback_timing_scope[^\n]*final overrun classification/);
   assert.match(bridge, /callbackRecordCapacity|kMaximumRecords = 65'536/);
 });
 
@@ -80,6 +87,10 @@ test("route and generation checks bracket stream open and start, then poll on co
   assert.match(activity, /AudioDeviceInfo\.TYPE_TELEPHONY -> RouteDeviceKind\.TELEPHONY/);
   assert.match(activity, /nativePublishRouteSnapshot\(/);
   assert.match(activity, /nativeRequestStop\(context\.runToken, reasonCode\)/);
+  assert.match(activity, /PhysicalDspShadowReportStore\.publish\(filesDir, resultFileName, persistedReport\)/);
+  assert.match(reportStore, /temporaryFile\.writeText\(report, Charsets\.UTF_8\)/);
+  assert.match(reportStore, /Files\.move\([\s\S]*StandardCopyOption\.ATOMIC_MOVE/);
+  assert.match(instrumentation, /callbackReportIsAtomicallyPublishedOnlyAsACompleteFinalFile/);
   assert.match(policy, /predicted\.size != 1/);
   assert.match(policy, /predictedDevice\.kind != RouteDeviceKind\.BUILTIN_SPEAKER/);
   assert.match(policy, /expected\.routeGeneration/);
