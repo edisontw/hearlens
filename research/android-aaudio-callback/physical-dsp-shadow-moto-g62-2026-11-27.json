@@ -1,0 +1,143 @@
+{
+  "format": "hearlens.android-physical-dsp-shadow-run.v1",
+  "runDate": "2026-11-27",
+  "artifact": {
+    "repository": "edisontw/hearlens",
+    "artifactId": 15198712216,
+    "sourceCommit": "d17337db99c28744685151f95b1d6526a8b382a2",
+    "apkSha256": "510daef4b2c3964d5b7e27879cf6041bc85acc7e857d43a3312b5b0cc64fdc9a",
+    "releaseArchiveSha256": "d87a5da39a6342f0a2be99fd7667e0d0f5751d8a987320d68856c705c26741c9",
+    "ciArtifactZipSha256": "6317f9884d0e989ca7cd54ba3c64e48cc521cad0072fab963b2a0202fd88d5f4"
+  },
+  "authorization": {
+    "ownerAuthorized": true,
+    "ownerWaiver": "OWNER_WAIVER_NO_INDEPENDENT_REVIEW",
+    "independentReviewPass": false,
+    "runCountAuthorized": 1,
+    "maxDurationSeconds": 60,
+    "maxExtensionSeconds": 0,
+    "runConsumed": true
+  },
+  "device": {
+    "model": "Moto g62 5G",
+    "serial": "ZY22FWGQTB",
+    "androidVersion": "13",
+    "api": 33,
+    "abi": "arm64-v8a"
+  },
+  "requested": {
+    "testMode": "DSP_SHADOW_ZERO_OUTPUT",
+    "route": "BUILTIN_SPEAKER_ONLY",
+    "durationMs": 60000,
+    "sampleRate": 48000,
+    "microphoneUsed": false,
+    "bluetoothApiUsed": false,
+    "externalAudioDevicesUsed": false,
+    "hearingOutputUsed": false,
+    "callbackFrames": "UNSPECIFIED_VARIABLE"
+  },
+  "result": {
+    "acceptanceStatus": "FAILED",
+    "status": "CALLBACK_OVERRUN",
+    "runCompletion": "CALLBACK_OVERRUN",
+    "durationComplete": false,
+    "physicalAudioStreamStarted": true,
+    "dspBenchmarkValid": false,
+    "dspExecutionStatus": "FAIL_STOP",
+    "reason": "complete callback exceeded the actual frame-count deadline",
+    "callbacksObserved": 1,
+    "successfulDspCallbacks": 0,
+    "nativeSessionInvocations": 1,
+    "controlUpdates": 0
+  },
+  "negotiatedStream": {
+    "sampleRate": 48000,
+    "framesPerBurst": 192,
+    "bufferSizeFrames": 1536,
+    "bufferCapacityFrames": 1536,
+    "performanceModeRequested": "LOW_LATENCY",
+    "performanceModeActual": "LOW_LATENCY",
+    "sharingModeRequested": "SHARED",
+    "sharingModeActual": "SHARED",
+    "usage": "MEDIA",
+    "format": "FLOAT",
+    "channels": 2,
+    "callbackFrameHistogram": {
+      "192": 1
+    }
+  },
+  "callback": {
+    "frames": 192,
+    "deadlineBudgetNs": 4000000,
+    "dspProcessingWallNs": 7305416,
+    "callbackWallNs": 7358907,
+    "threadCpuNs": 6425888,
+    "dspDeadlineFailureCount": 1,
+    "fullCallbackOverrunCount": 1,
+    "nativeSessionFailStopCount": 1,
+    "callbackCoreFailStopCount": 1,
+    "overlapCount": 0,
+    "singleObservationOnly": true
+  },
+  "route": {
+    "audioModeBeforeQueries": 0,
+    "audioModeAfterQueries": 0,
+    "mediaPredictedRoute": [
+      {
+        "id": 3,
+        "kind": "BUILTIN_SPEAKER"
+      }
+    ],
+    "actualOutputDeviceIdBeforeStart": 3,
+    "actualOutputDeviceId": 3,
+    "routeMismatchObserved": false,
+    "routePolicyInvalidated": false,
+    "telephonyInventoryOnly": true,
+    "routePolicyHardwareGuarantee": false
+  },
+  "outputAndLifecycle": {
+    "zeroOutputVerificationEnabled": true,
+    "zeroSamplesVerified": 384,
+    "nonzeroOutputSamplesObserved": 0,
+    "dspToAudioBufferPath": false,
+    "xrunStartCount": 0,
+    "xrunCount": 0,
+    "xrunDelta": 0,
+    "streamStopConfirmed": true,
+    "aaudioStopResult": 0,
+    "aaudioCloseResult": 0,
+    "callbacksInFlightAfterClose": 0,
+    "disconnectObserved": false,
+    "apkUninstallResult": "Success"
+  },
+  "interarrival": {
+    "maximumEvent": null,
+    "reasonUnavailable": "Only one callback was observed, so there is no interval or adjacent callback pair.",
+    "priorZeroOnlyMaximumGapMs": 98.423,
+    "priorGapCause": "unresolved"
+  },
+  "allocationAudit": "Callback source path contains no allocation, file I/O, JNI, mutex or sleep. AAudio and Bionic internal allocations are not instrumented.",
+  "interpretation": {
+    "callbackPeriodMs": 4.0,
+    "dspProcessingMs": 7.305416,
+    "callbackWallMs": 7.358907,
+    "threadCpuMs": 6.425888,
+    "wallMinusThreadCpuMs": 0.933019,
+    "assessment": "The only observed callback exceeded both DSP and full-callback budgets. Thread CPU accounts for most of its wall time, but a single first callback cannot establish steady-state cost or distinguish cold-start effects. No DSP algorithm change is justified from this one observation."
+  },
+  "evidence": {
+    "localDirectory": "D:\\Dev\\Android\\test-results\\hearlens\\physical-dsp-shadow\\20261127-211247-895-device-e94a303e",
+    "nativeResultSha256": "abae832538dc426e87c0dccae9bcf1e279bd1c4af15bc46d462f3413b14449ae",
+    "runSummarySha256": "9a9202b8991d32221b49181f84cb35c13628d0b0c8a3e7157553e4f1a02cc2cf",
+    "fullLogcatSha256": "9441a5f3f32659874f3e5074bc21af13a6cab04bad7961e41b054ac6180fde16",
+    "evidenceManifest": "sha256-manifest.json",
+    "rawDeviceLogsCommitted": false
+  },
+  "claimLimits": [
+    "This was not a completed 60-second acceptance run.",
+    "No five-minute run or retry is authorized by the consumed one-run approval.",
+    "The measured route is an Android policy and AAudio device-ID observation, not a physical hardware-route guarantee.",
+    "This test does not establish acoustic latency, hearing safety, calibrated SPL/MPO or real hearing output.",
+    "M04 REAL HEARING remains BLOCKED / DEFERRED."
+  ]
+}

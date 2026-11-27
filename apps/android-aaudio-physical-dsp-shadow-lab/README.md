@@ -36,4 +36,14 @@ The first-run acceptance gate requires: output nonzero samples = 0; XRuns = 0; D
 
 The physical runner does not run automatically from CI. The owner authorization must bind the exact artifact ID, APK hash, release archive hash and source commit before any device stream. See [the physical-zero lab](../android-aaudio-physical-zero-lab/README.md) for the separate ZERO_ONLY contract; its prior authorization does not apply to this DSP-shadow APK.
 
+## First physical DSP-shadow run — 2026-11-27
+
+One owner-authorized run used CI artifact 15198712216, source commit d17337db99c28744685151f95b1d6526a8b382a2, APK SHA-256 510daef4b2c3964d5b7e27879cf6041bc85acc7e857d43a3312b5b0cc64fdc9a, and release archive SHA-256 d87a5da39a6342f0a2be99fd7667e0d0f5751d8a987320d68856c705c26741c9 on the Moto g62 5G (ZY22FWGQTB, Android 13/API 33, arm64-v8a). The owner waived independent human review for this exact artifact; the recorded gate is OWNER_WAIVER_NO_INDEPENDENT_REVIEW, not independent review PASS.
+
+The stream negotiated 48 kHz, 192 frames per burst, a 1,536-frame buffer, SHARED and LOW_LATENCY. Route policy selected the built-in speaker (predicted and AAudio device ID 3) in MODE_NORMAL; telephony was inventory-only. The first observed callback had 192 frames and a 4 ms budget, but DSP processing took 7.305 ms, callback wall time was 7.359 ms, and callback-thread CPU time was 6.426 ms. It fail-stopped immediately: one DSP deadline failure, one full callback overrun, one NativeSession fail-stop, zero successful DSP callbacks and zero control updates. The 60-second acceptance run therefore FAILED and did not complete.
+
+The one callback verified 384 zero output samples and observed zero nonzero samples. XRun delta, route mismatch, callback overlap and disconnect were all zero. AAudio stop/close returned success, no callbacks remained in flight, and the runner uninstalled the APK. Because only one callback was recorded, there is no maximum inter-arrival event or adjacent callback pair to analyze. The callback timing is a single observation, not a steady-state distribution. See the [structured research report](../../research/android-aaudio-callback/physical-dsp-shadow-moto-g62-2026-11-27.md); the full device logs and their SHA-256 manifest remain in the local evidence directory recorded there.
+
+This run does not pass the first-run gate and does not authorize a five-minute run or a retry. A new physical run requires new exact-scope owner authorization. No DSP algorithm or oracle tolerance was changed. M04 REAL HEARING remains BLOCKED / DEFERRED.
+
 M01 captions remain unchanged. M03 offline tuning remains closed. M04 REAL HEARING remains **BLOCKED / DEFERRED**.
