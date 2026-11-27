@@ -93,6 +93,11 @@ jobs:
             'build-tools;35.0.0' \
             'ndk;27.2.12479018' \
             'cmake;3.22.1'
+      - name: Run physical zero-only route policy host tests
+        run: |
+          apps/android-native-dsp-lab/gradlew --no-daemon \
+            --project-dir apps/android-aaudio-physical-zero-lab \
+            :app:testDebugUnitTest
       - name: Generate the canonical JS-oracle fixture
         run: |
           fixture="$RUNNER_TEMP/hearlens-aaudio-fixture"
@@ -147,7 +152,7 @@ jobs:
             "packageName": "org.hearlens.physicalzero",
             "maxDurationMs": 60000,
             "testWorkload": "ZERO_ONLY",
-            "routePolicy": "BUILTIN_SPEAKER_ONLY_EXACT_DEVICE_ID",
+            "routePolicy": "API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR",
             "permissionsDeclared": [],
             "installOrStreamStarted": false
           }

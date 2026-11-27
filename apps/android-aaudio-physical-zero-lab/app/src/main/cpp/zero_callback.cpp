@@ -25,6 +25,8 @@ constexpr std::int32_t kMaximumDurationMs = 60'000;
 constexpr std::size_t kMaximumCallbackRecords = 65'536;
 constexpr std::size_t kMaximumHistogramFrames = 8'192;
 constexpr std::size_t kMaximumXrunObservations = 12'008;
+constexpr std::int32_t kBridgeStopReasonRoutePolicy = 2;
+constexpr std::int32_t kBridgeStopReasonLifecycle = 3;
 
 enum class StopReason : std::int32_t {
   kNone = 0,
@@ -38,6 +40,8 @@ enum class StopReason : std::int32_t {
   kStreamError = 8,
   kRouteMismatch = 9,
   kMetricCapacity = 10,
+  kRoutePolicyInvalidated = 11,
+  kLifecycleInvalidated = 12,
 };
 
 const char* reasonName(StopReason reason) noexcept {
@@ -53,6 +57,8 @@ const char* reasonName(StopReason reason) noexcept {
     case StopReason::kStreamError: return "AAUDIO_STREAM_ERROR";
     case StopReason::kRouteMismatch: return "BUILTIN_SPEAKER_ROUTE_MISMATCH";
     case StopReason::kMetricCapacity: return "METRIC_CAPACITY_EXHAUSTED";
+    case StopReason::kRoutePolicyInvalidated: return "ROUTE_POLICY_INVALIDATED";
+    case StopReason::kLifecycleInvalidated: return "LIFECYCLE_INVALIDATED";
   }
   return "UNKNOWN";
 }
@@ -94,11 +100,42 @@ struct XrunObservation {
   std::int32_t cumulativeCount = -1;
 };
 
+struct PublishedRouteSnapshot {
+  std::uint64_t runToken = 0;
+  std::uint64_t generation = 0;
+  std::int32_t speakerId = -1;
+  std::int32_t invalidationReasonCode = 0;
+  bool allowed = false;
+};
+
+std::mutex gRoutePolicyMutex;
+PublishedRouteSnapshot gPublishedRouteSnapshot;
+
+StopReason routeInvalidationReason(std::uint64_t token) noexcept {
+  std::lock_guard<std::mutex> lock(gRoutePolicyMutex);
+  if (gPublishedRouteSnapshot.runToken == token &&
+      gPublishedRouteSnapshot.invalidationReasonCode == kBridgeStopReasonLifecycle) {
+    return StopReason::kLifecycleInvalidated;
+  }
+  return StopReason::kRoutePolicyInvalidated;
+}
+
+bool routePolicyMatches(std::uint64_t token, std::uint64_t generation,
+                        std::int32_t speakerId) noexcept {
+  std::lock_guard<std::mutex> lock(gRoutePolicyMutex);
+  return gPublishedRouteSnapshot.allowed &&
+      gPublishedRouteSnapshot.runToken == token &&
+      gPublishedRouteSnapshot.generation == generation &&
+      gPublishedRouteSnapshot.speakerId == speakerId;
+}
+
 struct Session {
-  explicit Session(std::int32_t expectedDeviceId, std::uint64_t runToken)
+  explicit Session(std::int32_t expectedDeviceId, std::uint64_t runToken,
+                   std::uint64_t routeGeneration)
       : records(new (std::nothrow) CallbackRecord[kMaximumCallbackRecords]),
         xrunObservations(new (std::nothrow) XrunObservation[kMaximumXrunObservations]),
-        expectedOutputDeviceId(expectedDeviceId), token(runToken) {
+        expectedOutputDeviceId(expectedDeviceId), token(runToken),
+        expectedRouteGeneration(routeGeneration) {
     for (auto& count : frameHistogram) {
       count.store(0, std::memory_order_relaxed);
     }
@@ -126,17 +163,27 @@ struct Session {
   std::atomic<StopReason> stopReason{StopReason::kNone};
   std::atomic<bool> stopRequested{false};
   std::atomic<std::int32_t> streamErrorCode{AAUDIO_OK};
+  std::atomic<bool> streamDisconnectObserved{false};
   std::uint64_t previousCallbackStartNs = 0;
   std::atomic<std::uint64_t> runStartNs{0};
   std::uint64_t xrunObservationCount = 0;
+  std::uint64_t routePolicyCheckCount = 0;
+  std::uint64_t actualDeviceIdCheckCount = 0;
+  std::uint64_t routePolicyInvalidationMonotonicNs = 0;
+  std::uint64_t routeMismatchMonotonicNs = 0;
   std::int32_t expectedOutputDeviceId;
   std::uint64_t token;
+  std::uint64_t expectedRouteGeneration;
   std::int32_t sampleRate = 0;
   std::int32_t channelCount = 0;
   std::int32_t framesPerBurst = 0;
   std::int32_t bufferSizeFrames = 0;
   std::int32_t bufferCapacityFrames = 0;
   std::int32_t actualDeviceId = -1;
+  std::int32_t actualDeviceIdBeforeStart = -1;
+  std::int32_t lastObservedDeviceId = -1;
+  bool routePolicyValidBeforeOpen = false;
+  bool routePolicyValidBeforeStart = false;
   std::int32_t xrunStartCount = -1;
   std::int32_t xrunFinalCount = -1;
   std::uint64_t cpuAvailableSamples = 0;
@@ -149,6 +196,8 @@ struct Session {
   aaudio_result_t closeResult = AAUDIO_ERROR_INVALID_STATE;
   bool streamStarted = false;
   bool streamStopConfirmed = false;
+  bool callbackDrainConfirmed = false;
+  aaudio_stream_state_t finalStreamState = AAUDIO_STREAM_STATE_UNKNOWN;
 };
 
 static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
@@ -266,6 +315,9 @@ void errorCallback(AAudioStream*, void* userData,
   session->callbacksInFlight.fetch_add(1, std::memory_order_acq_rel);
   session->errorCallbackCount.fetch_add(1, std::memory_order_relaxed);
   session->streamErrorCode.store(error, std::memory_order_release);
+  if (error == AAUDIO_ERROR_DISCONNECTED) {
+    session->streamDisconnectObserved.store(true, std::memory_order_release);
+  }
   requestStop(*session, StopReason::kStreamError);
   session->callbacksInFlight.fetch_sub(1, std::memory_order_acq_rel);
 }
@@ -366,10 +418,26 @@ std::string report(Session& session, const char* status,
        << performanceModeName(session.performanceMode) << "\""
        << ",\"requested_usage\":\"MEDIA\""
        << ",\"requested_output_device_id\":" << session.expectedOutputDeviceId
+       << ",\"route_policy_generation\":" << session.expectedRouteGeneration
+       << ",\"route_policy_valid_before_open\":"
+       << (session.routePolicyValidBeforeOpen ? "true" : "false")
+       << ",\"route_policy_valid_before_start\":"
+       << (session.routePolicyValidBeforeStart ? "true" : "false")
+       << ",\"route_policy_control_checks\":" << session.routePolicyCheckCount
+       << ",\"route_policy_invalidation_monotonic_ns\":"
+       << session.routePolicyInvalidationMonotonicNs
        << ",\"requested_output_device_type\":\"TYPE_BUILTIN_SPEAKER\""
        << ",\"actual_output_device_id\":" << session.actualDeviceId
+       << ",\"actual_output_device_id_before_start\":"
+       << session.actualDeviceIdBeforeStart
+       << ",\"last_observed_output_device_id\":"
+       << session.lastObservedDeviceId
+       << ",\"actual_output_device_id_control_checks\":"
+       << session.actualDeviceIdCheckCount
+       << ",\"route_mismatch_monotonic_ns\":"
+       << session.routeMismatchMonotonicNs
        << ",\"actual_output_device_type\":\""
-       << (session.actualDeviceId == session.expectedOutputDeviceId
+       << (session.lastObservedDeviceId == session.expectedOutputDeviceId
                ? "TYPE_BUILTIN_SPEAKER" : "NOT_VERIFIED") << "\""
        << ",\"requested_route\":\"BUILTIN_SPEAKER_ONLY\""
        << ",\"frames_per_burst\":" << session.framesPerBurst
@@ -383,10 +451,18 @@ std::string report(Session& session, const char* status,
        << streamErrorCode
        << ",\"aaudio_error_callback_count\":"
        << session.errorCallbackCount.load(std::memory_order_acquire)
+       << ",\"stream_disconnect_observed\":"
+       << (session.streamDisconnectObserved.load(std::memory_order_acquire)
+               ? "true" : "false")
        << ",\"physical_audio_stream_started\":"
        << (session.streamStarted ? "true" : "false")
        << ",\"stream_stop_confirmed\":"
        << (session.streamStopConfirmed ? "true" : "false")
+       << ",\"callback_drain_confirmed\":"
+       << (session.callbackDrainConfirmed ? "true" : "false")
+       << ",\"callbacks_in_flight_after_drain\":"
+       << session.callbacksInFlight.load(std::memory_order_acquire)
+       << ",\"aaudio_final_stream_state\":" << session.finalStreamState
        << ",\"actual_callback_observed\":" << (invocations > 0 ? "true" : "false")
        << ",\"callback_count\":" << invocations
        << ",\"callback_records_count\":" << count
@@ -415,7 +491,7 @@ std::string report(Session& session, const char* status,
        << ",\"native_session_invocations\":0"
        << ",\"dsp_to_audio_buffer_path\":false"
        << ",\"microphone_used\":false,\"bluetooth_api_used\":false"
-       << ",\"audio_route_policy\":\"AAudio pinned to the selected Android built-in speaker device id; no fallback accepted\""
+        << ",\"audio_route_policy\":\"route generation and API 33 MEDIA prediction checked before open/start; AAudio device id polled on control thread; no fallback accepted; observation is not a hardware-route guarantee\""
        << ",\"callback_allocation_claim\":\"source-audited only; runtime allocation instrumentation is not available\""
        << ",\"dsp_thread_cpu_percent\":0.0"
        << ",\"aaudio_xrun_counter_available\":"
@@ -462,7 +538,8 @@ jstring javaString(JNIEnv* env, const std::string& value) {
   return env->NewStringUTF(value.c_str());
 }
 
-std::string notRun(const char* reason, std::int32_t expectedDeviceId) {
+std::string notRun(const char* reason, std::int32_t expectedDeviceId,
+                   StopReason stopReason = StopReason::kNone) {
   std::ostringstream json;
   json << "{\"status\":\"NOT_RUN\",\"reason\":\"" << reason
        << "\",\"workload\":\"ZERO_ONLY\",\"requested_duration_ms\":"
@@ -474,7 +551,8 @@ std::string notRun(const char* reason, std::int32_t expectedDeviceId) {
        << ",\"actual_output_device_type\":\"NOT_VERIFIED\""
        << ",\"dsp_benchmark_valid\":false,\"native_session_invocations\":0"
        << ",\"dsp_to_audio_buffer_path\":false,\"microphone_used\":false"
-       << ",\"bluetooth_api_used\":false} ";
+       << ",\"bluetooth_api_used\":false,\"stop_reason\":\""
+       << reasonName(stopReason) << "\"} ";
   return json.str();
 }
 
@@ -488,6 +566,11 @@ std::string drainTimeoutReport(const Session& session, std::uint64_t elapsedNs) 
        << ",\"run_wall_ns\":" << elapsedNs
        << ",\"physical_audio_stream_started\":true"
        << ",\"stream_stop_confirmed\":false"
+       << ",\"callback_drain_confirmed\":false"
+       << ",\"callbacks_in_flight_after_drain\":"
+       << session.callbacksInFlight.load(std::memory_order_acquire)
+       << ",\"aaudio_final_stream_state\":" << session.finalStreamState
+       << ",\"aaudio_stop_result\":" << session.stopResult
        << ",\"aaudio_close_result\":" << session.closeResult
        << ",\"aaudio_stream_error_code\":"
        << session.streamErrorCode.load(std::memory_order_acquire)
@@ -503,6 +586,27 @@ std::string drainTimeoutReport(const Session& session, std::uint64_t elapsedNs) 
        << session.nonZeroSamplesObserved.load(std::memory_order_relaxed)
        << ",\"requested_output_device_id\":" << session.expectedOutputDeviceId
        << ",\"actual_output_device_id\":" << session.actualDeviceId
+       << ",\"actual_output_device_id_before_start\":"
+       << session.actualDeviceIdBeforeStart
+       << ",\"last_observed_output_device_id\":"
+       << session.lastObservedDeviceId
+       << ",\"route_policy_generation\":" << session.expectedRouteGeneration
+       << ",\"route_policy_valid_before_open\":"
+       << (session.routePolicyValidBeforeOpen ? "true" : "false")
+       << ",\"route_policy_valid_before_start\":"
+       << (session.routePolicyValidBeforeStart ? "true" : "false")
+       << ",\"route_policy_control_checks\":" << session.routePolicyCheckCount
+       << ",\"actual_output_device_id_control_checks\":"
+       << session.actualDeviceIdCheckCount
+       << ",\"route_policy_invalidation_monotonic_ns\":"
+       << session.routePolicyInvalidationMonotonicNs
+       << ",\"route_mismatch_monotonic_ns\":"
+       << session.routeMismatchMonotonicNs
+       << ",\"stop_reason\":\""
+       << reasonName(session.stopReason.load(std::memory_order_acquire)) << "\""
+       << ",\"stream_disconnect_observed\":"
+       << (session.streamDisconnectObserved.load(std::memory_order_acquire)
+               ? "true" : "false")
        << ",\"requested_output_device_type\":\"TYPE_BUILTIN_SPEAKER\""
        << ",\"dsp_benchmark_valid\":false,\"native_session_invocations\":0"
        << ",\"dsp_to_audio_buffer_path\":false,\"microphone_used\":false"
@@ -510,14 +614,25 @@ std::string drainTimeoutReport(const Session& session, std::uint64_t elapsedNs) 
   return json.str();
 }
 
-std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
+std::string run(std::int32_t expectedDeviceId, std::uint64_t token,
+                std::uint64_t routeGeneration) {
   if (expectedDeviceId <= 0 || token == 0) {
     return notRun("invalid built-in speaker id or run token", expectedDeviceId);
+  }
+  if (!routePolicyMatches(token, routeGeneration, expectedDeviceId)) {
+    return notRun("route policy snapshot missing, stale, or invalid before AAudio open",
+        expectedDeviceId, routeInvalidationReason(token));
+  }
+  if (gStopRequestedToken.load(std::memory_order_acquire) == token) {
+    const auto reason = routePolicyMatches(token, routeGeneration, expectedDeviceId)
+        ? StopReason::kUser : routeInvalidationReason(token);
+    return notRun("stop or invalidation arrived before stream setup", expectedDeviceId, reason);
   }
   if (gDrainTimeoutFailStop.load(std::memory_order_acquire)) {
     return notRun("process fail-stop latched after a prior callback drain timeout", expectedDeviceId);
   }
-  std::unique_ptr<Session> session(new (std::nothrow) Session(expectedDeviceId, token));
+  std::unique_ptr<Session> session(new (std::nothrow) Session(
+      expectedDeviceId, token, routeGeneration));
   if (!session || !session->records || !session->xrunObservations) {
     return notRun("preallocated callback metrics could not be allocated", expectedDeviceId);
   }
@@ -527,7 +642,16 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
       return notRun("another physical zero-only run is already active", expectedDeviceId);
     }
     if (gStopRequestedToken.load(std::memory_order_acquire) == token) {
-      return notRun("stop or foreground invalidation arrived before stream open", expectedDeviceId);
+      const auto reason = routePolicyMatches(token, routeGeneration, expectedDeviceId)
+          ? StopReason::kUser : routeInvalidationReason(token);
+      return notRun("stop or invalidation arrived before stream open", expectedDeviceId, reason);
+    }
+    session->routePolicyCheckCount++;
+    session->routePolicyValidBeforeOpen = routePolicyMatches(
+        token, routeGeneration, expectedDeviceId);
+    if (!session->routePolicyValidBeforeOpen) {
+      return notRun("route generation changed before AAudio open", expectedDeviceId,
+          routeInvalidationReason(token));
     }
     gCurrentSession = session.get();
   }
@@ -542,14 +666,15 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   }
   if (session->stopRequested.load(std::memory_order_acquire) ||
       gStopRequestedToken.load(std::memory_order_acquire) == token) {
-    requestStop(*session, StopReason::kUser);
+    requestStop(*session, routePolicyMatches(token, routeGeneration, expectedDeviceId)
+        ? StopReason::kUser : routeInvalidationReason(token));
     AAudioStreamBuilder_delete(builder);
     {
       std::lock_guard<std::mutex> lock(gSessionMutex);
       if (gCurrentSession == session.get()) gCurrentSession = nullptr;
     }
     return report(*session, "STOPPED_BEFORE_OPEN",
-        "visible Stop action or foreground invalidation arrived before AAudio open", 0, false);
+        "stop, route invalidation, or lifecycle invalidation arrived before AAudio open", 0, false);
   }
   AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
   AAudioStreamBuilder_setDeviceId(builder, expectedDeviceId);
@@ -562,6 +687,22 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
       AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
   AAudioStreamBuilder_setDataCallback(builder, &dataCallback, session.get());
   AAudioStreamBuilder_setErrorCallback(builder, &errorCallback, session.get());
+  session->routePolicyCheckCount++;
+  session->routePolicyValidBeforeOpen = routePolicyMatches(
+      token, routeGeneration, expectedDeviceId);
+  if (!session->routePolicyValidBeforeOpen ||
+      gStopRequestedToken.load(std::memory_order_acquire) == token) {
+    const auto reason = session->routePolicyValidBeforeOpen
+        ? StopReason::kUser : routeInvalidationReason(token);
+    requestStop(*session, reason);
+    AAudioStreamBuilder_delete(builder);
+    {
+      std::lock_guard<std::mutex> lock(gSessionMutex);
+      if (gCurrentSession == session.get()) gCurrentSession = nullptr;
+    }
+    return report(*session, "ROUTE_REFUSED",
+        "route policy or generation changed before AAudio open", 0, false);
+  }
   AAudioStream* stream = nullptr;
   session->openResult = AAudioStreamBuilder_openStream(builder, &stream);
   AAudioStreamBuilder_delete(builder);
@@ -579,6 +720,8 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   session->bufferSizeFrames = AAudioStream_getBufferSizeInFrames(stream);
   session->bufferCapacityFrames = AAudioStream_getBufferCapacityInFrames(stream);
   session->actualDeviceId = AAudioStream_getDeviceId(stream);
+  session->actualDeviceIdCheckCount++;
+  session->lastObservedDeviceId = session->actualDeviceId;
   session->sharingMode = AAudioStream_getSharingMode(stream);
   session->performanceMode = AAudioStream_getPerformanceMode(stream);
   if (session->actualDeviceId != expectedDeviceId) {
@@ -598,8 +741,33 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
     return report(*session, "FORMAT_REFUSED",
         "negotiated output format is not stereo PCM_FLOAT", 0, false);
   }
+  session->routePolicyCheckCount++;
+  session->routePolicyValidBeforeStart = routePolicyMatches(
+      token, routeGeneration, expectedDeviceId);
+  session->actualDeviceIdBeforeStart = AAudioStream_getDeviceId(stream);
+  session->actualDeviceIdCheckCount++;
+  session->lastObservedDeviceId = session->actualDeviceIdBeforeStart;
+  if (!session->routePolicyValidBeforeStart) {
+    session->routePolicyInvalidationMonotonicNs = nowNs(Clock::now());
+    requestStop(*session, routeInvalidationReason(token));
+    session->closeResult = AAudioStream_close(stream);
+    std::lock_guard<std::mutex> lock(gSessionMutex);
+    gCurrentSession = nullptr;
+    return report(*session, "ROUTE_REFUSED",
+        "route policy generation changed after open and before start", 0, false);
+  }
+  if (session->actualDeviceIdBeforeStart != expectedDeviceId) {
+    session->routeMismatchMonotonicNs = nowNs(Clock::now());
+    requestStop(*session, StopReason::kRouteMismatch);
+    session->closeResult = AAudioStream_close(stream);
+    std::lock_guard<std::mutex> lock(gSessionMutex);
+    gCurrentSession = nullptr;
+    return report(*session, "ROUTE_REFUSED",
+        "AAudio device id changed between open and start", 0, false);
+  }
   if (gStopRequestedToken.load(std::memory_order_acquire) == token) {
-    requestStop(*session, StopReason::kUser);
+    requestStop(*session, session->routePolicyValidBeforeStart
+        ? StopReason::kUser : routeInvalidationReason(token));
     session->closeResult = AAudioStream_close(stream);
     std::lock_guard<std::mutex> lock(gSessionMutex);
     gCurrentSession = nullptr;
@@ -624,7 +792,27 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   while (Clock::now() < deadline &&
          !session->stopRequested.load(std::memory_order_acquire)) {
     if (gStopRequestedToken.load(std::memory_order_acquire) == token) {
-      requestStop(*session, StopReason::kUser);
+      requestStop(*session, routePolicyMatches(token, routeGeneration, expectedDeviceId)
+          ? StopReason::kUser : routeInvalidationReason(token));
+      break;
+    }
+    session->routePolicyCheckCount++;
+    if (!routePolicyMatches(token, routeGeneration, expectedDeviceId)) {
+      session->routePolicyInvalidationMonotonicNs = nowNs(Clock::now());
+      requestStop(*session, routeInvalidationReason(token));
+      break;
+    }
+    session->lastObservedDeviceId = AAudioStream_getDeviceId(stream);
+    session->actualDeviceIdCheckCount++;
+    if (session->lastObservedDeviceId != expectedDeviceId) {
+      session->routeMismatchMonotonicNs = nowNs(Clock::now());
+      requestStop(*session, StopReason::kRouteMismatch);
+      break;
+    }
+    const auto streamState = AAudioStream_getState(stream);
+    if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
+      session->streamDisconnectObserved.store(true, std::memory_order_release);
+      requestStop(*session, StopReason::kStreamError);
       break;
     }
     const auto currentXrunCount = AAudioStream_getXRunCount(stream);
@@ -658,11 +846,13 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   }
   const bool terminalState = state == AAUDIO_STREAM_STATE_STOPPED ||
       state == AAUDIO_STREAM_STATE_DISCONNECTED;
+  session->finalStreamState = state;
   const auto drainDeadline = Clock::now() + std::chrono::seconds(1);
   while (session->callbacksInFlight.load(std::memory_order_acquire) > 0 &&
          Clock::now() < drainDeadline) std::this_thread::yield();
-  session->streamStopConfirmed = terminalState &&
+  session->callbackDrainConfirmed =
       session->callbacksInFlight.load(std::memory_order_acquire) == 0;
+  session->streamStopConfirmed = terminalState && session->callbackDrainConfirmed;
   session->xrunFinalCount = AAudioStream_getXRunCount(stream);
   if (session->xrunFinalCount >= 0 && previousXrunCount >= 0 &&
       session->xrunFinalCount > previousXrunCount &&
@@ -681,6 +871,7 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
   }
   if (session->callbacksInFlight.load(std::memory_order_acquire) > 0) {
     session->streamStopConfirmed = false;
+    session->callbackDrainConfirmed = false;
     gDrainTimeoutFailStop.store(true, std::memory_order_release);
     {
       std::lock_guard<std::mutex> lock(gSessionMutex);
@@ -689,6 +880,7 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
     auto* retainedSession = session.release();
     return drainTimeoutReport(*retainedSession, elapsedNs);
   }
+  session->callbackDrainConfirmed = true;
 
   auto reason = session->stopReason.load(std::memory_order_acquire);
   const auto streamErrorCode = session->streamErrorCode.load(std::memory_order_acquire);
@@ -731,19 +923,49 @@ std::string run(std::int32_t expectedDeviceId, std::uint64_t token) {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_hearlens_physicalzero_NativeBridge_nativeRunBuiltInSpeaker(
-    JNIEnv* env, jobject, jint deviceId, jlong runToken) {
-  if (runToken <= 0) return javaString(env, notRun("invalid run token", deviceId));
-  return javaString(env, run(deviceId, static_cast<std::uint64_t>(runToken)));
+    JNIEnv* env, jobject, jint deviceId, jlong runToken,
+    jlong routeGeneration) {
+  if (runToken <= 0 || routeGeneration <= 0) {
+    return javaString(env, notRun("invalid run token or route generation", deviceId));
+  }
+  return javaString(env, run(deviceId, static_cast<std::uint64_t>(runToken),
+      static_cast<std::uint64_t>(routeGeneration)));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_hearlens_physicalzero_NativeBridge_nativePublishRouteSnapshot(
+    JNIEnv*, jobject, jlong runToken, jlong generation, jint speakerId,
+    jboolean allowed, jint invalidationReasonCode) {
+  if (runToken <= 0 || generation <= 0) return;
+  const auto token = static_cast<std::uint64_t>(runToken);
+  const auto routeGeneration = static_cast<std::uint64_t>(generation);
+  std::lock_guard<std::mutex> lock(gRoutePolicyMutex);
+  if (token < gPublishedRouteSnapshot.runToken ||
+      (token == gPublishedRouteSnapshot.runToken &&
+       routeGeneration < gPublishedRouteSnapshot.generation)) {
+    return;
+  }
+  gPublishedRouteSnapshot = {
+      token,
+      routeGeneration,
+      static_cast<std::int32_t>(speakerId),
+      static_cast<std::int32_t>(invalidationReasonCode),
+      allowed == JNI_TRUE && speakerId > 0,
+  };
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_hearlens_physicalzero_NativeBridge_nativeRequestStop(
-    JNIEnv*, jobject, jlong runToken) {
+    JNIEnv*, jobject, jlong runToken, jint reasonCode) {
   if (runToken <= 0) return;
   const auto token = static_cast<std::uint64_t>(runToken);
   gStopRequestedToken.store(token, std::memory_order_release);
+  const auto reason = reasonCode == kBridgeStopReasonRoutePolicy
+      ? StopReason::kRoutePolicyInvalidated
+      : reasonCode == kBridgeStopReasonLifecycle
+          ? StopReason::kLifecycleInvalidated : StopReason::kUser;
   std::lock_guard<std::mutex> lock(gSessionMutex);
   if (gCurrentSession != nullptr && gCurrentSession->token == token) {
-    requestStop(*gCurrentSession, StopReason::kUser);
+    requestStop(*gCurrentSession, reason);
   }
 }
