@@ -85,7 +85,9 @@ class NativeSession {
   Candidate process(const Ticket& ticket, std::uint64_t observedRouteStamp,
                     const float* interleaved, std::size_t sampleCount,
                     Clock::time_point deadline,
-                    ReadClock now = &Clock::now) noexcept {
+                    ReadClock now = &Clock::now,
+                    NativeDspStageTimings* timings = nullptr) noexcept {
+    if (timings != nullptr) *timings = {};
     if (!isArmed(ticket)) return {};
     if (busy_.test_and_set(std::memory_order_acquire)) {
       invalidate(ticket);
@@ -101,15 +103,34 @@ class NativeSession {
       return {};
     }
     if (processedGeneration_ != ticket.generation_) {
+      const auto resetStart = timings == nullptr
+          ? NativeTimingClock::time_point{} : NativeTimingClock::now();
       dsp_.reset();
+      if (timings != nullptr) {
+        timings->generationResetNs = nativeElapsedNs(
+            resetStart, NativeTimingClock::now());
+      }
       processedGeneration_ = ticket.generation_;
     }
 
     const auto frames = sampleCount / 2;
-    const bool processed = dsp_.processInto(interleaved, scratch_.data(), frames);
+    const bool processed = dsp_.processInto(interleaved, scratch_.data(),
+                                             frames, timings);
+    const auto validationStart = timings == nullptr
+        ? NativeTimingClock::time_point{} : NativeTimingClock::now();
     const bool finite = std::all_of(scratch_.begin(), scratch_.begin() + sampleCount,
                                     [](float sample) { return std::isfinite(sample); });
+    if (timings != nullptr) {
+      timings->scratchValidationNs = nativeElapsedNs(
+          validationStart, NativeTimingClock::now());
+    }
+    const auto clearStart = timings == nullptr
+        ? NativeTimingClock::time_point{} : NativeTimingClock::now();
     std::fill_n(scratch_.begin(), sampleCount, 0.0F);
+    if (timings != nullptr) {
+      timings->scratchClearNs = nativeElapsedNs(clearStart,
+                                                 NativeTimingClock::now());
+    }
     if (!processed || !finite || now() >= deadline) {
       invalidate(ticket);
       return {};

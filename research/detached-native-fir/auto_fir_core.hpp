@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dynamic_fir_core.hpp"
+#include "native_timing.hpp"
 #include "six_band_level_core.hpp"
 
 #include <algorithm>
@@ -46,7 +47,9 @@ class AutoFirResearch {
   }
 
   bool processInto(const float* input, float* output,
-                   std::size_t frames) noexcept {
+                   std::size_t frames,
+                   NativeDspStageTimings* timings = nullptr,
+                   std::size_t earIndex = 0) noexcept {
     if (faulted_ || !configValid_) return false;
     if (input == nullptr || output == nullptr || frames == 0 ||
         frames > kMaximumCallbackFrames || rangesOverlap(input, output, frames)) {
@@ -63,8 +66,15 @@ class AutoFirResearch {
     }
 
     if (!initialized_) {
+      const auto synthesisStart = timings == nullptr
+          ? NativeTimingClock::time_point{}
+          : NativeTimingClock::now();
       if (!fir_.setSyntheticBandLevels(kZeroLevels)) {
         return failCallback(output, frames);
+      }
+      if (timings != nullptr && earIndex < 2) {
+        timings->initialFirCoefficientSynthesisNs[earIndex] +=
+            nativeElapsedNs(synthesisStart, NativeTimingClock::now());
       }
       initialized_ = true;
     }
@@ -73,18 +83,39 @@ class AutoFirResearch {
     while (position < frames) {
       const std::size_t untilUpdate = controlIntervalSamples_ - sinceUpdate_;
       const std::size_t count = std::min(frames - position, untilUpdate);
-      if (count == 0 ||
-          !detector_.process(input + position, count) ||
-          !fir_.processInto(input + position, output + position, count)) {
+      if (count == 0) {
         return failCallback(output, frames);
+      }
+      auto stageStart = timings == nullptr
+          ? NativeTimingClock::time_point{} : NativeTimingClock::now();
+      if (!detector_.process(input + position, count)) {
+        return failCallback(output, frames);
+      }
+      if (timings != nullptr) {
+        timings->detectorNs += nativeElapsedNs(stageStart,
+                                               NativeTimingClock::now());
+        stageStart = NativeTimingClock::now();
+      }
+      if (!fir_.processInto(input + position, output + position, count)) {
+        return failCallback(output, frames);
+      }
+      if (timings != nullptr) {
+        timings->firConvolutionNs += nativeElapsedNs(stageStart,
+                                                     NativeTimingClock::now());
       }
       position += count;
       sinceUpdate_ += count;
       if (sinceUpdate_ == controlIntervalSamples_) {
         DetectorLevels levels{};
+        stageStart = timings == nullptr
+            ? NativeTimingClock::time_point{} : NativeTimingClock::now();
         if (!detector_.readNominalLevelsInto(levels) ||
             !fir_.setSyntheticBandLevels(levels)) {
           return failCallback(output, frames);
+        }
+        if (timings != nullptr) {
+          timings->dynamicControlUpdateNs += nativeElapsedNs(
+              stageStart, NativeTimingClock::now());
         }
         if (updateLog_.sampleIndices != nullptr) {
           if (updates_ >= updateLog_.capacity) {
@@ -185,7 +216,8 @@ class StereoAutoFirResearch {
   }
 
   bool processInto(const float* interleavedInput, float* interleavedOutput,
-                   std::size_t frames) noexcept {
+                   std::size_t frames,
+                   NativeDspStageTimings* timings = nullptr) noexcept {
     if (faulted_ || !configValid_) {
       return failCallback(interleavedOutput, frames);
     }
@@ -205,8 +237,10 @@ class StereoAutoFirResearch {
       rightInput_[frame] = right;
     }
 
-    if (!left_.processInto(leftInput_.data(), leftOutput_.data(), frames) ||
-        !right_.processInto(rightInput_.data(), rightOutput_.data(), frames)) {
+    if (!left_.processInto(leftInput_.data(), leftOutput_.data(), frames,
+                           timings, 0) ||
+        !right_.processInto(rightInput_.data(), rightOutput_.data(), frames,
+                            timings, 1)) {
       return failCallback(interleavedOutput, frames);
     }
     for (std::size_t frame = 0; frame < frames; ++frame) {

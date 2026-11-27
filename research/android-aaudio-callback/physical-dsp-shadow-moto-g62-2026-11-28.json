@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-11-28",
+  "result": "CALLBACK_OVERRUN",
+  "acceptance": "FAIL",
+  "authorization": {
+    "artifactId": 15212874345,
+    "sourceCommit": "54cacf1cd3b3f54e85d4253f840b7edbd0d97bfd",
+    "reviewGateMode": "OWNER_WAIVER_NO_INDEPENDENT_REVIEW",
+    "deviceSerial": "ZY22FWGQTB",
+    "model": "Moto g62 5G",
+    "androidApi": 33,
+    "abi": "arm64-v8a",
+    "testMode": "DSP_SHADOW_ZERO_OUTPUT",
+    "route": "BUILTIN_SPEAKER_ONLY",
+    "maxDurationSeconds": 60,
+    "maxExtensionSeconds": 0,
+    "authorizationConsumed": true
+  },
+  "hashes": {
+    "actionsArtifactZip": "c61c2c765d61dcd3d9e5422a857c3dd035d64fc2e9dd884555a6869c0a65da40",
+    "releaseArchive": "f13e5c2047c2d2320f66e715402fd9b8bc27d37135d99e73a4e1d80405fbb5bd",
+    "apk": "5a22327567ea7562f77224b7b630ad1605e57348ad7acdf39dcd3b58f13ce516",
+    "fixture": "40ae2cdecf7f83ef11dc12302c65315cc6382f3e193b5c4b63e15bfb98bbfe3c",
+    "jsOracle": "f148b30b17bab4f61f141bb37c511295574ba2983fbbb71fa10ed4673692c8c4",
+    "compileCommands": "528181d82a9609af86227c383bd2959fca16a737e9f8ee54f852442ba0e78ed3",
+    "nativeResult": "9e5b34c9e4f05fab2cab08252885d9b7d38e6da970c5fb65a1d2ff199a506748",
+    "logcat": "929948ecd879bdff50cfbf7e9486f9607592993eae96f333fbd0f256313436b4",
+    "sha256Manifest": "f6b03f95c50518ef7856b54bdbfac5fe9ba19c297695f3a09a244f9c2cd00cae"
+  },
+  "compiler": {
+    "profile": "O2",
+    "ndk": "27.2.12479018",
+    "effectiveFlags": ["-O2", "-fno-fast-math", "-ffp-contract=off"]
+  },
+  "stream": {
+    "requestedSampleRateHz": 48000,
+    "actualSampleRateHz": 48000,
+    "format": "FLOAT",
+    "channels": 2,
+    "usage": "MEDIA",
+    "sharingMode": "SHARED",
+    "sharingModeAchieved": true,
+    "performanceMode": "LOW_LATENCY",
+    "performanceModeAchieved": true,
+    "framesPerBurst": 192,
+    "bufferSizeFrames": 1536,
+    "bufferCapacityFrames": 1536
+  },
+  "route": {
+    "audioMode": "MODE_NORMAL",
+    "mediaPredictedRoute": [{"id": 3, "kind": "BUILTIN_SPEAKER"}],
+    "inventory": [
+      {"id": 2, "kind": "BUILTIN_EARPIECE"},
+      {"id": 3, "kind": "BUILTIN_SPEAKER"},
+      {"id": 9, "kind": "TELEPHONY"}
+    ],
+    "requestedDeviceId": 3,
+    "actualDeviceIdBeforeStart": 3,
+    "actualDeviceId": 3,
+    "routeMismatch": false,
+    "hardwareRouteGuarantee": false
+  },
+  "runtime": {
+    "startedUtc": "2026-11-27T16:19:15.2556067Z",
+    "finishedUtc": "2026-11-27T16:19:33.9171373Z",
+    "requestedDurationMs": 60000,
+    "runWallMs": 4023.799425,
+    "durationComplete": false,
+    "runCompletion": "CALLBACK_OVERRUN",
+    "callbackCount": 1032,
+    "successfulDspCallbacks": 1032,
+    "nativeControlUpdates": 388,
+    "frameCountDistribution": {"64": 61, "128": 61, "192": 910},
+    "callbackThreadCpuPercent": 52.8309
+  },
+  "timingsMs": {
+    "callbackWall": {"p50": 1.965937, "p95": 3.132604, "p99": 3.190885, "max": 3.371146},
+    "threadCpu": {"p50": 1.952708, "p95": 3.01375, "p99": 3.089533, "max": 3.159948},
+    "dspProcessing": {"p50": 1.944791, "p95": 3.108958, "p99": 3.163958, "max": 3.347343},
+    "byCallbackFrames": [
+      {
+        "frames": 64,
+        "count": 61,
+        "callbackWallMs": {"p50": 0.679062, "p95": 1.155104, "p99": 1.466875, "max": 1.466875},
+        "threadCpuMs": {"p50": 0.670261, "p95": 1.022865, "p99": 1.074896, "max": 1.074896},
+        "dspWallMs": {"p50": 0.660938, "p95": 1.140416, "p99": 1.410938, "max": 1.410938},
+        "overruns": 1
+      },
+      {
+        "frames": 128,
+        "count": 61,
+        "callbackWallMs": {"p50": 1.310312, "p95": 2.017709, "p99": 2.174114, "max": 2.174114},
+        "threadCpuMs": {"p50": 1.301146, "p95": 2.010157, "p99": 2.091772, "max": 2.091772},
+        "dspWallMs": {"p50": 1.298697, "p95": 2.003854, "p99": 2.15901, "max": 2.15901},
+        "overruns": 0
+      },
+      {
+        "frames": 192,
+        "count": 910,
+        "callbackWallMs": {"p50": 1.98224, "p95": 3.139062, "p99": 3.198073, "max": 3.371146},
+        "threadCpuMs": {"p50": 1.959687, "p95": 3.025209, "p99": 3.090885, "max": 3.159948},
+        "dspWallMs": {"p50": 1.959636, "p95": 3.11724, "p99": 3.175052, "max": 3.347343},
+        "overruns": 0
+      }
+    ]
+  },
+  "deadlines": {
+    "dspBudgetBasis": "max(callback frames, negotiated framesPerBurst) / sample rate",
+    "callbackBudgetBasis": "callback frames / sample rate",
+    "dspDeadlineFailures": 0,
+    "callbackOverruns": 1,
+    "event": {
+      "callbackIndex": 1031,
+      "frames": 64,
+      "callbackBudgetMs": 1.333333,
+      "callbackWallMs": 1.466875,
+      "dspWallMs": 1.410938,
+      "threadCpuMs": 1.028281,
+      "dspDeadlineMs": 4.0
+    }
+  },
+  "xruns": {"start": 0, "end": 0, "delta": 0, "source": "AAudioStream_getXRunCount"},
+  "maximumInterarrival": {
+    "callbackIndex": 8,
+    "interArrivalMs": 159.305365,
+    "expectedMs": 4.0,
+    "jitterMs": 155.305365,
+    "surroundingRecords": [
+      {"callbackIndex": 6, "frames": 192, "interArrivalMs": 1.973073, "wallMs": 1.905469, "threadCpuMs": 1.895677},
+      {"callbackIndex": 7, "frames": 192, "interArrivalMs": 1.925521, "wallMs": 2.056719, "threadCpuMs": 2.027291},
+      {"callbackIndex": 8, "frames": 192, "interArrivalMs": 159.305365, "wallMs": 1.938229, "threadCpuMs": 1.930469},
+      {"callbackIndex": 9, "frames": 192, "interArrivalMs": 3.752968, "wallMs": 0.336771, "threadCpuMs": 0.308647},
+      {"callbackIndex": 10, "frames": 128, "interArrivalMs": 4.03625, "wallMs": 1.362292, "threadCpuMs": 1.348542}
+    ],
+    "startupCorrelation": "AAudio state 3 to 4 transition logged at 00:19:27.893 near the event; cause not established"
+  },
+  "output": {
+    "zeroSamplesVerified": 372864,
+    "nonzeroSamples": 0,
+    "dspToAudioBufferPath": false,
+    "microphoneUsedByApp": false,
+    "bluetoothApiUsed": false
+  },
+  "teardown": {
+    "aaudioOpen": 0,
+    "aaudioStart": 0,
+    "aaudioStop": 0,
+    "aaudioClose": 0,
+    "streamStopConfirmed": true,
+    "callbacksInFlightAfterClose": 0,
+    "apkUninstalled": true
+  },
+  "limits": {
+    "allocationAudit": "Static callback source-path audit only; AAudio/Bionic internal allocations not instrumented",
+    "thermal": "NOT_CAPTURED",
+    "vendorHalLog": "vi-feedback, fluence nn capture state and spkr-vi-record appeared during speaker-output startup; Motorola-specific meaning not confirmed",
+    "callbackTimingScope": "Includes DSP, zero scan, frame histogram, record/jitter and budget bookkeeping; ends before final overrun classification and callback return tail"
+  },
+  "evidenceDirectory": "D:\\Dev\\Android\\test-results\\hearlens\\physical-dsp-shadow\\20261128-001915-252-device-358c47ae"
+}

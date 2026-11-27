@@ -79,7 +79,8 @@ class CallbackCore {
       Clock::time_point callbackStart = Clock::now(),
       ReadClock now = &Clock::now,
       std::int32_t deadlineFrameBudget = 0,
-      bool executeNativeSession = true) noexcept {
+      bool executeNativeSession = true,
+      NativeDspStageTimings* stageTimings = nullptr) noexcept {
     lastDspProcessingNs_.store(0, std::memory_order_relaxed);
     // Output is zeroed before validation or DSP work. The pointer is never
     // passed to NativeSession, and DSP scratch is never copied to this buffer.
@@ -137,7 +138,8 @@ class CallbackCore {
     const auto dspStart = Clock::now();
     const auto candidate = session_.process(
         ticket_, kSyntheticRouteStamp, inputScratch_.data(),
-        static_cast<std::size_t>(frames) * kChannels, deadline, now);
+        static_cast<std::size_t>(frames) * kChannels, deadline, now,
+        stageTimings);
     const auto dspEnd = Clock::now();
     if (dspEnd >= dspStart) {
       lastDspProcessingNs_.store(static_cast<std::uint64_t>(

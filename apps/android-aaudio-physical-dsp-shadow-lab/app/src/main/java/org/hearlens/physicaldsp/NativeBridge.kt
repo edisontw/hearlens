@@ -17,4 +17,5 @@ internal object NativeBridge {
     external fun nativeRunDspShadow(fixture: ByteArray, deviceId: Int, runToken: Long, routeGeneration: Long): String
     external fun nativeRunPortableFixture(fixture: ByteArray): ByteArray?
     external fun nativeRunSessionMatrix(): String?
+    external fun nativeRunNoAudioBenchmark(fixture: ByteArray): String?
 }
