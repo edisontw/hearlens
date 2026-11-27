@@ -477,8 +477,9 @@ export class EdisonLocalAsrProvider {
 
   async drainQueue() {
     if (this.drainPromise) return this.drainPromise;
-    this.drainPromise = (async () => {
-      while (this.pendingSegments.length && !this.fatalError) {
+    const generation = this.generation;
+    const drainPromise = (async () => {
+      while (generation === this.generation && this.pendingSegments.length && !this.fatalError) {
         const segment = this.pendingSegments.shift();
         this.onStatus({ providerId: this.id, state: "processing", label: `Edison 本機辨識中；待處理 ${this.pendingSegments.length} 段` });
         this.debug("segment-submit", `duration=${segment.duration.toFixed(2)}s; pending=${this.pendingSegments.length}`);
@@ -489,7 +490,7 @@ export class EdisonLocalAsrProvider {
           const wav = encodeWav16kMono(segment.chunks);
           const result = await submitEdisonAudio({ endpoint: this.endpoint, model: this.model, wav,
             language: this.languageMode, fetchImpl: fetch, signal: controller.signal });
-          if (this.fatalError) break;
+          if (generation !== this.generation || this.fatalError) break;
           const receivedAt = Date.now();
           const outputs = Array.isArray(result.segments) && result.segments.length
             ? result.segments.map(item => ({ text: item?.text, start: Number(item?.start || 0) }))
@@ -505,7 +506,7 @@ export class EdisonLocalAsrProvider {
             label: this.active ? `本機收音中；待辨識 ${this.pendingSegments.length} 段` : "正在完成本機字幕片段" });
           this.debug("segment-complete", `model=${this.model}; audio=${Number(result.duration || segment.duration).toFixed(2)}s; pending=${this.pendingSegments.length}`);
         } catch (error) {
-          if (this.fatalError) break;
+          if (generation !== this.generation || this.fatalError) break;
           const message = error?.name === "AbortError"
             ? "Edison 本機 ASR 等待逾時，已停止本機收音；請確認 Edison 服務與 GPU 狀態。"
             : (error instanceof Error ? error.message : "Edison 本機轉錄失敗。");
@@ -517,9 +518,13 @@ export class EdisonLocalAsrProvider {
       }
     })();
     try {
-      await this.drainPromise;
+      this.drainPromise = drainPromise;
+      await drainPromise;
     } finally {
-      this.drainPromise = null;
+      if (this.drainPromise === drainPromise) this.drainPromise = null;
+      if (generation !== this.generation && !this.fatalError && this.pendingSegments.length) {
+        void this.drainQueue();
+      }
     }
   }
 
@@ -542,6 +547,7 @@ export class EdisonLocalAsrProvider {
     this.active = false;
     this.stopping = true;
     this.fatalError = true;
+    const drainPromise = this.drainPromise;
     this.startupAbort?.abort();
     this.startupAbort = null;
     this.requestAbort?.abort();
@@ -549,6 +555,7 @@ export class EdisonLocalAsrProvider {
     this.currentChunks = [];
     this.currentSamples = 0;
     this.pendingSegments = [];
+    if (drainPromise) await drainPromise;
     this.stopping = false;
     if (!this.fatalError) this.onStatus({ providerId: this.id, state: "stopped", label: "Edison 本機收音已取消" });
   }

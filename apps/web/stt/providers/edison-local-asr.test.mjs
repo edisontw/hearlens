@@ -316,3 +316,87 @@ test("stopping during microphone permission stops a stream granted later", async
     else delete globalThis.navigator;
   }
 });
+
+test("dispose drains an aborted generation before restart and ignores its late transcript", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let resolveTranscription;
+  let requestStartedResolve;
+  const requestStarted = new Promise(resolve => { requestStartedResolve = resolve; });
+  let transcriptionSignal;
+  let stoppedTracks = 0;
+  let disposeFinished = false;
+  let drainPromise;
+  let disposePromise;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { return new FakeNode(); }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({
+      getTracks: () => [{ stop: () => { stoppedTracks += 1; } }],
+    }) } },
+  });
+  globalThis.fetch = async (url, options = {}) => {
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      return { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+    }
+    if (url.endsWith("/v1/audio/transcriptions")) {
+      transcriptionSignal = options.signal;
+      requestStartedResolve();
+      return new Promise(resolve => { resolveTranscription = resolve; });
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const finals = [];
+  try {
+    const provider = new EdisonLocalAsrProvider({
+      endpoint: "http://127.0.0.1:8765",
+      model: "breeze-asr-26-q5",
+      onFinal: value => finals.push(value),
+    });
+    provider.pendingSegments.push({
+      chunks: [new Float32Array([0.25, 0.5])],
+      duration: 2 / 16_000,
+      timestamp: 1234,
+    });
+    drainPromise = provider.drainQueue();
+    await requestStarted;
+    disposePromise = provider.dispose().then(() => { disposeFinished = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(transcriptionSignal.aborted, true);
+    assert.equal(disposeFinished, false);
+
+    resolveTranscription({ ok: true, json: async () => ({
+      text: "過期世代字幕",
+      duration: 1,
+      segments: [{ start: 0, end: 1, text: "過期世代字幕" }],
+    }) });
+    await Promise.all([drainPromise, disposePromise]);
+    assert.equal(provider.drainPromise, null);
+    assert.deepEqual(finals, []);
+
+    await provider.start();
+    assert.equal(provider.active, true);
+    assert.deepEqual(finals, []);
+    await provider.dispose();
+    assert.equal(stoppedTracks, 1);
+  } finally {
+    if (resolveTranscription) resolveTranscription({ ok: true, json: async () => ({ text: "late" }) });
+    if (disposePromise) await disposePromise;
+    if (drainPromise) await drainPromise;
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
