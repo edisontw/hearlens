@@ -80,6 +80,7 @@ jobs:
             tools/android-aaudio-callback-lab-contract.test.mjs \
             tools/physical-aaudio-zero-contract.test.mjs \
             tools/physical-aaudio-dsp-shadow-contract.test.mjs \
+            tools/android-n07-first-callback-contract.test.mjs \
             apps/web/caption-failstop.test.mjs \
             tools/m04-output-safety-gate.test.mjs
 
@@ -216,11 +217,23 @@ jobs:
             "$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/generated/androidTestAssets/portable-fixture/"
           "$source_root/apps/android-native-dsp-lab/gradlew" --no-daemon \
             --project-dir "$source_root/apps/android-aaudio-physical-dsp-shadow-lab" \
-            :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+            :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest \
+            -PnativeOptimizationLevel=2
           apk="$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/outputs/apk/debug/app-debug.apk"
           test_apk="$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
           test -f "$apk"
           test -f "$test_apk"
+          compile_commands=$(find \
+            "$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/.cxx/Debug" \
+            -path '*/arm64-v8a/compile_commands.json' -type f -print -quit)
+          test -n "$compile_commands"
+          node "$source_root/tools/android/verify-native-optimization.mjs" \
+            "$compile_commands" O2 \
+            > "$RUNNER_TEMP/physical-dsp-shadow-native-compile-verification.json"
+          native_compile_commands_sha=$(jq -r '.compileCommandsSha256' \
+            "$RUNNER_TEMP/physical-dsp-shadow-native-compile-verification.json")
+          test -n "$native_compile_commands_sha"
+          clang_version=$("$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" --version | sed -n '1p')
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
           permissions="$RUNNER_TEMP/physical-dsp-shadow-apk-permissions.txt"
           "$aapt" dump permissions "$apk" | tee "$permissions"
@@ -233,6 +246,9 @@ jobs:
           cp "$apk" "$stage/hearlens-physical-dsp-shadow-arm64-v8a-debug.apk"
           cp "$test_apk" "$stage/hearlens-physical-dsp-shadow-androidTest.apk"
           cp "$fixture/auto-fir-fixture.bin" "$fixture/auto-fir-js-oracle.bin" "$fixture/manifest.json" "$stage/"
+          cp "$compile_commands" "$stage/native-compile-commands.json"
+          cp "$RUNNER_TEMP/physical-dsp-shadow-native-compile-verification.json" \
+            "$stage/native-compile-verification.json"
           cp "$permissions" "$stage/apk-permissions.txt"
           release_archive="$RUNNER_TEMP/hearlens-physical-dsp-shadow-arm64-release.zip"
           (cd "$stage" && zip -j -X "$release_archive" ./*)
@@ -248,6 +264,12 @@ jobs:
             "releaseArchiveSha256": "$archive_sha",
             "nativeAbi": "arm64-v8a",
             "nativeLibrary": "libhearlens_physical_dsp_shadow.so",
+            "nativeOptimizationProfile": "O2",
+            "nativeCompiler": "$clang_version",
+            "nativeNdkVersion": "27.2.12479018",
+            "nativeCmakeVersion": "3.22.1",
+            "nativeEffectiveFlags": ["-O2", "-fno-fast-math", "-ffp-contract=off"],
+            "nativeCompileCommandsSha256": "$native_compile_commands_sha",
             "packageName": "org.hearlens.physicaldsp",
             "requestedSampleRate": 48000,
             "dspFixtureSampleRate": 48000,
@@ -264,11 +286,19 @@ jobs:
           EOF
           (cd "$RUNNER_TEMP" && sha256sum \
             physical-dsp-shadow-build-info.json \
-            physical-dsp-shadow-apk-permissions.txt \
+            physical-dsp-shadow-release-payload/hearlens-physical-dsp-shadow-arm64-v8a-debug.apk \
+            physical-dsp-shadow-release-payload/hearlens-physical-dsp-shadow-androidTest.apk \
+            physical-dsp-shadow-release-payload/auto-fir-fixture.bin \
+            physical-dsp-shadow-release-payload/auto-fir-js-oracle.bin \
+            physical-dsp-shadow-release-payload/manifest.json \
+            physical-dsp-shadow-release-payload/native-compile-commands.json \
+            physical-dsp-shadow-release-payload/native-compile-verification.json \
+            physical-dsp-shadow-release-payload/apk-permissions.txt \
             hearlens-physical-dsp-shadow-arm64-release.zip > physical-dsp-shadow-sha256-manifest.txt)
           echo "apk_sha256=$apk_sha" >> "$GITHUB_OUTPUT"
           echo "archive_sha256=$archive_sha" >> "$GITHUB_OUTPUT"
           echo "source_commit=$source_commit" >> "$GITHUB_OUTPUT"
+          echo "native_compile_commands_sha=$native_compile_commands_sha" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         id: physical-dsp-shadow-artifact
         with:
@@ -277,6 +307,8 @@ jobs:
             ${{ runner.temp }}/physical-dsp-shadow-release-payload/hearlens-physical-dsp-shadow-arm64-v8a-debug.apk
             ${{ runner.temp }}/physical-dsp-shadow-release-payload/hearlens-physical-dsp-shadow-androidTest.apk
             ${{ runner.temp }}/physical-dsp-shadow-release-payload/apk-permissions.txt
+            ${{ runner.temp }}/physical-dsp-shadow-release-payload/native-compile-commands.json
+            ${{ runner.temp }}/physical-dsp-shadow-release-payload/native-compile-verification.json
             ${{ runner.temp }}/hearlens-physical-dsp-shadow-arm64-release.zip
             ${{ runner.temp }}/physical-dsp-shadow-build-info.json
             ${{ runner.temp }}/physical-dsp-shadow-sha256-manifest.txt
@@ -290,6 +322,8 @@ jobs:
             echo "Source commit: ${{ steps.physical-dsp-shadow-build.outputs.source_commit }}"
             echo "APK SHA-256: ${{ steps.physical-dsp-shadow-build.outputs.apk_sha256 }}"
             echo "Release archive SHA-256: ${{ steps.physical-dsp-shadow-build.outputs.archive_sha256 }}"
+            echo "Native optimization profile: O2"
+            echo "Native compile-commands SHA-256: ${{ steps.physical-dsp-shadow-build.outputs.native_compile_commands_sha }}"
             echo "Physical AAudio stream started: false"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Check APK permissions and native ABI packaging

@@ -5,6 +5,11 @@ plugins {
 
 def targetAbis = (project.findProperty('targetAbis') ?: 'arm64-v8a')
     .toString().split(',').collect { it.trim() }.findAll { !it.isEmpty() }
+def nativeOptimizationLevel = (project.findProperty('nativeOptimizationLevel') ?: '2')
+    .toString()
+if (!(nativeOptimizationLevel in ['0', '2'])) {
+    throw new GradleException('nativeOptimizationLevel must be 0 or 2')
+}
 
 android {
     namespace 'org.hearlens.physicaldsp'
@@ -23,7 +28,9 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags '-std=c++17 -Wall -Wextra -Wpedantic -Werror'
-                arguments '-DANDROID_STL=c++_static'
+                arguments '-DANDROID_STL=c++_static',
+                    '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
+                    "-DHEARLENS_NATIVE_OPT_LEVEL=${nativeOptimizationLevel}"
             }
         }
     }

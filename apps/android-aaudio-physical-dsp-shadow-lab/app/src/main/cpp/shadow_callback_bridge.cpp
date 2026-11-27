@@ -1283,6 +1283,216 @@ std::string runFixture(JNIEnv* env, jbyteArray fixtureBytes, int durationMs,
   return report;
 }
 
+struct NoAudioObservation {
+  const char* scenario = "";
+  std::uint32_t callbackIndex = 0;
+  std::uint32_t frames = 0;
+  std::uint64_t callbackWallNs = 0;
+  std::uint64_t threadCpuNs = 0;
+  std::uint64_t dspProcessingNs = 0;
+  std::uint64_t deadlineBudgetNs = 0;
+  std::uint64_t controlUpdatesBefore = 0;
+  std::uint64_t controlUpdatesAfter = 0;
+  std::uint64_t zeroSamplesVerified = 0;
+  std::uint64_t nonzeroSamplesObserved = 0;
+  std::uint64_t dspDeadlineFailures = 0;
+  bool cpuAvailable = false;
+  bool callbackOverrun = false;
+  CallbackDisposition disposition = CallbackDisposition::kRejected;
+  NativeDspStageTimings stages{};
+};
+
+const char* noAudioDispositionName(CallbackDisposition disposition) noexcept {
+  switch (disposition) {
+    case CallbackDisposition::kContinue: return "CONTINUE";
+    case CallbackDisposition::kStopped: return "STOPPED";
+    case CallbackDisposition::kRejected: return "REJECTED_FAIL_STOP";
+    case CallbackDisposition::kOverlap: return "OVERLAP_FAIL_STOP";
+  }
+  return "UNKNOWN";
+}
+
+NoAudioObservation runNoAudioCallback(CallbackCore& core,
+                                      std::uint32_t frames,
+                                      const char* scenario,
+                                      std::uint32_t callbackIndex,
+                                      bool traceStages) noexcept {
+  NoAudioObservation observation;
+  observation.scenario = scenario;
+  observation.callbackIndex = callbackIndex;
+  observation.frames = frames;
+  observation.deadlineBudgetNs = static_cast<std::uint64_t>(
+      static_cast<double>(frames) * 1'000'000'000.0 /
+      static_cast<double>(kFixtureSampleRate));
+  observation.controlUpdatesBefore = core.nativeControlUpdates();
+  const auto deadlineFailuresBefore = core.dspDeadlineFailureCount();
+  std::array<float, kMaximumCallbackFrames * 2> privateZeroOutput{};
+  bool cpuStartAvailable = false;
+  const auto cpuStart = threadCpuNow(cpuStartAvailable);
+  const auto callbackStart = Clock::now();
+  observation.disposition = core.processOutput(
+      privateZeroOutput.data(), static_cast<std::int32_t>(frames),
+      kFixtureSampleRate, callbackStart, &Clock::now,
+      static_cast<std::int32_t>(frames), true,
+      traceStages ? &observation.stages : nullptr);
+  const auto callbackEnd = Clock::now();
+  bool cpuEndAvailable = false;
+  const auto cpuEnd = threadCpuNow(cpuEndAvailable);
+  observation.callbackWallNs = nativeElapsedNs(callbackStart, callbackEnd);
+  observation.cpuAvailable = cpuStartAvailable && cpuEndAvailable &&
+      cpuEnd >= cpuStart;
+  observation.threadCpuNs = observation.cpuAvailable ? cpuEnd - cpuStart : 0;
+  observation.dspProcessingNs = core.lastDspProcessingNs();
+  observation.controlUpdatesAfter = core.nativeControlUpdates();
+  observation.dspDeadlineFailures =
+      core.dspDeadlineFailureCount() - deadlineFailuresBefore;
+  observation.callbackOverrun =
+      observation.callbackWallNs >= observation.deadlineBudgetNs;
+  for (std::size_t index = 0; index < static_cast<std::size_t>(frames) * 2;
+       ++index) {
+    if (privateZeroOutput[index] == 0.0F) {
+      ++observation.zeroSamplesVerified;
+    } else {
+      ++observation.nonzeroSamplesObserved;
+    }
+  }
+  return observation;
+}
+
+void appendNoAudioObservation(std::ostringstream& output,
+                              const NoAudioObservation& item,
+                              bool& first) {
+  if (!first) output << ',';
+  first = false;
+  output << "{\"scenario\":\"" << item.scenario
+         << "\",\"callback_index\":" << item.callbackIndex
+         << ",\"frames\":" << item.frames
+         << ",\"deadline_budget_ns\":" << item.deadlineBudgetNs
+         << ",\"callback_wall_ns\":" << item.callbackWallNs
+         << ",\"thread_cpu_available\":"
+         << (item.cpuAvailable ? "true" : "false")
+         << ",\"thread_cpu_ns\":";
+  if (item.cpuAvailable) output << item.threadCpuNs;
+  else output << "null";
+  output << ",\"dsp_processing_ns\":" << item.dspProcessingNs
+         << ",\"dsp_deadline_failures\":" << item.dspDeadlineFailures
+         << ",\"callback_overrun\":"
+         << (item.callbackOverrun ? "true" : "false")
+         << ",\"disposition\":\""
+         << noAudioDispositionName(item.disposition)
+         << "\",\"control_updates_before\":"
+         << item.controlUpdatesBefore
+         << ",\"control_updates_after\":"
+         << item.controlUpdatesAfter
+         << ",\"zero_samples_verified\":"
+         << item.zeroSamplesVerified
+         << ",\"nonzero_samples_observed\":"
+         << item.nonzeroSamplesObserved
+         << ",\"stage_timing_enabled\":"
+         << (item.stages.generationResetNs != 0 ||
+                     item.stages.initialFirCoefficientSynthesisNs[0] != 0 ||
+                     item.stages.initialFirCoefficientSynthesisNs[1] != 0 ||
+                     item.stages.detectorNs != 0 ||
+                     item.stages.firConvolutionNs != 0 ||
+                     item.stages.dynamicControlUpdateNs != 0 ||
+                     item.stages.scratchValidationNs != 0 ||
+                     item.stages.scratchClearNs != 0
+                 ? "true" : "false")
+         << ",\"stages_ns\":{\"generation_reset\":"
+         << item.stages.generationResetNs
+         << ",\"initial_fir_coefficients_left\":"
+         << item.stages.initialFirCoefficientSynthesisNs[0]
+         << ",\"initial_fir_coefficients_right\":"
+         << item.stages.initialFirCoefficientSynthesisNs[1]
+         << ",\"detector\":" << item.stages.detectorNs
+         << ",\"fir_convolution\":" << item.stages.firConvolutionNs
+         << ",\"dynamic_control_update\":"
+         << item.stages.dynamicControlUpdateNs
+         << ",\"scratch_validation\":"
+         << item.stages.scratchValidationNs
+         << ",\"scratch_clear\":" << item.stages.scratchClearNs
+         << "}}";
+}
+
+std::string runNoAudioBenchmark(const FixtureData& fixture) {
+  std::vector<NoAudioObservation> observations;
+  observations.reserve(40);
+  const std::vector<std::uint32_t> steadyFrames(12, 192);
+  const std::vector<std::uint32_t> variableFrames{64, 128, 128, 64};
+  const auto runSequence = [&](const char* scenario,
+                               const std::vector<std::uint32_t>& frames,
+                               bool traceStages) {
+    CallbackCore core(fixture.basis, fixture.targets, fixture.pcm);
+    if (!core.start()) return false;
+    for (std::size_t index = 0; index < frames.size(); ++index) {
+      auto observation = runNoAudioCallback(
+          core, frames[index], scenario, static_cast<std::uint32_t>(index),
+          traceStages);
+      const bool continued = observation.disposition ==
+          CallbackDisposition::kContinue;
+      observations.push_back(observation);
+      if (!continued) return false;
+    }
+    return true;
+  };
+
+  runSequence("new_instance_first_unprofiled", {192}, false);
+  runSequence("new_instance_first_profiled", {192}, true);
+  runSequence("steady_and_control_update_unprofiled", steadyFrames, false);
+  runSequence("steady_and_control_update_profiled", steadyFrames, true);
+
+  CallbackCore restarted(fixture.basis, fixture.targets, fixture.pcm);
+  if (restarted.start()) {
+    const auto warm = runNoAudioCallback(
+        restarted, 192, "new_generation_warmup", 0, false);
+    observations.push_back(warm);
+    restarted.stop();
+    if (restarted.start()) {
+      observations.push_back(runNoAudioCallback(
+          restarted, 192, "new_generation_first_profiled", 0, true));
+    }
+  }
+
+  runSequence("variable_64_128_profiled", variableFrames, true);
+
+  std::uint64_t deadlineFailures = 0;
+  std::uint64_t callbackOverruns = 0;
+  std::uint64_t zeroSamples = 0;
+  std::uint64_t nonzeroSamples = 0;
+  for (const auto& item : observations) {
+    deadlineFailures += item.dspDeadlineFailures;
+    callbackOverruns += item.callbackOverrun ? 1U : 0U;
+    zeroSamples += item.zeroSamplesVerified;
+    nonzeroSamples += item.nonzeroSamplesObserved;
+  }
+
+#if HEARLENS_NATIVE_OPT_LEVEL == 2
+  constexpr const char* optimizationProfile = "O2";
+#else
+  constexpr const char* optimizationProfile = "O0";
+#endif
+  std::ostringstream output;
+  output << "{\"contract\":\"NO_AUDIO_NATIVE_DSP_BENCHMARK\""
+         << ",\"physical_stream_opened\":false"
+         << ",\"aaudio_open_calls\":0"
+         << ",\"audio_output_connected_to_dsp\":false"
+         << ",\"optimization_profile\":\"" << optimizationProfile << "\""
+         << ",\"sample_rate\":48000"
+         << ",\"strict_callback_deadlines\":true"
+         << ",\"target_wall_ns\":2000000"
+         << ",\"deadline_failures\":" << deadlineFailures
+         << ",\"callback_overruns\":" << callbackOverruns
+         << ",\"zero_samples_verified\":" << zeroSamples
+         << ",\"nonzero_samples_observed\":" << nonzeroSamples
+         << ",\"records\":[";
+  bool first = true;
+  for (const auto& item : observations) {
+    appendNoAudioObservation(output, item, first);
+  }
+  output << "]}";
+  return output.str();
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -1342,6 +1552,26 @@ Java_org_hearlens_physicaldsp_NativeBridge_nativeRunSessionMatrix(
     std::ostringstream output;
     if (runNativeSessionCheck(output) != 0) return nullptr;
     return env->NewStringUTF(output.str().c_str());
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_hearlens_physicaldsp_NativeBridge_nativeRunNoAudioBenchmark(
+    JNIEnv* env, jobject, jbyteArray fixtureBytes) {
+  if (fixtureBytes == nullptr) return nullptr;
+  const jsize size = env->GetArrayLength(fixtureBytes);
+  if (size <= 0) return nullptr;
+  try {
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+    env->GetByteArrayRegion(fixtureBytes, 0, size,
+                            reinterpret_cast<jbyte*>(bytes.data()));
+    if (env->ExceptionCheck()) return nullptr;
+    FixtureData fixture;
+    if (!parseFixture(bytes.data(), bytes.size(), fixture)) return nullptr;
+    const std::string report = runNoAudioBenchmark(fixture);
+    return env->NewStringUTF(report.c_str());
   } catch (...) {
     return nullptr;
   }
