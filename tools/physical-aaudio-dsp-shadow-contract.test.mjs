@@ -148,6 +148,9 @@ test("physical runner requires exact artifact owner authorization and one review
   assert.match(runner, /owner\.allowSyntheticDspProcessing -ne \$true/);
   assert.match(runner, /\$record\.zero_samples_verified -ne \(2L \* \[long\]\$record\.frame_count\)/);
   assert.match(runner, /\$native\.native_control_updates -le 0/);
+  assert.match(runner, /\$native\.frame_count_overflow -ne 0/);
+  assert.match(runner, /callback_cpu_unavailable_samples/);
+  assert.match(runner, /maximum_interarrival_event\.surrounding_records/);
   assert.match(runner, /dsp_deadline_failure_count -ne 0/);
   assert.match(runner, /callback_overrun_count -ne 0/);
   assert.match(runner, /xrun_delta -ne 0/);

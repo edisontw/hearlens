@@ -297,11 +297,13 @@ try {
     }
     $predicted = @($native.route_policy_final_snapshot.mediaPredictedRoute)
     $records = @($native.callback_records_detail)
+    $maximumGapRecords = @($native.maximum_interarrival_event.surrounding_records)
     $callbackRecordsValid = $records.Count -gt 0
     for ($index = 0; $index -lt $records.Count; $index++) {
         $record = $records[$index]
         if ($record.callback_index -ne $index -or $record.frame_count -le 0 -or
-            $record.callback_wall_ns -le 0 -or $record.dsp_processing_wall_ns -le 0 -or
+            $record.callback_wall_ns -le 0 -or $record.callback_thread_cpu_ns -le 0 -or
+            $record.dsp_processing_wall_ns -le 0 -or
             $record.dsp_deadline_budget_ns -le 0 -or $record.callback_budget_ns -le 0 -or
             $record.zero_samples_verified -ne (2L * [long]$record.frame_count) -or
             $record.dsp_deadline_failure -ne $false -or $record.callback_overrun -ne $false) {
@@ -313,14 +315,19 @@ try {
         !$native.duration_complete -or !$native.physical_audio_stream_started -or
         !$native.dsp_benchmark_valid -or $native.dsp_execution_status -ne 'EXECUTED' -or
         !$native.sample_rate_matches_fixture -or !$native.actual_callback_observed -or
+        $native.callback_frames_request -ne 'UNSPECIFIED_VARIABLE' -or
         !$native.stream_stop_confirmed -or $native.callbacks_in_flight_after_close -ne 0 -or
         $native.actual_sample_rate -ne 48000 -or $native.dsp_fixture_sample_rate -ne 48000 -or
         $native.frames_per_burst -le 0 -or $native.buffer_size_frames -le 0 -or
         $native.buffer_capacity_frames -le 0 -or $native.callback_log_overflow -ne 0 -or
         $native.callback_records -ne $histogramCallbacks -or $records.Count -ne $histogramCallbacks -or
+        $native.frame_count_overflow -ne 0 -or
         $native.zero_samples_verified -ne $histogramSamples -or
         $native.nonzero_output_samples_observed -ne 0 -or $native.zero_samples_verified -le 0 -or
-        $native.native_session_invocations -le 0 -or $native.native_control_updates -le 0 -or
+        $native.native_session_invocations -ne $histogramCallbacks -or
+        $native.successful_dsp_callbacks -ne $histogramCallbacks -or
+        ($native.callback_cpu_samples + $native.callback_cpu_unavailable_samples) -ne $histogramCallbacks -or
+        $native.native_control_updates -le 0 -or
         !$callbackRecordsValid -or
         $native.dsp_deadline_failure_count -ne 0 -or $native.callback_overrun_count -ne 0 -or
         $native.callback_overlap_count -ne 0 -or $native.native_session_fail_stop_count -ne 0 -or
@@ -343,6 +350,13 @@ try {
         $native.aaudio_open_result -ne 0 -or $native.aaudio_start_result -ne 0 -or
         $native.aaudio_stop_result -ne 0 -or $native.aaudio_close_result -ne 0) {
         $errors.Add('Native report did not satisfy the exact 60-second DSP-shadow zero-output acceptance gates.')
+    }
+    if ($native.callback_cpu_unavailable_samples -gt 0) {
+        $errors.Add('Thread CPU time was unavailable for one or more callback records.')
+    }
+    if ($native.callback_records -gt 1 -and
+        (!$native.maximum_interarrival_event -or $maximumGapRecords.Count -lt 2)) {
+        $errors.Add('Maximum callback inter-arrival event is missing its adjacent records.')
     }
     Save-TargetDiagnostics -Directory $runDir
     $diagnosticsSaved = $true
