@@ -83,7 +83,8 @@ bool nativeSessionDiagnosticsCountCallsAndControlUpdates() {
       Clock::time_point{}, &fixedClock, 1024, true);
   return result == CallbackDisposition::kContinue && isZero(output) &&
       core.nativeSessionInvocations() == 1 &&
-      core.nativeControlUpdates() == 2 && core.dspDeadlineFailureCount() == 0;
+      core.nativeControlUpdates() == 2 && core.lastDspProcessingNs() > 0 &&
+      core.dspDeadlineFailureCount() == 0;
 }
 
 bool partialCallbackUsesNegotiatedBurstDeadlineQuantum() {

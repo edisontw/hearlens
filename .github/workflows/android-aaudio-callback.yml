@@ -6,16 +6,21 @@ on:
       - '.github/workflows/android-aaudio-callback.yml'
       - 'apps/android-aaudio-callback-lab/**'
       - 'apps/android-aaudio-physical-zero-lab/**'
+      - 'apps/android-aaudio-physical-dsp-shadow-lab/**'
       - 'apps/web/caption-failstop.test.mjs'
       - 'package.json'
       - 'research/android-aaudio-callback/**'
       - 'research/detached-native-fir/**'
       - 'scripts/android/Build-PhysicalZeroAAudioLab.ps1'
+      - 'scripts/android/Build-PhysicalDspShadowAAudioLab.ps1'
+      - 'scripts/android/Test-AndroidAAudioCallbackCore.ps1'
+      - 'scripts/android/Test-AndroidPhysicalDspShadowAAudioLab.ps1'
       - 'scripts/android/Test-AndroidPhysicalZeroAAudioLab.ps1'
       - 'scripts/android/Test-PhysicalZeroOutputCore.ps1'
       - 'scripts/android/Test-AndroidAAudioCallbackLab.ps1'
       - 'tools/android-aaudio-callback-lab-contract.test.mjs'
       - 'tools/physical-aaudio-zero-contract.test.mjs'
+      - 'tools/physical-aaudio-dsp-shadow-contract.test.mjs'
       - 'tools/m04-output-safety-gate.test.mjs'
   push:
     branches: [main]
@@ -23,16 +28,21 @@ on:
       - '.github/workflows/android-aaudio-callback.yml'
       - 'apps/android-aaudio-callback-lab/**'
       - 'apps/android-aaudio-physical-zero-lab/**'
+      - 'apps/android-aaudio-physical-dsp-shadow-lab/**'
       - 'apps/web/caption-failstop.test.mjs'
       - 'package.json'
       - 'research/android-aaudio-callback/**'
       - 'research/detached-native-fir/**'
       - 'scripts/android/Build-PhysicalZeroAAudioLab.ps1'
+      - 'scripts/android/Build-PhysicalDspShadowAAudioLab.ps1'
+      - 'scripts/android/Test-AndroidAAudioCallbackCore.ps1'
+      - 'scripts/android/Test-AndroidPhysicalDspShadowAAudioLab.ps1'
       - 'scripts/android/Test-AndroidPhysicalZeroAAudioLab.ps1'
       - 'scripts/android/Test-PhysicalZeroOutputCore.ps1'
       - 'scripts/android/Test-AndroidAAudioCallbackLab.ps1'
       - 'tools/android-aaudio-callback-lab-contract.test.mjs'
       - 'tools/physical-aaudio-zero-contract.test.mjs'
+      - 'tools/physical-aaudio-dsp-shadow-contract.test.mjs'
       - 'tools/m04-output-safety-gate.test.mjs'
 
 permissions:
@@ -56,11 +66,20 @@ jobs:
             research/android-aaudio-callback/physical_zero_output_core_test.cpp \
             -o "$RUNNER_TEMP/hearlens-physical-zero-output-core-test"
           "$RUNNER_TEMP/hearlens-physical-zero-output-core-test"
+      - name: Verify native Auto-FIR oracle parity and NativeSession regressions
+        run: |
+          make -C research/detached-native-fir auto-check native-session-check
+          (
+            cd research/detached-native-fir
+            node auto-check.mjs
+            ./native-session-check
+          )
       - name: Verify callback safety contract and Windows line-ending regressions
         run: |
           node --test \
             tools/android-aaudio-callback-lab-contract.test.mjs \
             tools/physical-aaudio-zero-contract.test.mjs \
+            tools/physical-aaudio-dsp-shadow-contract.test.mjs \
             apps/web/caption-failstop.test.mjs \
             tools/m04-output-safety-gate.test.mjs
 
@@ -171,6 +190,108 @@ jobs:
             ${{ runner.temp }}/physical-zero-sha256-manifest.txt
           if-no-files-found: error
           retention-days: 30
+      - name: Check out exact physical DSP-shadow APK source revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: physical-dsp-shadow-source
+      - name: Build permissionless physical DSP-shadow ARM64 APK and offline tests
+        id: physical-dsp-shadow-build
+        env:
+          EXPECTED_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          source_root="$GITHUB_WORKSPACE/physical-dsp-shadow-source"
+          source_commit=$(git -C "$source_root" rev-parse HEAD)
+          test "$source_commit" = "$EXPECTED_SOURCE_COMMIT"
+          fixture="$RUNNER_TEMP/hearlens-physical-dsp-shadow-fixture"
+          node "$source_root/research/detached-native-fir/auto-check.mjs" "--export-portable=$fixture"
+          mkdir -p \
+            "$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/generated/mainAssets/portable-fixture" \
+            "$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/generated/androidTestAssets/portable-fixture"
+          cp "$fixture/auto-fir-fixture.bin" "$fixture/auto-fir-js-oracle.bin" "$fixture/manifest.json" \
+            "$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/generated/mainAssets/portable-fixture/"
+          cp "$fixture/auto-fir-fixture.bin" "$fixture/auto-fir-js-oracle.bin" "$fixture/manifest.json" \
+            "$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/generated/androidTestAssets/portable-fixture/"
+          "$source_root/apps/android-native-dsp-lab/gradlew" --no-daemon \
+            --project-dir "$source_root/apps/android-aaudio-physical-dsp-shadow-lab" \
+            :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+          apk="$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/outputs/apk/debug/app-debug.apk"
+          test_apk="$source_root/apps/android-aaudio-physical-dsp-shadow-lab/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+          test -f "$apk"
+          test -f "$test_apk"
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          permissions="$RUNNER_TEMP/physical-dsp-shadow-apk-permissions.txt"
+          "$aapt" dump permissions "$apk" | tee "$permissions"
+          ! grep -q 'uses-permission:' "$permissions"
+          "$aapt" dump badging "$apk" | grep -q "package: name='org.hearlens.physicaldsp'"
+          unzip -Z1 "$apk" | grep -qx 'lib/arm64-v8a/libhearlens_physical_dsp_shadow.so'
+          ! unzip -Z1 "$apk" | grep -Eq '^lib/(armeabi|armeabi-v7a|x86|x86_64)/'
+          stage="$RUNNER_TEMP/physical-dsp-shadow-release-payload"
+          mkdir -p "$stage"
+          cp "$apk" "$stage/hearlens-physical-dsp-shadow-arm64-v8a-debug.apk"
+          cp "$test_apk" "$stage/hearlens-physical-dsp-shadow-androidTest.apk"
+          cp "$fixture/auto-fir-fixture.bin" "$fixture/auto-fir-js-oracle.bin" "$fixture/manifest.json" "$stage/"
+          cp "$permissions" "$stage/apk-permissions.txt"
+          release_archive="$RUNNER_TEMP/hearlens-physical-dsp-shadow-arm64-release.zip"
+          (cd "$stage" && zip -j -X "$release_archive" ./*)
+          apk_sha=$(sha256sum "$stage/hearlens-physical-dsp-shadow-arm64-v8a-debug.apk" | cut -d ' ' -f 1)
+          archive_sha=$(sha256sum "$release_archive" | cut -d ' ' -f 1)
+          fixture_sha=$(sha256sum "$fixture/auto-fir-fixture.bin" | cut -d ' ' -f 1)
+          oracle_sha=$(sha256sum "$fixture/auto-fir-js-oracle.bin" | cut -d ' ' -f 1)
+          manifest_sha=$(sha256sum "$fixture/manifest.json" | cut -d ' ' -f 1)
+          cat > "$RUNNER_TEMP/physical-dsp-shadow-build-info.json" <<EOF
+          {
+            "sourceCommit": "$source_commit",
+            "apkSha256": "$apk_sha",
+            "releaseArchiveSha256": "$archive_sha",
+            "nativeAbi": "arm64-v8a",
+            "nativeLibrary": "libhearlens_physical_dsp_shadow.so",
+            "packageName": "org.hearlens.physicaldsp",
+            "requestedSampleRate": 48000,
+            "dspFixtureSampleRate": 48000,
+            "callbackFramesRequest": "UNSPECIFIED_VARIABLE",
+            "maxDurationMs": 60000,
+            "testWorkload": "DSP_SHADOW_ZERO_OUTPUT",
+            "routePolicy": "API33_MEDIA_PREDICTION_GENERATION_AND_AAUDIO_ID_MONITOR",
+            "permissionsDeclared": [],
+            "fixtureSha256": "$fixture_sha",
+            "jsOracleSha256": "$oracle_sha",
+            "fixtureManifestSha256": "$manifest_sha",
+            "installOrStreamStarted": false
+          }
+          EOF
+          (cd "$RUNNER_TEMP" && sha256sum \
+            physical-dsp-shadow-build-info.json \
+            physical-dsp-shadow-apk-permissions.txt \
+            hearlens-physical-dsp-shadow-arm64-release.zip > physical-dsp-shadow-sha256-manifest.txt)
+          echo "apk_sha256=$apk_sha" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$archive_sha" >> "$GITHUB_OUTPUT"
+          echo "source_commit=$source_commit" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        id: physical-dsp-shadow-artifact
+        with:
+          name: hearlens-physical-dsp-shadow-arm64-apk
+          path: |
+            ${{ runner.temp }}/physical-dsp-shadow-release-payload/hearlens-physical-dsp-shadow-arm64-v8a-debug.apk
+            ${{ runner.temp }}/physical-dsp-shadow-release-payload/hearlens-physical-dsp-shadow-androidTest.apk
+            ${{ runner.temp }}/physical-dsp-shadow-release-payload/apk-permissions.txt
+            ${{ runner.temp }}/hearlens-physical-dsp-shadow-arm64-release.zip
+            ${{ runner.temp }}/physical-dsp-shadow-build-info.json
+            ${{ runner.temp }}/physical-dsp-shadow-sha256-manifest.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Record exact physical DSP-shadow CI artifact identity
+        run: |
+          {
+            echo "### Physical DSP-shadow APK artifact"
+            echo "Artifact ID: ${{ steps.physical-dsp-shadow-artifact.outputs.artifact-id }}"
+            echo "Source commit: ${{ steps.physical-dsp-shadow-build.outputs.source_commit }}"
+            echo "APK SHA-256: ${{ steps.physical-dsp-shadow-build.outputs.apk_sha256 }}"
+            echo "Release archive SHA-256: ${{ steps.physical-dsp-shadow-build.outputs.archive_sha256 }}"
+            echo "Physical AAudio stream started: false"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Check APK permissions and native ABI packaging
         run: |
           set -euo pipefail
