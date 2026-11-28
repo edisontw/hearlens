@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-startup-timeout1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-body-timeout1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -79,6 +79,87 @@ test("a stalled Edison model-status request times out and can be cancelled", asy
     assert.equal(signals[0].aborted, true);
   } finally {
     clearTimeout(guard);
+  }
+});
+
+test("the Edison model-status response body remains covered by its request timeout", async () => {
+  let signal;
+  const pending = ensureEdisonModelLoaded({
+    endpoint: "http://127.0.0.1:8765",
+    model: "breeze-asr-26-q5",
+    requestTimeoutMs: 10,
+    timeoutMs: 1_000,
+    fetchImpl: async (_url, options = {}) => {
+      signal = options.signal;
+      return {
+        ok: true,
+        json: () => new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+        }),
+      };
+    },
+  });
+  let guard;
+  const deadline = new Promise((_resolve, reject) => { guard = setTimeout(() => reject(new Error("test guard expired")), 250); });
+  try {
+    await assert.rejects(Promise.race([pending, deadline]), /Edison 本機服務回應逾時/);
+    assert.equal(signal.aborted, true);
+  } finally {
+    clearTimeout(guard);
+  }
+});
+
+test("stopping startup aborts a stalled Edison model-status response body", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let statusSignal;
+  let statusBodyStartedResolve;
+  const statusBodyStarted = new Promise(resolve => { statusBodyStartedResolve = resolve; });
+  let microphoneRequests = 0;
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: class {}, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => { microphoneRequests += 1; throw new Error("must not request microphone"); } } },
+  });
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    requests.push(url);
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      statusSignal = options.signal;
+      return { ok: true, json: () => {
+        statusBodyStartedResolve();
+        return new Promise((_resolve, reject) => statusSignal.addEventListener("abort",
+          () => reject(new DOMException("aborted", "AbortError")), { once: true }));
+      } };
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const errors = [];
+  const statuses = [];
+  const provider = new EdisonLocalAsrProvider({
+    endpoint: "http://127.0.0.1:8765",
+    model: "breeze-asr-26-q5",
+    onError: error => errors.push(error),
+    onStatus: status => statuses.push(status),
+  });
+  try {
+    const starting = provider.start();
+    await statusBodyStarted;
+    await provider.stop();
+    await starting;
+    assert.equal(statusSignal.aborted, true);
+    assert.deepEqual(requests, ["http://127.0.0.1:8765/health", "http://127.0.0.1:8765/api/v1/asr/status"]);
+    assert.equal(microphoneRequests, 0);
+    assert.equal(errors.length, 0);
+    assert.ok(statuses.some(status => status.state === "stopped"));
+  } finally {
+    await provider.dispose();
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
   }
 });
 

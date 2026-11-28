@@ -26,7 +26,8 @@ function isLoopback(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }
 
-async function fetchEdison(url, options = {}, fetchImpl = fetch, timeoutMs = LOCAL_API_REQUEST_TIMEOUT_MS) {
+async function fetchEdison(url, options = {}, fetchImpl = fetch, timeoutMs = LOCAL_API_REQUEST_TIMEOUT_MS,
+  consumeResponse = response => response) {
   const upstreamSignal = options.signal;
   const controller = new AbortController();
   let timedOut = false;
@@ -38,12 +39,22 @@ async function fetchEdison(url, options = {}, fetchImpl = fetch, timeoutMs = LOC
     controller.abort();
   }, timeoutMs);
   try {
-    return await fetchImpl(url, { ...options, signal: controller.signal });
-  } catch (error) {
-    if (timedOut) throw new Error("Edison 本機服務回應逾時；請確認服務狀態。");
-    if (upstreamSignal?.aborted) throw error;
-    if (error?.name === "AbortError") throw error;
-    throw new Error("Edison 本機服務連線中斷；請確認服務狀態。未轉送雲端。");
+    let response;
+    try {
+      response = await fetchImpl(url, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (timedOut) throw new Error("Edison 本機服務回應逾時；請確認服務狀態。");
+      if (upstreamSignal?.aborted) throw error;
+      if (error?.name === "AbortError") throw error;
+      throw new Error("Edison 本機服務連線中斷；請確認服務狀態。未轉送雲端。");
+    }
+    try {
+      return await consumeResponse(response);
+    } catch (error) {
+      if (timedOut) throw new Error("Edison 本機服務回應逾時；請確認服務狀態。");
+      if (upstreamSignal?.aborted) throw error;
+      throw error;
+    }
   } finally {
     clearTimeout(timeout);
     upstreamSignal?.removeEventListener("abort", abortFromCaller);
@@ -141,19 +152,20 @@ export async function submitEdisonAudio({ endpoint, model, wav, language = "zh",
   form.append("model", model);
   form.append("language", language);
   form.append("response_format", "verbose_json");
-  const response = await fetchEdison(endpoint + "/v1/audio/transcriptions", {
+  const { response, result } = await fetchEdison(endpoint + "/v1/audio/transcriptions", {
     method: "POST",
     body: form,
     cache: "no-store",
     credentials: "omit",
     signal,
-  }, fetchImpl, TRANSCRIPTION_REQUEST_TIMEOUT_MS);
-  let result;
-  try {
-    result = await response.json();
-  } catch {
-    throw new Error("Edison 本機 ASR 回傳無法讀取的結果。");
-  }
+  }, fetchImpl, TRANSCRIPTION_REQUEST_TIMEOUT_MS, async response => {
+    try {
+      return { response, result: await response.json() };
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      throw new Error("Edison 本機 ASR 回傳無法讀取的結果。");
+    }
+  });
   if (!response.ok) {
     throw new Error(typeof result?.detail === "string" ? result.detail : "Edison 本機轉錄失敗。");
   }
@@ -196,9 +208,9 @@ export async function ensureEdisonModelLoaded({ endpoint, model, fetchImpl = fet
   }
   const statusUrl = endpoint + "/api/v1/asr/status";
   const readStatus = async () => {
-    const response = await fetchEdison(statusUrl, { cache: "no-store", credentials: "omit", signal }, fetchImpl,
-      requestTimeoutMs);
-    const value = await readEdisonJson(response, "無法讀取 Edison 模型狀態。");
+    const { response, value } = await fetchEdison(statusUrl,
+      { cache: "no-store", credentials: "omit", signal }, fetchImpl, requestTimeoutMs,
+      async response => ({ response, value: await readEdisonJson(response, "無法讀取 Edison 模型狀態。") }));
     if (!response.ok) throw new Error(value?.detail || "無法讀取 Edison 模型狀態。");
     return value;
   };
@@ -206,15 +218,15 @@ export async function ensureEdisonModelLoaded({ endpoint, model, fetchImpl = fet
   if (status.active_model_id === model && ["available", "busy"].includes(status.status)) return status;
 
   onStatus({ providerId: "edison-local-asr", state: "loading", label: `Edison 正在檢查 GPU 並載入 ${model}…` });
-  const load = await fetchEdison(endpoint + `/api/v1/asr/models/${encodeURIComponent(model)}/load`, {
+  const { load, loadResult } = await fetchEdison(endpoint + `/api/v1/asr/models/${encodeURIComponent(model)}/load`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: "{}",
     cache: "no-store",
     credentials: "omit",
     signal,
-  }, fetchImpl, requestTimeoutMs);
-  const loadResult = await readEdisonJson(load, "Edison 無法啟動模型載入。");
+  }, fetchImpl, requestTimeoutMs,
+  async load => ({ load, loadResult: await readEdisonJson(load, "Edison 無法啟動模型載入。") }));
   if (!load.ok) throw new Error(loadResult?.detail || "Edison 無法啟動模型載入。");
   if (loadResult?.state === "available") return { ...status, ...loadResult, status: "available", active_model_id: model };
 
