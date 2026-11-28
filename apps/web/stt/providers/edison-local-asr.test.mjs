@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-vad-boundary1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-startup-timeout1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -54,6 +54,32 @@ test("Edison preload refuses unavailable models and defers Whisper to its manage
     model: "qwen3-asr-1.7b-q8", fetchImpl: async () => ({ ok: false, json: async () => ({ detail: "VRAM不足" }) }) }), /VRAM不足/);
   const whisper = await ensureEdisonModelLoaded({ endpoint: "http://127.0.0.1:8765", model: "whisper-large-v3-turbo" });
   assert.equal(whisper.state, "deferred");
+});
+
+test("a stalled Edison model-status request times out and can be cancelled", async () => {
+  const signals = [];
+  const pending = ensureEdisonModelLoaded({
+    endpoint: "http://127.0.0.1:8765",
+    model: "breeze-asr-26-q5",
+    requestTimeoutMs: 10,
+    timeoutMs: 1_000,
+    fetchImpl: (_url, options = {}) => {
+      signals.push(options.signal);
+      if (!options.signal) return new Promise(() => {});
+      return new Promise((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      });
+    },
+  });
+  let guard;
+  const deadline = new Promise((_resolve, reject) => { guard = setTimeout(() => reject(new Error("test guard expired")), 250); });
+  try {
+    await assert.rejects(Promise.race([pending, deadline]), /Edison 本機服務回應逾時/);
+    assert.equal(signals.length, 1, "a timed-out status read must not continue to a model-load POST");
+    assert.equal(signals[0].aborted, true);
+  } finally {
+    clearTimeout(guard);
+  }
 });
 
 test("browser audio is linearly resampled and encoded as mono 16 kHz PCM WAV", async () => {

@@ -10,6 +10,8 @@ const OVERLAP_SAMPLES = Math.round(0.25 * SAMPLE_RATE);
 const MIN_SPEECH_SAMPLES = Math.round(0.15 * SAMPLE_RATE);
 const SPEECH_RMS_THRESHOLD = 0.012;
 const MAX_PENDING_SEGMENTS = 20;
+const LOCAL_API_REQUEST_TIMEOUT_MS = 15_000;
+const TRANSCRIPTION_REQUEST_TIMEOUT_MS = 120_000;
 const LOCAL_MODELS = new Set([
   "whisper-large-v3-turbo",
   "qwen3-asr-1.7b-q8",
@@ -24,21 +26,37 @@ function isLoopback(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }
 
-async function fetchEdison(url, options, fetchImpl = fetch) {
+async function fetchEdison(url, options = {}, fetchImpl = fetch, timeoutMs = LOCAL_API_REQUEST_TIMEOUT_MS) {
+  const upstreamSignal = options.signal;
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromCaller = () => controller.abort();
+  if (upstreamSignal?.aborted) abortFromCaller();
+  else upstreamSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   try {
-    return await fetchImpl(url, options);
+    return await fetchImpl(url, { ...options, signal: controller.signal });
   } catch (error) {
+    if (timedOut) throw new Error("Edison 本機服務回應逾時；請確認服務狀態。");
+    if (upstreamSignal?.aborted) throw error;
     if (error?.name === "AbortError") throw error;
     throw new Error("Edison 本機服務連線中斷；請確認服務狀態。未轉送雲端。");
+  } finally {
+    clearTimeout(timeout);
+    upstreamSignal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
-async function checkEdisonHealth(endpoint, { fetchImpl = fetch, signal } = {}) {
+async function checkEdisonHealth(endpoint, { fetchImpl = fetch, signal,
+  requestTimeoutMs = LOCAL_API_REQUEST_TIMEOUT_MS } = {}) {
   let response;
   try {
     response = await fetchEdison(endpoint + "/health", {
       cache: "no-store", credentials: "omit", signal,
-    }, fetchImpl);
+    }, fetchImpl, requestTimeoutMs);
   } catch (error) {
     if (error?.name === "AbortError") throw error;
     throw new Error("無法連線至 Edison 本機服務；請確認 127.0.0.1:8765 正在執行。未轉送雲端。");
@@ -129,7 +147,7 @@ export async function submitEdisonAudio({ endpoint, model, wav, language = "zh",
     cache: "no-store",
     credentials: "omit",
     signal,
-  }, fetchImpl);
+  }, fetchImpl, TRANSCRIPTION_REQUEST_TIMEOUT_MS);
   let result;
   try {
     result = await response.json();
@@ -171,13 +189,15 @@ function delayOrAbort(milliseconds, signal) {
 }
 
 export async function ensureEdisonModelLoaded({ endpoint, model, fetchImpl = fetch, signal,
-  onStatus = () => {}, pollIntervalMs = 750, timeoutMs = 240_000 }) {
+  onStatus = () => {}, pollIntervalMs = 750, timeoutMs = 240_000,
+  requestTimeoutMs = LOCAL_API_REQUEST_TIMEOUT_MS }) {
   if (!PRELOAD_MODELS.has(model)) {
     return { state: "deferred", detail: "Whisper 會由 Edison 在第一段轉錄前載入並檢查 GPU。" };
   }
   const statusUrl = endpoint + "/api/v1/asr/status";
   const readStatus = async () => {
-    const response = await fetchEdison(statusUrl, { cache: "no-store", credentials: "omit", signal }, fetchImpl);
+    const response = await fetchEdison(statusUrl, { cache: "no-store", credentials: "omit", signal }, fetchImpl,
+      requestTimeoutMs);
     const value = await readEdisonJson(response, "無法讀取 Edison 模型狀態。");
     if (!response.ok) throw new Error(value?.detail || "無法讀取 Edison 模型狀態。");
     return value;
@@ -193,7 +213,7 @@ export async function ensureEdisonModelLoaded({ endpoint, model, fetchImpl = fet
     cache: "no-store",
     credentials: "omit",
     signal,
-  }, fetchImpl);
+  }, fetchImpl, requestTimeoutMs);
   const loadResult = await readEdisonJson(load, "Edison 無法啟動模型載入。");
   if (!load.ok) throw new Error(loadResult?.detail || "Edison 無法啟動模型載入。");
   if (loadResult?.state === "available") return { ...status, ...loadResult, status: "available", active_model_id: model };
