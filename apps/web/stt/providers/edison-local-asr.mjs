@@ -143,7 +143,8 @@ export function encodeWav16kMono(chunks) {
   return new Blob([buffer], { type: "audio/wav" });
 }
 
-export async function submitEdisonAudio({ endpoint, model, wav, language = "zh", fetchImpl = fetch, signal }) {
+export async function submitEdisonAudio({ endpoint, model, wav, language = "zh", fetchImpl = fetch, signal,
+  requestTimeoutMs = TRANSCRIPTION_REQUEST_TIMEOUT_MS }) {
   if (!LOCAL_MODELS.has(model)) throw new Error("不支援所選的 Edison ASR 模型。");
   if (!["auto", "zh", "en"].includes(language)) throw new Error("不支援所選的 Edison 語言模式。");
   await checkEdisonHealth(endpoint, { fetchImpl, signal });
@@ -158,7 +159,7 @@ export async function submitEdisonAudio({ endpoint, model, wav, language = "zh",
     cache: "no-store",
     credentials: "omit",
     signal,
-  }, fetchImpl, TRANSCRIPTION_REQUEST_TIMEOUT_MS, async response => {
+  }, fetchImpl, requestTimeoutMs, async response => {
     try {
       return { response, result: await response.json() };
     } catch (error) {

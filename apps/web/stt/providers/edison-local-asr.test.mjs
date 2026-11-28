@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-body-timeout1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-transcription-timeout1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -215,6 +215,35 @@ test("Edison submit accepts an explicit no-speech result without inventing capti
     wav: encodeWav16kMono([new Float32Array([0, 0])]), fetchImpl });
   assert.equal(result.no_speech, true);
   assert.equal(result.text, "");
+});
+
+test("an Edison transcription response body remains covered by its request timeout", async () => {
+  const callerAbort = new AbortController();
+  let requestSignal;
+  const pending = submitEdisonAudio({
+    endpoint: "http://127.0.0.1:8765",
+    model: "breeze-asr-26-q5",
+    wav: encodeWav16kMono([new Float32Array([0, 0])]),
+    signal: callerAbort.signal,
+    requestTimeoutMs: 10,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/health")) return { ok: true };
+      requestSignal = options.signal;
+      return { ok: true, json: () => new Promise((_resolve, reject) => {
+        requestSignal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      }) };
+    },
+  });
+  let guard;
+  const deadline = new Promise((_resolve, reject) => { guard = setTimeout(() => reject(new Error("test guard expired")), 250); });
+  try {
+    await assert.rejects(Promise.race([pending, deadline]), /Edison 本機服務回應逾時/);
+    assert.equal(requestSignal.aborted, true);
+  } finally {
+    clearTimeout(guard);
+    callerAbort.abort();
+    await pending.catch(() => {});
+  }
 });
 
 test("Edison segment timestamps stay within the submitted audio window", async () => {
