@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-body-cancel1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-dispose-body1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -889,7 +889,7 @@ test("dispose drains an aborted generation before restart and ignores its late t
   const previousWindow = globalThis.window;
   const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   const previousFetch = globalThis.fetch;
-  let resolveTranscription;
+  let rejectTranscriptionBody;
   let requestStartedResolve;
   const requestStarted = new Promise(resolve => { requestStartedResolve = resolve; });
   let transcriptionSignal;
@@ -920,17 +920,24 @@ test("dispose drains an aborted generation before restart and ignores its late t
     }
     if (url.endsWith("/v1/audio/transcriptions")) {
       transcriptionSignal = options.signal;
-      requestStartedResolve();
-      return new Promise(resolve => { resolveTranscription = resolve; });
+      return { ok: true, json: () => new Promise((_resolve, reject) => {
+        rejectTranscriptionBody = reject;
+        requestStartedResolve();
+        options.signal.addEventListener("abort", () => {
+          setTimeout(() => reject(new DOMException("aborted", "AbortError")), 10);
+        }, { once: true });
+      }) };
     }
     throw new Error(`unexpected request: ${url}`);
   };
   const finals = [];
+  const errors = [];
   try {
     const provider = new EdisonLocalAsrProvider({
       endpoint: "http://127.0.0.1:8765",
       model: "breeze-asr-26-q5",
       onFinal: value => finals.push(value),
+      onError: value => errors.push(value),
     });
     provider.pendingSegments.push({
       chunks: [new Float32Array([0.25, 0.5])],
@@ -944,22 +951,19 @@ test("dispose drains an aborted generation before restart and ignores its late t
     assert.equal(transcriptionSignal.aborted, true);
     assert.equal(disposeFinished, false);
 
-    resolveTranscription({ ok: true, json: async () => ({
-      text: "過期世代字幕",
-      duration: 1,
-      segments: [{ start: 0, end: 1, text: "過期世代字幕" }],
-    }) });
     await Promise.all([drainPromise, disposePromise]);
     assert.equal(provider.drainPromise, null);
     assert.deepEqual(finals, []);
+    assert.deepEqual(errors, [], "disposing a cancelled request must not report a local service failure");
 
     await provider.start();
     assert.equal(provider.active, true);
     assert.deepEqual(finals, []);
+    assert.deepEqual(errors, []);
     await provider.dispose();
     assert.equal(stoppedTracks, 1);
   } finally {
-    if (resolveTranscription) resolveTranscription({ ok: true, json: async () => ({ text: "late" }) });
+    rejectTranscriptionBody?.(new DOMException("aborted", "AbortError"));
     if (disposePromise) await disposePromise;
     if (drainPromise) await drainPromise;
     globalThis.fetch = previousFetch;
