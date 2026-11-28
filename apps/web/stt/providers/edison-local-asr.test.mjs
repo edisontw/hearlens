@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-transcription-timeout1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-body-cancel1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -242,6 +242,43 @@ test("an Edison transcription response body remains covered by its request timeo
   } finally {
     clearTimeout(guard);
     callerAbort.abort();
+    await pending.catch(() => {});
+  }
+});
+
+test("cancelling an Edison transcription while reading its body preserves AbortError", async () => {
+  const callerAbort = new AbortController();
+  let requestSignal;
+  let rejectBody;
+  let bodyStartedResolve;
+  const bodyStarted = new Promise(resolve => { bodyStartedResolve = resolve; });
+  const pending = submitEdisonAudio({
+    endpoint: "http://127.0.0.1:8765",
+    model: "breeze-asr-26-q5",
+    wav: encodeWav16kMono([new Float32Array([0, 0])]),
+    signal: callerAbort.signal,
+    requestTimeoutMs: 1_000,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/health")) return { ok: true };
+      requestSignal = options.signal;
+      return { ok: true, json: () => new Promise((_resolve, reject) => {
+        rejectBody = reject;
+        bodyStartedResolve();
+        requestSignal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      }) };
+    },
+  });
+  let guard;
+  const deadline = new Promise((_resolve, reject) => { guard = setTimeout(() => reject(new Error("test guard expired")), 250); });
+  try {
+    await Promise.race([bodyStarted, deadline]);
+    callerAbort.abort();
+    await assert.rejects(Promise.race([pending, deadline]), error => error?.name === "AbortError");
+    assert.equal(requestSignal.aborted, true);
+  } finally {
+    clearTimeout(guard);
+    callerAbort.abort();
+    rejectBody?.(new DOMException("aborted", "AbortError"));
     await pending.catch(() => {});
   }
 });
