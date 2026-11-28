@@ -252,6 +252,7 @@ export class EdisonLocalAsrProvider {
     this.silenceSamples = 0;
     this.preRoll = new Float32Array();
     this.overlapPrefix = new Float32Array();
+    this.resetTranscriptOverlapOnNextSegment = false;
     this.pendingSegments = [];
     this.drainPromise = null;
     this.requestAbort = null;
@@ -304,6 +305,7 @@ export class EdisonLocalAsrProvider {
     this.silenceSamples = 0;
     this.preRoll = new Float32Array();
     this.overlapPrefix = new Float32Array();
+    this.resetTranscriptOverlapOnNextSegment = false;
     this.pendingSegments = [];
     this.totalCaptureSamples = 0;
     this.lastEmittedText = "";
@@ -402,6 +404,7 @@ export class EdisonLocalAsrProvider {
             this.silenceSamples += chunk.length;
             if (this.silenceSamples >= SILENCE_HANGOVER_SAMPLES) {
               this.overlapPrefix = new Float32Array();
+              this.resetTranscriptOverlapOnNextSegment = true;
               this.silenceSamples = 0;
             }
           }
@@ -457,12 +460,15 @@ export class EdisonLocalAsrProvider {
     const speechSamples = this.currentSpeechSamples;
     const silenceSamples = this.silenceSamples;
     const startSample = Math.max(0, this.totalCaptureSamples - sampleCount);
+    const resetTranscriptOverlap = this.resetTranscriptOverlapOnNextSegment;
+    this.resetTranscriptOverlapOnNextSegment = false;
     this.currentChunks = [];
     this.currentSamples = 0;
     this.currentSpeechSamples = 0;
     this.silenceSamples = 0;
     if (reason === "max-duration") this.overlapPrefix = tailSamples(chunks, OVERLAP_SAMPLES);
     else this.overlapPrefix = new Float32Array();
+    if (reason === "vad-silence") this.resetTranscriptOverlapOnNextSegment = true;
     if (speechSamples < MIN_SPEECH_SAMPLES) return;
     if (this.pendingSegments.length >= MAX_PENDING_SEGMENTS) {
       void this.fail("local-asr-overloaded", "本機 ASR 處理速度跟不上收音，為避免字幕延遲持續累積，已停止本機收音。", true);
@@ -470,6 +476,7 @@ export class EdisonLocalAsrProvider {
     }
     const segment = {
       chunks,
+      resetTranscriptOverlap,
       timestamp: this.captureStartedAt + Math.max(0, Math.round(startSample * 1000 / SAMPLE_RATE)),
       duration: sampleCount / SAMPLE_RATE,
     };
@@ -541,6 +548,7 @@ export class EdisonLocalAsrProvider {
     const drainPromise = (async () => {
       while (generation === this.generation && this.pendingSegments.length && !this.fatalError) {
         const segment = this.pendingSegments.shift();
+        if (segment.resetTranscriptOverlap) this.lastEmittedText = "";
         this.onStatus({ providerId: this.id, state: "processing", label: `Edison 本機辨識中；待處理 ${this.pendingSegments.length} 段` });
         this.debug("segment-submit", `duration=${segment.duration.toFixed(2)}s; pending=${this.pendingSegments.length}`);
         const controller = new AbortController();

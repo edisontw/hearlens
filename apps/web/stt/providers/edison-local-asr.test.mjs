@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-track-mute1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-vad-boundary1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -233,6 +233,120 @@ test("Edison local provider sends VAD-delimited microphone segments while listen
     assert.ok(statuses.some(value => value.state === "stopped"));
     assert.equal(stoppedTracks.count, 1);
   } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("a repeated phrase after VAD silence is not removed as cross-segment overlap", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let processor;
+  let transcriptionCalls = 0;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; this.destination = {}; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { processor = new FakeNode(); return processor; }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) } },
+  });
+  globalThis.fetch = async url => {
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      return { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+    }
+    if (url.endsWith("/v1/audio/transcriptions")) {
+      transcriptionCalls += 1;
+      return { ok: true, json: async () => ({ text: "yes", duration: 0.5,
+        segments: [{ start: 0, end: 0.5, text: "yes" }] }) };
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const finals = [];
+  const provider = new EdisonLocalAsrProvider({ endpoint: "http://127.0.0.1:8765", model: "breeze-asr-26-q5",
+    onFinal: item => finals.push(item.text) });
+  const voice = new Float32Array(4096).fill(0.25);
+  const silence = new Float32Array(4096);
+  const emit = samples => processor.onaudioprocess({ inputBuffer: { getChannelData: () => samples } });
+  try {
+    await provider.start();
+    for (let utterance = 0; utterance < 2; utterance += 1) {
+      emit(voice);
+      emit(voice);
+      emit(silence);
+      emit(silence);
+      await provider.drainQueue();
+    }
+    assert.equal(transcriptionCalls, 2);
+    assert.deepEqual(finals, ["yes", "yes"], "a VAD-separated repeated word is new speech, not overlap");
+  } finally {
+    await provider.dispose();
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("overlap dedupe remains active across max-duration splits of one utterance", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let processor;
+  let transcriptionCalls = 0;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; this.destination = {}; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { processor = new FakeNode(); return processor; }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) } },
+  });
+  globalThis.fetch = async url => {
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      return { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+    }
+    if (url.endsWith("/v1/audio/transcriptions")) {
+      transcriptionCalls += 1;
+      const text = transcriptionCalls === 1 ? "hello there" : "there again";
+      return { ok: true, json: async () => ({ text, duration: 1, segments: [{ start: 0, end: 1, text }] }) };
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const finals = [];
+  const provider = new EdisonLocalAsrProvider({ endpoint: "http://127.0.0.1:8765", model: "breeze-asr-26-q5",
+    onFinal: item => finals.push(item.text) });
+  const voice = new Float32Array(4096).fill(0.25);
+  const silence = new Float32Array(4096);
+  const emit = samples => processor.onaudioprocess({ inputBuffer: { getChannelData: () => samples } });
+  try {
+    await provider.start();
+    for (let i = 0; i < 10; i += 1) emit(voice);
+    emit(voice);
+    emit(silence);
+    emit(silence);
+    await provider.drainQueue();
+    assert.equal(transcriptionCalls, 2);
+    assert.deepEqual(finals, ["hello there", "again"], "the intentional 250 ms split overlap is still deduplicated");
+  } finally {
+    await provider.dispose();
     globalThis.fetch = previousFetch;
     globalThis.window = previousWindow;
     if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
