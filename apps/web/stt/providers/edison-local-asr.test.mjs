@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-v4-listener1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-segment-offset1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -108,6 +108,31 @@ test("Edison submit accepts an explicit no-speech result without inventing capti
     wav: encodeWav16kMono([new Float32Array([0, 0])]), fetchImpl });
   assert.equal(result.no_speech, true);
   assert.equal(result.text, "");
+});
+
+test("Edison segment timestamps stay within the submitted audio window", async () => {
+  const previousWindow = globalThis.window;
+  const previousFetch = globalThis.fetch;
+  const finals = [];
+  globalThis.window = { setTimeout, clearTimeout };
+  globalThis.fetch = async url => url.endsWith("/health")
+    ? { ok: true }
+    : { ok: true, json: async () => ({ text: "alpha bravo charlie", duration: 1, segments: [
+      { start: "invalid", text: "alpha" },
+      { start: -2, text: "bravo" },
+      { start: 2, text: "charlie" },
+    ] }) };
+  const provider = new EdisonLocalAsrProvider({ onFinal: value => finals.push(value) });
+  provider.pendingSegments.push({ chunks: [new Float32Array([0.25])], duration: 1, timestamp: 1234 });
+  try {
+    await provider.drainQueue();
+    assert.deepEqual(finals.map(value => value.text), ["alpha", "bravo", "charlie"]);
+    assert.deepEqual(finals.map(value => value.timestamp), [1234, 1234, 2234]);
+  } finally {
+    await provider.dispose();
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+  }
 });
 
 test("Edison offline errors are actionable and never trigger a cloud fallback", async () => {

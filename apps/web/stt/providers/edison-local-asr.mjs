@@ -499,8 +499,15 @@ export class EdisonLocalAsrProvider {
             language: this.languageMode, fetchImpl: fetch, signal: controller.signal });
           if (generation !== this.generation || this.fatalError) break;
           const receivedAt = Date.now();
+          const segmentDuration = Number.isFinite(segment.duration) ? Math.max(0, segment.duration) : 0;
           const outputs = Array.isArray(result.segments) && result.segments.length
-            ? result.segments.map(item => ({ text: item?.text, start: Number(item?.start || 0) }))
+            ? result.segments.map(item => {
+              const requestedStart = Number(item?.start);
+              const start = Number.isFinite(requestedStart)
+                ? Math.min(segmentDuration, Math.max(0, requestedStart))
+                : 0;
+              return { text: item?.text, start };
+            })
             : [{ text: result.text, start: 0 }];
           for (const item of outputs) {
             const text = removeTranscriptOverlap(item.text || "", this.lastEmittedText);
