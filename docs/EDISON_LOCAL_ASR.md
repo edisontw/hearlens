@@ -20,10 +20,10 @@ Supported models are `whisper-large-v3-turbo`, `qwen3-asr-1.7b-q8`, and `breeze-
 
 ## Behavior and limits
 
-- The adapter buffers mono audio in the browser at 16 kHz and sends a WAV to Edison only after the user presses Stop. It is batch transcription, not live captions; the screen and diagnostics say so.
+- The adapter processes mono audio in the browser at 16 kHz and sends VAD-delimited WAV segments to Edison during capture. Speech segments contain up to about 2.5 seconds before a forced split, with 250 ms of overlap across a continuous utterance; requests are serialized and captions appear as each local response completes. This is segmented batch ASR, not a continuous streaming connection. Stop sends the current segment and drains the remaining queue.
 - Capture is limited to 15 minutes. The server applies its configured file-size and task-retention rules under `D:\AIData`.
 - Edison accepts browser requests only from explicitly configured loopback origins. The adapter rejects HTTPS/public pages, remote service hosts, custom paths, credentials, and model IDs outside the allowlist.
-- The browser microphone prompt appears before capture. The page’s notice explains that the recording is sent to the same computer’s Edison service after Stop. Get consent from people being recorded.
+- The browser microphone prompt appears before capture. The page’s notice explains that speech is sent in short segments to the same computer’s Edison service during capture. Get consent from people being recorded.
 - Stop during startup invalidates the provider generation and aborts health/model checks. If a pending browser permission request returns a stream later, its tracks are stopped before an audio context or listening state is created.
 - Disposing a session invalidates its generation, aborts any in-flight transcription request, and waits for the request queue to settle before cleanup resolves; a late response from that generation cannot emit captions after restart.
 - A transcription request failure stops the current capture and requires an explicit restart; the adapter does not auto-retry or switch to cloud ASR. After Edison recovers, a new start checks service/model state again and begins a fresh caption generation.

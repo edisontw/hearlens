@@ -371,6 +371,13 @@ export class EdisonLocalAsrProvider {
           this.silenceSamples += chunk.length;
           if (this.silenceSamples >= SILENCE_HANGOVER_SAMPLES) this.finalizeSegment("vad-silence");
         } else {
+          if (this.overlapPrefix.length) {
+            this.silenceSamples += chunk.length;
+            if (this.silenceSamples >= SILENCE_HANGOVER_SAMPLES) {
+              this.overlapPrefix = new Float32Array();
+              this.silenceSamples = 0;
+            }
+          }
           this.preRoll = keepTail(this.preRoll, chunk, PRE_ROLL_SAMPLES);
         }
       };

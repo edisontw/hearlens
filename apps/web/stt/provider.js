@@ -1,15 +1,15 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261125-edison-local-stability2";
+} from "./providers/browser-speech.js?v=20261128-edison-vad-hangover1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261125-edison-local-stability2";
+  "./providers/gemini-live-transcribe.js?v=20261128-edison-vad-hangover1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261125-edison-local-stability2";
+  "./providers/google-cloud-streaming.js?v=20261128-edison-vad-hangover1";
 import { EdisonLocalAsrProvider } from
-  "./providers/edison-local-asr.mjs?v=20261125-edison-local-stability2";
+  "./providers/edison-local-asr.mjs?v=20261128-edison-vad-hangover1";
 export { validateEdisonLocalSelection } from
-  "./providers/edison-local-asr.mjs?v=20261125-edison-local-stability2";
+  "./providers/edison-local-asr.mjs?v=20261128-edison-vad-hangover1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",

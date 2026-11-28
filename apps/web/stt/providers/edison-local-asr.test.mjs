@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261125-edison-local-stability2";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-vad-hangover1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint accepts only loopback HTTP pages and loopback service URLs", () => {
@@ -208,6 +208,73 @@ test("Edison local provider sends VAD-delimited microphone segments while listen
     assert.ok(statuses.some(value => value.state === "stopped"));
     assert.equal(stoppedTracks.count, 1);
   } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("a long pause after a maximum segment does not prepend stale speech to the next utterance", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let processor;
+  const submittedFirstSamples = [];
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { processor = new FakeNode(); return processor; }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  globalThis.window = {
+    location: { href: "http://localhost:8080/" },
+    AudioContext: FakeAudioContext,
+    setTimeout,
+    clearTimeout,
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) } },
+  });
+  globalThis.fetch = async (url, options = {}) => {
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      return { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+    }
+    if (url.endsWith("/v1/audio/transcriptions")) {
+      const wav = options.body.get("file");
+      const view = new DataView(await wav.arrayBuffer());
+      submittedFirstSamples.push(view.getInt16(44, true));
+      return { ok: true, json: async () => ({ text: "合成字幕", segments: [{ start: 0, end: 1, text: "合成字幕" }] }) };
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  let provider;
+  try {
+    provider = new EdisonLocalAsrProvider({ endpoint: "http://127.0.0.1:8765", model: "breeze-asr-26-q5" });
+    await provider.start();
+    const voice = new Float32Array(4096).fill(0.25);
+    const silence = new Float32Array(4096);
+    const emit = samples => processor.onaudioprocess({ inputBuffer: { getChannelData: () => samples } });
+
+    for (let i = 0; i < 10; i += 1) emit(voice);
+    await provider.drainQueue();
+    emit(silence);
+    emit(silence);
+    emit(voice);
+    emit(silence);
+    emit(silence);
+    await provider.drainQueue();
+
+    assert.equal(submittedFirstSamples.length, 2);
+    assert.equal(submittedFirstSamples[1], 0,
+      "a new utterance after the VAD hangover starts with its silent pre-roll, not the prior segment overlap");
+  } finally {
+    await provider?.dispose();
     globalThis.fetch = previousFetch;
     globalThis.window = previousWindow;
     if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
