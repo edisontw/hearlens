@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-track-preflight1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-track-mute1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -339,6 +339,87 @@ test("an already-ended Edison microphone track is rejected before creating an Au
     assert.equal(contextsCreated, 0, "an unusable track must be rejected before allocating an audio graph");
     assert.equal(stoppedTracks, 1, "the rejected stream is released");
     assert.equal(provider.active, false);
+  } finally {
+    await provider.dispose();
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("a muted Edison microphone track pauses capture and resumes without ending the session", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  const listeners = new Map();
+  let processor;
+  let stoppedTracks = 0;
+  let transcriptionRequests = 0;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; this.destination = {}; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { processor = new FakeNode(); return processor; }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; }
+  }
+  const track = {
+    kind: "audio",
+    readyState: "live",
+    muted: false,
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type, listener) { if (listeners.get(type) === listener) listeners.delete(type); },
+    stop() { stoppedTracks += 1; this.readyState = "ended"; },
+  };
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [track], getAudioTracks: () => [track] }) } },
+  });
+  globalThis.fetch = async url => {
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      return { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+    }
+    if (url.endsWith("/v1/audio/transcriptions")) {
+      transcriptionRequests += 1;
+      return { ok: true, json: async () => ({ text: "unexpected", segments: [{ start: 0, text: "unexpected" }] }) };
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const statuses = [];
+  const provider = new EdisonLocalAsrProvider({ endpoint: "http://127.0.0.1:8765", model: "breeze-asr-26-q5",
+    onStatus: value => statuses.push(value) });
+  try {
+    await provider.start();
+    assert.equal(statuses.at(-1).state, "listening");
+    assert.equal(typeof listeners.get("mute"), "function", "provider observes a temporary track mute");
+    assert.equal(typeof listeners.get("unmute"), "function", "provider observes input recovery");
+
+    track.muted = true;
+    listeners.get("mute")();
+    assert.equal(statuses.at(-1).state, "processing");
+    assert.match(statuses.at(-1).label, /麥克風.*暫停/);
+    const voice = new Float32Array(4096).fill(0.25);
+    const samplesBeforeMute = provider.totalCaptureSamples;
+    processor.onaudioprocess({ inputBuffer: { getChannelData: () => voice } });
+    assert.equal(provider.currentSpeechSamples, 0, "muted input is not appended to an ASR segment");
+    assert.ok(provider.preRoll.every(sample => sample === 0), "muted audio is replaced with silence");
+    assert.equal(provider.pendingSegments.length, 0);
+    assert.equal(transcriptionRequests, 0, "the fake voice present during mute is never submitted to Edison");
+    assert.equal(provider.totalCaptureSamples, samplesBeforeMute + voice.length,
+      "synthetic silence advances the sample clock so later captions keep session time");
+    assert.equal(provider.active, true, "a temporary mute does not fail-stop the local session");
+
+    track.muted = false;
+    listeners.get("unmute")();
+    assert.equal(statuses.at(-1).state, "listening");
+    assert.equal(provider.active, true);
+    await provider.dispose();
+    assert.equal(stoppedTracks, 1);
+    assert.equal(listeners.size, 0, "track state listeners are removed during teardown");
   } finally {
     await provider.dispose();
     globalThis.fetch = previousFetch;

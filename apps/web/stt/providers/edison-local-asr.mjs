@@ -240,7 +240,8 @@ export class EdisonLocalAsrProvider {
     this.active = false;
     this.stopping = false;
     this.stream = null;
-    this.trackEndListeners = [];
+    this.audioTracks = [];
+    this.trackListeners = [];
     this.audioContext = null;
     this.sourceNode = null;
     this.processorNode = null;
@@ -267,6 +268,22 @@ export class EdisonLocalAsrProvider {
 
   debug(event, detail = "") {
     this.onDebug({ providerId: this.id, event, detail, segmentId: this.segmentId, timestamp: Date.now() });
+  }
+
+  hasMutedInput() {
+    return this.audioTracks.some(track => track.muted === true);
+  }
+
+  publishCaptureStatus() {
+    if (!this.active || this.stopping) return;
+    if (this.hasMutedInput()) {
+      const processing = Boolean(this.drainPromise || this.pendingSegments.length);
+      this.onStatus({ providerId: this.id, state: "processing",
+        label: processing ? "本機麥克風暫停；正在完成已收音字幕片段" : "本機麥克風暫停，等待音訊恢復" });
+      return;
+    }
+    this.onStatus({ providerId: this.id, state: "listening",
+      label: `本機收音中；待辨識 ${this.pendingSegments.length} 段` });
   }
 
   async start() {
@@ -314,6 +331,10 @@ export class EdisonLocalAsrProvider {
       }
       this.stream = stream;
       const tracks = stream.getTracks?.() ?? [];
+      const streamAudioTracks = stream.getAudioTracks?.();
+      this.audioTracks = streamAudioTracks?.length
+        ? streamAudioTracks
+        : tracks.filter(track => track.kind !== "video");
       if (tracks.some(track => track.readyState === "ended")) {
         throw new Error("本機麥克風串流已中斷，請確認麥克風後重新開始。");
       }
@@ -332,7 +353,8 @@ export class EdisonLocalAsrProvider {
       this.processorNode.onaudioprocess = (event) => {
         if (!this.active || this.stopping) return;
         const input = event.inputBuffer.getChannelData(0);
-        const chunk = resampleLinear(input, context.sampleRate);
+        const captureInput = this.hasMutedInput() ? new Float32Array(input.length) : input;
+        const chunk = resampleLinear(captureInput, context.sampleRate);
         if (!chunk.length) return;
         this.totalCaptureSamples += chunk.length;
         const now = Date.now();
@@ -344,7 +366,7 @@ export class EdisonLocalAsrProvider {
           void this.fail("capture-limit", "本機字幕收音已達 15 分鐘上限，請停止後重新開始。", true);
           return;
         }
-        const rms = Math.sqrt(input.reduce((sum, value) => sum + value * value, 0) / Math.max(1, input.length));
+        const rms = Math.sqrt(captureInput.reduce((sum, value) => sum + value * value, 0) / Math.max(1, captureInput.length));
         const isSpeech = rms >= SPEECH_RMS_THRESHOLD;
         if (now - this.lastLevelAt >= 1000) {
           this.lastLevelAt = now;
@@ -390,13 +412,22 @@ export class EdisonLocalAsrProvider {
       this.active = true;
       for (const track of tracks) {
         if (typeof track.addEventListener !== "function") continue;
-        const listener = () => {
+        const endedListener = () => {
           if (generation !== this.generation || !this.active || this.stopping) return;
           void this.fail("microphone-track-ended",
             "本機麥克風串流已中斷，Edison 收音已停止；請確認麥克風後重新開始。", true);
         };
-        track.addEventListener("ended", listener, { once: true });
-        this.trackEndListeners.push({ track, listener });
+        track.addEventListener("ended", endedListener, { once: true });
+        this.trackListeners.push({ track, type: "ended", listener: endedListener });
+        if (!this.audioTracks.includes(track)) continue;
+        for (const type of ["mute", "unmute"]) {
+          const listener = () => {
+            if (generation !== this.generation || !this.active || this.stopping) return;
+            this.publishCaptureStatus();
+          };
+          track.addEventListener(type, listener);
+          this.trackListeners.push({ track, type, listener });
+        }
       }
       if (tracks.some(track => track.readyState === "ended")) {
         throw new Error("本機麥克風串流已中斷，請確認麥克風後重新開始。");
@@ -415,7 +446,7 @@ export class EdisonLocalAsrProvider {
     } finally {
       if (this.startupAbort === startupAbort) this.startupAbort = null;
     }
-    this.onStatus({ providerId: this.id, state: "listening", label: "本機分段字幕 Beta：語音片段會送到本機 Edison" });
+    this.publishCaptureStatus();
     this.debug("capture-ready", `model=${this.model}; mode=vad-segments; segment-max=${MAX_SEGMENT_SECONDS}s; overlap=${OVERLAP_SAMPLES / SAMPLE_RATE}s; sample-rate=${SAMPLE_RATE}`);
   }
 
@@ -456,9 +487,10 @@ export class EdisonLocalAsrProvider {
     }
     this.sourceNode = null;
     this.zeroGainNode = null;
-    for (const { track, listener } of this.trackEndListeners.splice(0)) {
-      try { track.removeEventListener?.("ended", listener); } catch { /* track already ended */ }
+    for (const { track, type, listener } of this.trackListeners.splice(0)) {
+      try { track.removeEventListener?.(type, listener); } catch { /* track already ended */ }
     }
+    this.audioTracks = [];
     const stream = this.stream;
     this.stream = null;
     for (const track of stream?.getTracks?.() ?? []) track.stop();
@@ -537,8 +569,8 @@ export class EdisonLocalAsrProvider {
             this.onFinal({ providerId: this.id, text,
               timestamp: segment.timestamp + Math.max(0, Math.round(item.start * 1000)), latencyTimestamp: receivedAt });
           }
-          this.onStatus({ providerId: this.id, state: this.active ? "listening" : "processing",
-            label: this.active ? `本機收音中；待辨識 ${this.pendingSegments.length} 段` : "正在完成本機字幕片段" });
+          if (this.active) this.publishCaptureStatus();
+          else this.onStatus({ providerId: this.id, state: "processing", label: "正在完成本機字幕片段" });
           this.debug("segment-complete", `model=${this.model}; audio=${Number(result.duration || segment.duration).toFixed(2)}s; pending=${this.pendingSegments.length}`);
         } catch (error) {
           if (generation !== this.generation || this.fatalError) break;
