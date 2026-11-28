@@ -53,9 +53,9 @@ export function validateEdisonLocalEndpoint(endpoint, pageUrl) {
   if (page.protocol !== "http:" || !isLoopback(page.hostname)) {
     throw new Error("Edison 本機 ASR 只可由同一台電腦上的 localhost 網頁使用。");
   }
-  if (target.protocol !== "http:" || !isLoopback(target.hostname) ||
+  if (target.protocol !== "http:" || target.hostname !== "127.0.0.1" ||
       target.username || target.password || target.search || target.hash || target.pathname !== "/") {
-    throw new Error("Edison URL 必須是純本機 loopback HTTP 位址，不接受遠端或帶路徑的 URL。");
+    throw new Error("Edison URL 必須使用 127.0.0.1 的本機 HTTP listener，不接受其他主機或帶路徑的 URL。");
   }
   return target.origin;
 }

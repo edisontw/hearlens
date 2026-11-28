@@ -9,17 +9,17 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-vad-hangover1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-v4-listener1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
-test("Edison endpoint accepts only loopback HTTP pages and loopback service URLs", () => {
+test("Edison endpoint matches its configured IPv4 loopback listener", () => {
   assert.equal(validateEdisonLocalEndpoint("http://127.0.0.1:8765", "http://localhost:8080/"),
     "http://127.0.0.1:8765");
-  assert.equal(validateEdisonLocalEndpoint("http://[::1]:8765", "http://[::1]:8080/"),
-    "http://[::1]:8765");
   for (const [endpoint, page] of [
     ["https://127.0.0.1:8765", "http://localhost:8080/"],
     ["http://example.com:8765", "http://localhost:8080/"],
+    ["http://localhost:8765", "http://localhost:8080/"],
+    ["http://[::1]:8765", "http://localhost:8080/"],
     ["http://127.0.0.1:8765", "https://example.com/"],
     ["http://user@127.0.0.1:8765", "http://localhost:8080/"],
     ["http://127.0.0.1:8765/path", "http://localhost:8080/"],
