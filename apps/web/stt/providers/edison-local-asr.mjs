@@ -313,6 +313,10 @@ export class EdisonLocalAsrProvider {
         return;
       }
       this.stream = stream;
+      const tracks = stream.getTracks?.() ?? [];
+      if (tracks.some(track => track.readyState === "ended")) {
+        throw new Error("本機麥克風串流已中斷，請確認麥克風後重新開始。");
+      }
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       const context = new AudioContextClass();
       this.audioContext = context;
@@ -384,7 +388,7 @@ export class EdisonLocalAsrProvider {
       };
       this.captureStartedAt = Date.now();
       this.active = true;
-      for (const track of stream.getTracks?.() ?? []) {
+      for (const track of tracks) {
         if (typeof track.addEventListener !== "function") continue;
         const listener = () => {
           if (generation !== this.generation || !this.active || this.stopping) return;
@@ -394,7 +398,7 @@ export class EdisonLocalAsrProvider {
         track.addEventListener("ended", listener, { once: true });
         this.trackEndListeners.push({ track, listener });
       }
-      if ((stream.getTracks?.() ?? []).some(track => track.readyState === "ended")) {
+      if (tracks.some(track => track.readyState === "ended")) {
         throw new Error("本機麥克風串流已中斷，請確認麥克風後重新開始。");
       }
       this.sourceNode.connect(this.processorNode);

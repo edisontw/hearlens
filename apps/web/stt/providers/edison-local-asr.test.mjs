@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-track-end1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-track-preflight1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -300,6 +300,47 @@ test("an ended Edison microphone track fail-stops and releases the active captur
     assert.ok(statuses.some(value => value.state === "error"));
   } finally {
     await provider?.dispose();
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("an already-ended Edison microphone track is rejected before creating an AudioContext", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let contextsCreated = 0;
+  let stoppedTracks = 0;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { contextsCreated += 1; this.sampleRate = 16_000; this.state = "running"; this.destination = {}; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { return new FakeNode(); }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async close() { this.state = "closed"; }
+  }
+  const track = {
+    readyState: "ended",
+    stop() { stoppedTracks += 1; },
+  };
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [track] }) } },
+  });
+  globalThis.fetch = async url => url.endsWith("/health")
+    ? { ok: true }
+    : { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+  const provider = new EdisonLocalAsrProvider({ endpoint: "http://127.0.0.1:8765", model: "breeze-asr-26-q5" });
+  try {
+    await assert.rejects(() => provider.start(), /麥克風串流已中斷/);
+    assert.equal(contextsCreated, 0, "an unusable track must be rejected before allocating an audio graph");
+    assert.equal(stoppedTracks, 1, "the rejected stream is released");
+    assert.equal(provider.active, false);
+  } finally {
+    await provider.dispose();
     globalThis.fetch = previousFetch;
     globalThis.window = previousWindow;
     if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
