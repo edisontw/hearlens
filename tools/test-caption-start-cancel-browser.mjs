@@ -224,6 +224,149 @@ try {
     await unsupportedContext.close();
   }
 
+  // Edison error recovery is verified with a mocked loopback service, fake
+  // microphone tracks and a fake AudioContext. No physical mic, remote request,
+  // model inference or audio output is involved.
+  const edisonContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    await edisonContext.addInitScript(() => {
+      window.__edisonGetUserMediaCalls = 0;
+      window.__edisonStoppedTrackIds = [];
+      window.__edisonProcessors = [];
+      Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: async () => {
+          const id = ++window.__edisonGetUserMediaCalls;
+          const track = {
+            kind: "audio",
+            label: "Synthetic audio source",
+            getSettings: () => ({ sampleRate: 16000, channelCount: 1 }),
+            stop: () => window.__edisonStoppedTrackIds.push(id),
+          };
+          return { getTracks: () => [track], getAudioTracks: () => [track] };
+        },
+      });
+      class FakeAudioNode {
+        connect() {}
+        disconnect() {}
+      }
+      class FakeAudioContext {
+        constructor() { this.sampleRate = 16000; this.state = "running"; this.destination = {}; }
+        createMediaStreamSource() { return new FakeAudioNode(); }
+        createAnalyser() { return new FakeAudioNode(); }
+        createScriptProcessor() {
+          const processor = new FakeAudioNode();
+          window.__edisonProcessors.push(processor);
+          return processor;
+        }
+        createGain() { return Object.assign(new FakeAudioNode(), { gain: { value: 1 } }); }
+        async resume() {}
+        async close() { this.state = "closed"; }
+      }
+      Object.defineProperty(window, "AudioContext", { configurable: true, value: FakeAudioContext });
+      Object.defineProperty(window, "webkitAudioContext", { configurable: true, value: undefined });
+    });
+    const edisonPage = await edisonContext.newPage();
+    const edisonErrors = [];
+    const externalRequests = [];
+    const staticModuleRequests = [];
+    let transcriptionRequests = 0;
+    edisonPage.on("pageerror", error => edisonErrors.push(error.message));
+    const serviceOrigin = "http://127.0.0.1:8765";
+    const serviceHeaders = {
+      "access-control-allow-origin": origin,
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "content-type",
+      vary: "Origin",
+    };
+    await edisonPage.route("**/*", async route => {
+      const request = route.request();
+      const url = request.url();
+      if (url.startsWith(origin + "/")) return route.continue();
+      if (url === "https://cdn.jsdelivr.net/npm/opencc-js@1.4.1/dist/esm/full.js") {
+        staticModuleRequests.push(url);
+        return route.fulfill({ status: 200, contentType: "text/javascript",
+          body: "export const Converter = () => value => value; export default { Converter };" });
+      }
+      if (!url.startsWith(serviceOrigin + "/")) {
+        externalRequests.push(url);
+        return route.abort();
+      }
+      const pathname = new URL(url).pathname;
+      if (request.method() === "OPTIONS") {
+        return route.fulfill({ status: 204, headers: serviceHeaders });
+      }
+      if (pathname === "/health") {
+        return route.fulfill({ status: 200, contentType: "application/json", headers: serviceHeaders, body: "{}" });
+      }
+      if (pathname === "/api/v1/asr/status") {
+        return route.fulfill({ status: 200, contentType: "application/json", headers: serviceHeaders,
+          body: JSON.stringify({ status: "available", active_model_id: "breeze-asr-26-q5" }) });
+      }
+      if (pathname === "/v1/audio/transcriptions" && request.method() === "POST") {
+        transcriptionRequests += 1;
+        if (transcriptionRequests === 1) {
+          return route.fulfill({ status: 503, contentType: "application/json", headers: serviceHeaders,
+            body: JSON.stringify({ detail: "Edison 本機服務正在重新啟動" }) });
+        }
+        return route.fulfill({ status: 200, contentType: "application/json", headers: serviceHeaders,
+          body: JSON.stringify({ text: "Edison 恢復後的新字幕", duration: 1,
+            segments: [{ start: 0, end: 1, text: "Edison 恢復後的新字幕" }] }) });
+      }
+      return route.fulfill({ status: 404, contentType: "application/json", headers: serviceHeaders,
+        body: JSON.stringify({ detail: "unexpected Edison endpoint" }) });
+    });
+    await edisonPage.goto(origin + "/index.html?stt=edison-local-asr&edison=http://127.0.0.1:8765&edisonModel=breeze-asr-26-q5&edisonLanguage=zh",
+      { waitUntil: "networkidle" });
+    await edisonPage.locator("#start").click();
+    await edisonPage.waitForFunction(() => window.__edisonProcessors.length === 1);
+    await edisonPage.waitForFunction(() => document.querySelector("#status")?.textContent === "正在聆聽");
+    await edisonPage.evaluate(() => {
+      const processor = window.__edisonProcessors.at(-1);
+      const voice = new Float32Array(4096);
+      for (let i = 0; i < voice.length; i += 1) voice[i] = Math.sin(i * 0.12) * 0.2;
+      const silence = new Float32Array(4096);
+      const emit = samples => processor.onaudioprocess({ inputBuffer: { getChannelData: () => samples } });
+      for (let i = 0; i < 4; i += 1) emit(voice);
+      emit(silence);
+      emit(silence);
+    });
+    await edisonPage.waitForFunction(() => document.querySelector("#status")?.textContent === "字幕連線中斷，請重新開始");
+    await edisonPage.waitForFunction(() => document.querySelector("#start")?.disabled === false);
+    assert.equal(transcriptionRequests, 1, "the failed service request is not automatically retried");
+    assert.equal(await edisonPage.locator("#stop").isDisabled(), true);
+    assert.deepEqual(await edisonPage.evaluate(() => window.__edisonStoppedTrackIds), [1, 2],
+      "diagnostic and provider synthetic tracks are released after fail-stop");
+    await edisonPage.waitForTimeout(200);
+    assert.equal(transcriptionRequests, 1);
+
+    await edisonPage.locator("#start").click();
+    await edisonPage.waitForFunction(() => window.__edisonProcessors.length === 2);
+    await edisonPage.waitForFunction(() => document.querySelector("#status")?.textContent === "正在聆聽");
+    await edisonPage.evaluate(() => {
+      const processor = window.__edisonProcessors.at(-1);
+      const voice = new Float32Array(4096);
+      for (let i = 0; i < voice.length; i += 1) voice[i] = Math.sin(i * 0.12) * 0.2;
+      const silence = new Float32Array(4096);
+      const emit = samples => processor.onaudioprocess({ inputBuffer: { getChannelData: () => samples } });
+      for (let i = 0; i < 4; i += 1) emit(voice);
+      emit(silence);
+      emit(silence);
+    });
+    await edisonPage.waitForFunction(() => document.querySelector("#caption")?.textContent?.includes("Edison 恢復後的新字幕"));
+    assert.equal(transcriptionRequests, 2, "the recovery request occurs only after the user's explicit restart");
+    assert.deepEqual(externalRequests, [], "the local provider makes no remote inference or cloud requests");
+    assert.deepEqual(staticModuleRequests, ["https://cdn.jsdelivr.net/npm/opencc-js@1.4.1/dist/esm/full.js"],
+      "the existing display-conversion dependency is stubbed locally without network access");
+    assert.deepEqual(edisonErrors, []);
+    await edisonPage.locator("#stop").click();
+    await edisonPage.waitForFunction(() => document.querySelector("#status")?.textContent === "已停止");
+    assert.deepEqual(await edisonPage.evaluate(() => window.__edisonStoppedTrackIds), [1, 2, 3, 4],
+      "all synthetic tracks are released after explicit stop");
+    console.log("PASS: Edison failure stops local capture; explicit user restart recovers without cloud fallback");
+  } finally {
+    await edisonContext.close();
+  }
   // A failed or cancelled restart must not destroy the last confirmed
   // conversation. A successful restart still creates a fresh transcript.
   const historyContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
