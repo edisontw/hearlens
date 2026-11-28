@@ -9,14 +9,14 @@
       content="HearLens caption-first hearing-assistance research prototype"
     />
     <title>HearLens Hearing Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20261119-stop-drain1" />
+    <link rel="stylesheet" href="./styles.css?v=20261128-edison-dispose-body1" />
   </head>
   <body>
     <main class="shell">
       <header class="hero">
         <p class="eyebrow">HearLens · Research prototype</p>
         <h1>聽清楚對話</h1>
-        <p class="lead">按下開始即可看即時字幕；辨識不清楚時，再把手機移近說話者。</p>
+        <p class="lead">依辨識模式顯示字幕；Gemini Live 維持預設，本機 Edison 分段辨識可於下方切換。辨識不清楚時，再把手機移近說話者。</p>
       </header>
 
       <section class="panel primary-panel" aria-labelledby="listen-title">
@@ -67,6 +67,31 @@
           <output id="android-preset-status" class="android-preset-status" aria-labelledby="quick-preset-title" hidden>自動（建議）</output>
           <button id="reset-preset" class="text-button" type="button">恢復自動</button>
           <span id="preset-hint"></span>
+        </div>
+
+        <div class="local-asr-controls" aria-label="語音辨識來源與本機模型">
+          <label for="stt-provider">語音辨識來源</label>
+          <select id="stt-provider">
+            <option value="gemini-live-transcribe">Gemini Live（預設）</option>
+            <option value="google-cloud-streaming">Google Cloud streaming</option>
+            <option value="browser-speech">Browser Speech</option>
+            <option value="edison-local-asr">Edison 本機 ASR（Beta）</option>
+          </select>
+          <div id="edison-model-controls" hidden>
+            <label for="edison-model">本機 ASR 模型</label>
+            <select id="edison-model">
+              <option value="breeze-asr-26-q5">Breeze-ASR-26 Q5</option>
+              <option value="qwen3-asr-1.7b-q8">Qwen3-ASR 1.7B Q8</option>
+              <option value="whisper-large-v3-turbo">Whisper large-v3-turbo</option>
+            </select>
+            <label for="edison-language">辨識語言提示</label>
+            <select id="edison-language">
+              <option value="auto">自動（台語／混語實驗）</option>
+              <option value="zh">華語提示</option>
+              <option value="en">英文提示</option>
+            </select>
+          </div>
+          <p id="edison-beta-note" hidden>本機分段字幕屬 Experimental。模型仍可能延遲或漏字；切換來源會重新載入頁面，不會自動轉送雲端。</p>
         </div>
 
         <p class="hint">
@@ -285,6 +310,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=20261119-stop-drain1"></script>
+    <script type="module" src="./main.js?v=20261128-edison-dispose-body1"></script>
   </body>
 </html>

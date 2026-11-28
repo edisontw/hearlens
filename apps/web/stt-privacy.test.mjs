@@ -17,6 +17,10 @@ test("pre-start privacy notice identifies the true configured provider", () => {
   assert.match(google, /語音代理/);
   assert.match(google, /Google Cloud/);
   assert.doesNotMatch(google, /Google Gemini/);
+  const edison = captionSttPrivacyNotice("edison-local-asr");
+  assert.match(edison, /短片段送至本機 Edison/);
+  assert.match(edison, /不會自動轉送雲端/);
+  assert.match(edison, /Experimental/);
   for (const unknown of [null, "", "future-provider"]) {
     assert.match(captionSttPrivacyNotice(unknown), /可能傳送至外部辨識服務/);
   }

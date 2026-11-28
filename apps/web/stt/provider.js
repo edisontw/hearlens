@@ -1,17 +1,22 @@
 import {
   BrowserSpeechProvider,
   browserSpeechSupported,
-} from "./providers/browser-speech.js?v=20261119-stop-drain1";
+} from "./providers/browser-speech.js?v=20261128-edison-dispose-body1";
 import { GeminiLiveTranscribeProvider } from
-  "./providers/gemini-live-transcribe.js?v=20261119-stop-drain1";
+  "./providers/gemini-live-transcribe.js?v=20261128-edison-dispose-body1";
 import { GoogleCloudStreamingProvider } from
-  "./providers/google-cloud-streaming.js?v=20261119-stop-drain1";
+  "./providers/google-cloud-streaming.js?v=20261128-edison-dispose-body1";
+import { EdisonLocalAsrProvider } from
+  "./providers/edison-local-asr.mjs?v=20261128-edison-dispose-body1";
+export { validateEdisonLocalSelection } from
+  "./providers/edison-local-asr.mjs?v=20261128-edison-dispose-body1";
 
 export const STT_PROVIDER_IDS = Object.freeze({
   AUTO: "auto",
   BROWSER: "browser-speech",
   GEMINI: "gemini-live-transcribe",
   GOOGLE: "google-cloud-streaming",
+  EDISON_LOCAL: "edison-local-asr",
 });
 
 // Resolve AUTO once so pre-capture disclosure and provider construction agree.
@@ -27,7 +32,10 @@ export function describeSttCapabilities() {
     browserSpeech: browserSpeechSupported(),
     geminiLiveTranscribeClient: true,
     googleCloudStreamingClient: true,
-    planned: ["openai-streaming", "local-taigi-breeze"],
+    edisonLocalBatch: true,
+    edisonLocalSegmented: true,
+    edisonLocalStreaming: false,
+    planned: ["openai-streaming", "native-taigi-evaluation"],
   };
 }
 
@@ -36,6 +44,9 @@ export function createSttProvider({
   language = "zh-TW",
   tokenUrl = "",
   websocketUrl = "",
+  edisonUrl = "http://127.0.0.1:8765",
+  edisonModel = "breeze-asr-26-q5",
+  edisonLanguageMode = "zh",
   inputGain = 1,
   inputMode = "adaptive",
   captureMode = "raw",
@@ -82,6 +93,20 @@ export function createSttProvider({
     return new GoogleCloudStreamingProvider({
       language: language === "zh-TW" ? "cmn-Hant-TW" : language,
       websocketUrl,
+      onPartial,
+      onFinal,
+      onStatus,
+      onError,
+      onDebug,
+    });
+  }
+
+  if (requested === STT_PROVIDER_IDS.EDISON_LOCAL) {
+    return new EdisonLocalAsrProvider({
+      endpoint: edisonUrl,
+      model: edisonModel,
+      language,
+      languageMode: edisonLanguageMode,
       onPartial,
       onFinal,
       onStatus,

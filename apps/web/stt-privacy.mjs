@@ -12,6 +12,8 @@ export function captionSttPrivacyNotice(provider) {
       return "開始後，語音會交由瀏覽器的辨識服務處理，可能使用雲端。請先告知對話者。";
     case "google-cloud-streaming":
       return "開始後，麥克風聲音會經由語音代理傳送至 Google Cloud 辨識。請先告知對話者。";
+    case "edison-local-asr":
+      return "開始後，語音會切成短片段送至本機 Edison 辨識；音檔與結果依 D:\\AIData 任務保留規則清理，不會自動轉送雲端。此本機字幕功能仍屬 Experimental。";
     default:
       return "開始後，語音可能傳送至外部辨識服務。請先告知對話者。";
   }
