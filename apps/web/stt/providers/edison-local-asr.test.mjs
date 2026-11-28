@@ -9,7 +9,7 @@ import {
   validateEdisonLocalEndpoint,
   validateEdisonLocalSelection,
 } from "./edison-local-asr.mjs";
-import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-segment-offset1";
+import { EdisonLocalAsrProvider } from "./edison-local-asr.mjs?v=20261128-edison-track-end1";
 import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS } from "../provider.js";
 
 test("Edison endpoint matches its configured IPv4 loopback listener", () => {
@@ -233,6 +233,73 @@ test("Edison local provider sends VAD-delimited microphone segments while listen
     assert.ok(statuses.some(value => value.state === "stopped"));
     assert.equal(stoppedTracks.count, 1);
   } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("an ended Edison microphone track fail-stops and releases the active capture", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let endedListener;
+  let stoppedTracks = 0;
+  let closedContexts = 0;
+  let resolveError;
+  const errorReceived = new Promise(resolve => { resolveError = resolve; });
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { return new FakeNode(); }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; closedContexts += 1; }
+  }
+  const track = {
+    readyState: "live",
+    addEventListener(type, listener) { if (type === "ended") endedListener = listener; },
+    removeEventListener(type, listener) { if (type === "ended" && endedListener === listener) endedListener = null; },
+    stop() { stoppedTracks += 1; this.readyState = "ended"; },
+  };
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [track] }) } },
+  });
+  globalThis.fetch = async url => url.endsWith("/health")
+    ? { ok: true }
+    : { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+  let provider;
+  const errors = [];
+  const statuses = [];
+  try {
+    provider = new EdisonLocalAsrProvider({
+      endpoint: "http://127.0.0.1:8765",
+      model: "breeze-asr-26-q5",
+      onError: value => { errors.push(value); resolveError(); },
+      onStatus: value => statuses.push(value),
+    });
+    await provider.start();
+    assert.equal(provider.active, true);
+    assert.equal(typeof endedListener, "function", "provider subscribes to the microphone track ended event");
+
+    track.readyState = "ended";
+    endedListener();
+    await errorReceived;
+
+    assert.equal(provider.active, false);
+    assert.equal(provider.fatalError, true);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].fatal, true);
+    assert.match(errors[0].message, /麥克風串流已中斷/);
+    assert.equal(stoppedTracks, 1);
+    assert.equal(closedContexts, 1);
+    assert.ok(statuses.some(value => value.state === "error"));
+  } finally {
+    await provider?.dispose();
     globalThis.fetch = previousFetch;
     globalThis.window = previousWindow;
     if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);

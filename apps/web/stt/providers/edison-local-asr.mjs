@@ -240,6 +240,7 @@ export class EdisonLocalAsrProvider {
     this.active = false;
     this.stopping = false;
     this.stream = null;
+    this.trackEndListeners = [];
     this.audioContext = null;
     this.sourceNode = null;
     this.processorNode = null;
@@ -383,6 +384,19 @@ export class EdisonLocalAsrProvider {
       };
       this.captureStartedAt = Date.now();
       this.active = true;
+      for (const track of stream.getTracks?.() ?? []) {
+        if (typeof track.addEventListener !== "function") continue;
+        const listener = () => {
+          if (generation !== this.generation || !this.active || this.stopping) return;
+          void this.fail("microphone-track-ended",
+            "本機麥克風串流已中斷，Edison 收音已停止；請確認麥克風後重新開始。", true);
+        };
+        track.addEventListener("ended", listener, { once: true });
+        this.trackEndListeners.push({ track, listener });
+      }
+      if ((stream.getTracks?.() ?? []).some(track => track.readyState === "ended")) {
+        throw new Error("本機麥克風串流已中斷，請確認麥克風後重新開始。");
+      }
       this.sourceNode.connect(this.processorNode);
       this.processorNode.connect(this.zeroGainNode);
       this.zeroGainNode.connect(context.destination);
@@ -438,6 +452,9 @@ export class EdisonLocalAsrProvider {
     }
     this.sourceNode = null;
     this.zeroGainNode = null;
+    for (const { track, listener } of this.trackEndListeners.splice(0)) {
+      try { track.removeEventListener?.("ended", listener); } catch { /* track already ended */ }
+    }
     const stream = this.stream;
     this.stream = null;
     for (const track of stream?.getTracks?.() ?? []) track.stop();

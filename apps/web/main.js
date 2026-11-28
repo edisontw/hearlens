@@ -1,15 +1,15 @@
-import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261128-edison-segment-offset1";
-import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261128-edison-segment-offset1";
-import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261128-edison-segment-offset1";
-import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261128-edison-segment-offset1";
-import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261128-edison-segment-offset1";
-import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261128-edison-segment-offset1";
-import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261128-edison-segment-offset1";
+import { createCaptionNoTextMonitor } from "./caption-stt-health.mjs?v=20261128-edison-track-end1";
+import { stopCaptionProviderSafely, disposeCaptionResourcesSafely } from "./caption-stop.mjs?v=20261128-edison-track-end1";
+import { SESSION_REVIEW_PAGE_SIZE, sessionReviewWindow } from "./transcript-review.mjs?v=20261128-edison-track-end1";
+import { captionSttPrivacyNotice } from "./stt-privacy.mjs?v=20261128-edison-track-end1";
+import { createCaptionFocusMode } from "./caption-focus.mjs?v=20261128-edison-track-end1";
+import { shouldFollowCaptionScroll, preserveCaptionScrollOnLayoutChange } from "./caption-scroll.mjs?v=20261128-edison-track-end1";
+import { createCaptionScreenWakeLock } from "./caption-screen-wake-lock.mjs?v=20261128-edison-track-end1";
 import {
   assertCaptionSessionCurrent,
   shouldInterruptForPageEvent,
 } from "./caption-lifecycle.mjs?v=20261013-mobile-lifecycle1";
-import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS, validateEdisonLocalSelection } from "./stt/provider.js?v=20261128-edison-segment-offset1";
+import { createSttProvider, describeSttCapabilities, resolveSttProviderId, STT_PROVIDER_IDS, validateEdisonLocalSelection } from "./stt/provider.js?v=20261128-edison-track-end1";
 import {
   ensureTaiwanTraditionalDisplay,
   toTaiwanTraditional,
@@ -21,7 +21,7 @@ import {
   recentTranscriptText,
   completeSessionTranscriptText,
   relativeTranscriptTime,
-} from "./transcript-window.mjs?v=20261128-edison-segment-offset1";
+} from "./transcript-window.mjs?v=20261128-edison-track-end1";
 import {
   CAPTION_SIZE_LEVELS,
   captionSizePixels,
@@ -42,14 +42,14 @@ import {
   isAndroidPlatform,
   parseCaptureOverride,
   resolveQuickPreset,
-} from "./stt/providers/quick-presets.mjs?v=20261128-edison-segment-offset1";
+} from "./stt/providers/quick-presets.mjs?v=20261128-edison-track-end1";
 import {
   clearAdvancedTuningParams,
   resolveAdvancedTuning,
   writeAdvancedTuningParams,
 } from "./stt/providers/tuning-profile.mjs?v=20261008-stop-flush1";
 
-const BUILD_ID = "20261128-edison-segment-offset1";
+const BUILD_ID = "20261128-edison-track-end1";
 const DEFAULT_GEMINI_TOKEN_URL = "https://edison.pepepow.net/token";
 const ROLLING_WINDOW_MS = 30_000;
 const CAPTION_REFRESH_MS = 1_000;
