@@ -26,6 +26,7 @@ Supported models are `whisper-large-v3-turbo`, `qwen3-asr-1.7b-q8`, and `breeze-
 - The browser microphone prompt appears before capture. The page’s notice explains that the recording is sent to the same computer’s Edison service after Stop. Get consent from people being recorded.
 - Stop during startup invalidates the provider generation and aborts health/model checks. If a pending browser permission request returns a stream later, its tracks are stopped before an audio context or listening state is created.
 - Disposing a session invalidates its generation, aborts any in-flight transcription request, and waits for the request queue to settle before cleanup resolves; a late response from that generation cannot emit captions after restart.
+- A transcription request failure stops the current capture and requires an explicit restart; the adapter does not auto-retry or switch to cloud ASR. After Edison recovers, a new start checks service/model state again and begins a fresh caption generation.
 - Do not use this adapter from a phone. A phone’s `127.0.0.1` would be the phone itself, and this API has no remote authentication or HTTPS gateway.
 - Local TTS, Taiwanese Hokkien accuracy, mobile access, and low-latency streaming are outside this adapter’s verified scope.
 

@@ -400,3 +400,98 @@ test("dispose drains an aborted generation before restart and ignores its late t
     else delete globalThis.navigator;
   }
 });
+
+test("a failed local request fail-stops without retry, then an explicit restart recovers cleanly", async () => {
+  const previousWindow = globalThis.window;
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const previousFetch = globalThis.fetch;
+  let transcriptionCalls = 0;
+  let getUserMediaCalls = 0;
+  let stoppedTracks = 0;
+  let closedContexts = 0;
+  class FakeNode { connect() {} disconnect() {} }
+  class FakeAudioContext {
+    constructor() { this.sampleRate = 16_000; this.state = "running"; }
+    createMediaStreamSource() { return new FakeNode(); }
+    createScriptProcessor() { return new FakeNode(); }
+    createGain() { return Object.assign(new FakeNode(), { gain: { value: 1 } }); }
+    async resume() {}
+    async close() { this.state = "closed"; closedContexts += 1; }
+  }
+  globalThis.window = { location: { href: "http://localhost:8080/" }, AudioContext: FakeAudioContext, setTimeout, clearTimeout };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => {
+      getUserMediaCalls += 1;
+      return { getTracks: () => [{ stop: () => { stoppedTracks += 1; } }] };
+    } } },
+  });
+  globalThis.fetch = async (url) => {
+    if (url.endsWith("/health")) return { ok: true };
+    if (url.endsWith("/api/v1/asr/status")) {
+      return { ok: true, json: async () => ({ status: "available", active_model_id: "breeze-asr-26-q5" }) };
+    }
+    if (url.endsWith("/v1/audio/transcriptions")) {
+      transcriptionCalls += 1;
+      if (transcriptionCalls === 1) {
+        return { ok: true, json: async () => ({ text: "上一段字幕", segments: [{ start: 0, end: 1, text: "上一段字幕" }] }) };
+      }
+      if (transcriptionCalls === 2) {
+        return { ok: false, json: async () => ({ detail: "Edison 本機服務正在重新啟動" }) };
+      }
+      return { ok: true, json: async () => ({ text: "上一段字幕與新內容", segments: [{ start: 0, end: 1, text: "上一段字幕與新內容" }] }) };
+    }
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const finals = [];
+  const errors = [];
+  try {
+    const provider = new EdisonLocalAsrProvider({
+      endpoint: "http://127.0.0.1:8765",
+      model: "breeze-asr-26-q5",
+      onFinal: value => finals.push(value),
+      onError: value => errors.push(value),
+    });
+    const queueSegment = text => provider.pendingSegments.push({
+      chunks: [new Float32Array([0.25, 0.5])],
+      duration: 2 / 16_000,
+      timestamp: 1234 + text.length,
+    });
+
+    await provider.start();
+    queueSegment("first");
+    await provider.drainQueue();
+    assert.deepEqual(finals.map(item => item.text), ["上一段字幕"]);
+
+    queueSegment("failure");
+    await provider.drainQueue();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(transcriptionCalls, 2, "a failed segment is not automatically retried");
+    assert.equal(provider.active, false);
+    assert.equal(provider.fatalError, true);
+    assert.equal(provider.pendingSegments.length, 0);
+    assert.equal(stoppedTracks, 1, "the failed session releases its capture");
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].fatal, true);
+    assert.match(errors[0].message, /正在重新啟動/);
+
+    await provider.start();
+    assert.equal(provider.active, true);
+    queueSegment("recovered");
+    await provider.drainQueue();
+    assert.deepEqual(finals.map(item => item.text), ["上一段字幕", "上一段字幕與新內容"],
+      "the new session does not deduplicate against the prior session's transcript");
+    assert.equal(transcriptionCalls, 3);
+    assert.equal(getUserMediaCalls, 2, "capture resumes only after explicit start");
+    assert.equal(errors.length, 1, "recovery does not erase the prior failure evidence");
+
+    await provider.dispose();
+    assert.equal(stoppedTracks, 2);
+    assert.equal(closedContexts, 2);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window = previousWindow;
+    if (previousNavigator) Object.defineProperty(globalThis, "navigator", previousNavigator);
+    else delete globalThis.navigator;
+  }
+});
